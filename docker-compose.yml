@@ -1,0 +1,60 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dacentric-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dacentric}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dacentric}
+      POSTGRES_DB: ${POSTGRES_DB:-dacentric_workflow}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - dacentric_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dacentric}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: dacentric-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dacentric}:${POSTGRES_PASSWORD:-dacentric}@postgres:5432/${POSTGRES_DB:-dacentric_workflow}?schema=public
+      PORT: 4000
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change-me-access-secret-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh-secret-change-me}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:5173}
+    ports:
+      - "4000:4000"
+    volumes:
+      - dacentric_uploads:/app/apps/api/uploads
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:4000/api}
+    container_name: dacentric-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+
+volumes:
+  dacentric_pg_data:
+  dacentric_uploads:

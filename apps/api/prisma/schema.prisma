@@ -1,0 +1,790 @@
+// ---------------------------------------------------------------------------
+// DaCentric Workflow Module — Prisma schema
+// PostgreSQL. UUID primary keys, soft-deletion where the requirements call
+// for history preservation, immutable audit_logs (append-only, enforced in
+// the service layer — no update/delete path is exposed for that model).
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Platform / identity (shared shape used by CRM, ERP, HRMS and Workflow)
+// ---------------------------------------------------------------------------
+
+enum AccountStatus {
+  PENDING_ACTIVATION
+  ACTIVE
+  LOCKED
+  DEACTIVATED
+}
+
+enum RoleCode {
+  SUPER_ADMIN
+  SYSTEM_ADMIN
+  CEO_DIRECTOR
+  MANAGER
+  HR
+  TEAM_LEAD
+  TEAM_MEMBER
+}
+
+enum ModuleCode {
+  CRM
+  ERP
+  HRMS
+  WORKFLOW
+}
+
+enum PermissionKey {
+  LOGIN
+  VIEW_WORKFLOW
+  CREATE_BOARD
+  EDIT_BOARD
+  ARCHIVE_DELETE_BOARD
+  CONFIGURE_STAGES
+  MANAGE_BOARD_MEMBERS
+  CREATE_TASK
+  EDIT_TASK
+  DELETE_TASK
+  ASSIGN_TASK
+  MOVE_TASK
+  MANAGE_TASK_COLLAB
+  VIEW_TEAM_WORKLOAD
+  APPROVE_TASK
+  CRM_ERP_LINKING
+  EXPORT
+  VIEW_AUDIT_TRAIL
+  MANAGE_ROLES
+  MANAGE_USERS
+  VIEW_TIME_LOGS
+  MANAGE_TICKETS
+}
+
+enum PermissionScope {
+  NONE
+  OWN
+  TEAM
+  ALL
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teams     Team[]
+  employees Employee[]
+}
+
+model Team {
+  id           String   @id @default(uuid())
+  name         String
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  managerId    String?
+  manager      Employee?   @relation("TeamManager", fields: [managerId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  members Employee[] @relation("TeamMembers")
+
+  @@index([departmentId])
+}
+
+/// The HRMS employee record. Users (accounts) optionally link to one.
+model Employee {
+  id           String    @id @default(uuid())
+  employeeCode String    @unique
+  fullName     String
+  workEmail    String    @unique
+  jobTitle     String?
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  teamId       String?
+  team         Team?     @relation("TeamMembers", fields: [teamId], references: [id])
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  managedTeams Team[]    @relation("TeamManager")
+  user         User?
+  leaveRequests LeaveRequest[]
+
+  @@index([departmentId])
+  @@index([teamId])
+}
+
+/// The single platform account. One login serves CRM/ERP/HRMS/Workflow.
+model User {
+  id                  String        @id @default(uuid())
+  name                String
+  workEmail           String        @unique
+  passwordHash        String?
+  avatarStorageKey    String?
+  status              AccountStatus @default(PENDING_ACTIVATION)
+  employeeId          String?       @unique
+  employee            Employee?     @relation(fields: [employeeId], references: [id])
+  failedLoginAttempts Int           @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  moduleAccess        ModuleCode[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  createdById         String?
+
+  roles                UserRole[]
+  invitations          Invitation[]
+  passwordResets       PasswordReset[]
+  sessions             Session[]
+  boardMemberships     BoardMember[]
+  ownedBoards          Board[]              @relation("BoardCreatedBy")
+  createdTasks         Task[]               @relation("TaskCreatedBy")
+  taskAssignments      TaskAssignee[]
+  taskWatching         TaskWatcher[]
+  comments             Comment[]
+  notifications        Notification[]
+  notificationPrefs    NotificationPreference[]
+  auditLogs            AuditLog[]
+  checklistOwnerOf     ChecklistItem[]      @relation("ChecklistItemOwner")
+  uploadedAttachments  TaskAttachment[]
+  approvalsAsApprover  TaskApproval[]       @relation("ApprovalApprover")
+  approvalsDecided     TaskApproval[]       @relation("ApprovalDecidedBy")
+  workSessions         WorkSession[]
+  createdTickets       SupportTicket[]      @relation("TicketCreatedBy")
+  uploadedTicketFiles  TicketAttachment[]   @relation("TicketAttachmentUploader")
+
+  @@index([status])
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  code        RoleCode @unique
+  name        String
+  description String?
+  isSystem    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  id         String          @id @default(uuid())
+  roleId     String
+  role       Role            @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module     ModuleCode      @default(WORKFLOW)
+  permission PermissionKey
+  scope      PermissionScope @default(NONE)
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([roleId, module, permission])
+}
+
+model Invitation {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  invitedById String?
+
+  @@index([userId])
+}
+
+model PasswordReset {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String @unique
+  userAgent    String?
+  ipAddress    String?
+  lastActiveAt DateTime @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+// One continuous stretch of active work time. A "pause" (browser tab hidden /
+// screen locked) closes the open segment by setting endedAt; "resume" opens a
+// new one. Day/week/month totals are the sum of each segment's overlap with
+// that period, so a segment spanning midnight is split correctly across days.
+model WorkSession {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  // Bumped by a periodic client heartbeat while a segment is open. A gap
+  // between now and lastHeartbeatAt bigger than the stale threshold means
+  // the machine was actually asleep or the browser died — the segment gets
+  // closed at lastHeartbeatAt (not now) so that gap is excluded from the
+  // tracked total, and a fresh segment starts. Ordinary tab-switching or
+  // backgrounding never produces a gap this large, so it never pauses.
+  lastHeartbeatAt DateTime @default(now())
+  createdAt      DateTime  @default(now())
+
+  @@index([userId, startedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Boards
+// ---------------------------------------------------------------------------
+
+enum BoardType {
+  STANDALONE
+  LINKED
+}
+
+enum LinkedRecordType {
+  CUSTOMER
+  LEAD
+  ORDER
+  INVOICE
+}
+
+model BoardTemplate {
+  id              String   @id @default(uuid())
+  name            String   @unique
+  description     String?
+  isSystem        Boolean  @default(false)
+  stageDefinition Json     // [{ name, color, wipLimit }]
+  checklistTemplate Json?  // [{ title }]
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  boardsCreatedFrom Board[]
+}
+
+model Board {
+  id              String     @id @default(uuid())
+  name            String
+  description     String?
+  boardType       BoardType  @default(STANDALONE)
+  linkedRecordType LinkedRecordType?
+  linkedRecordId  String?
+  linkedRecord    LinkedRecord? @relation(fields: [linkedRecordId], references: [id])
+  templateId      String?
+  template        BoardTemplate? @relation(fields: [templateId], references: [id])
+  isArchived      Boolean    @default(false)
+  archivedAt      DateTime?
+  isDeleted       Boolean    @default(false)
+  deletedAt       DateTime?
+  createdById     String
+  createdBy       User       @relation("BoardCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  version         Int        @default(1)
+
+  stages    BoardStage[]
+  members   BoardMember[]
+  tasks     Task[]
+  tags      TagOnBoard[]
+
+  @@index([boardType])
+  @@index([linkedRecordId])
+  @@index([isArchived, isDeleted])
+}
+
+model BoardStage {
+  id        String   @id @default(uuid())
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  name      String
+  color     String   @default("#6366f1")
+  position  Int
+  wipLimit  Int?
+  isTerminal Boolean @default(false) // "Done"-type stage that triggers approval gate
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks Task[]
+
+  @@unique([boardId, position])
+  @@index([boardId])
+}
+
+model BoardMember {
+  id        String          @id @default(uuid())
+  boardId   String
+  board     Board           @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String          @default("EDITOR") // Owner | Editor | Viewer | Commenter
+  addedAt   DateTime        @default(now())
+
+  @@unique([boardId, userId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Tags
+// ---------------------------------------------------------------------------
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#64748b")
+  createdById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks  TagOnTask[]
+  boards TagOnBoard[]
+}
+
+model TagOnTask {
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+}
+
+model TagOnBoard {
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tagId   String
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([boardId, tagId])
+}
+
+// ---------------------------------------------------------------------------
+// CRM/ERP linked records — mock/demo data behind an integration interface
+// ---------------------------------------------------------------------------
+
+model LinkedRecord {
+  id         String           @id @default(uuid())
+  recordType LinkedRecordType
+  externalRef String          @unique // e.g. CUST-0001, LEAD-0002, ORD-0003, INV-0004
+  name       String
+  summary    String?
+  createdAt  DateTime         @default(now())
+
+  boards Board[]
+  tasks  TaskLinkedRecord[]
+}
+
+model TaskLinkedRecord {
+  id             String       @id @default(uuid())
+  taskId         String       @unique
+  task           Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  linkedRecordId String
+  linkedRecord   LinkedRecord @relation(fields: [linkedRecordId], references: [id])
+  createdAt      DateTime     @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Tasks
+// ---------------------------------------------------------------------------
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskApprovalStatus {
+  NONE
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum TaskType {
+  STANDARD
+  RECURRING_INSTANCE
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum RecurrenceEndType {
+  NEVER
+  AFTER_N
+  ON_DATE
+}
+
+enum DependencyType {
+  BLOCKED_BY
+  BLOCKS
+}
+
+model RecurringTaskSeries {
+  id              String               @id @default(uuid())
+  boardId         String
+  frequency       RecurrenceFrequency
+  customRuleJson  Json?                // for CUSTOM frequency, e.g. { intervalDays: 10 }
+  endType         RecurrenceEndType    @default(NEVER)
+  occurrencesLimit Int?
+  endDate         DateTime?
+  occurrencesGenerated Int             @default(0)
+  nextRunAt       DateTime?
+  isActive        Boolean              @default(true)
+  taskTemplate    Json                 // snapshot of title/description/priority/checklist/etc used to spawn instances
+  createdById     String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tasks Task[]
+}
+
+model Task {
+  id               String              @id @default(uuid())
+  taskNumber       Int                 @unique @default(autoincrement())
+  taskId           String              @unique // formatted WF-000001, generated from taskNumber
+  title            String
+  description      String?             // rich text stored as sanitized HTML
+  boardId          String
+  board            Board               @relation(fields: [boardId], references: [id])
+  stageId          String
+  stage            BoardStage          @relation(fields: [stageId], references: [id])
+  priority         TaskPriority        @default(MEDIUM)
+  startDate        DateTime?
+  dueDate          DateTime?
+  estimatedEffortHours Float?
+  createdById      String
+  createdBy        User                @relation("TaskCreatedBy", fields: [createdById], references: [id])
+
+  taskType         TaskType            @default(STANDARD)
+  seriesId         String?
+  series           RecurringTaskSeries? @relation(fields: [seriesId], references: [id])
+
+  requiresApproval Boolean             @default(false)
+  approverUserId   String?
+  approvalStatus   TaskApprovalStatus  @default(NONE)
+  previousStageId  String?             // remembered so a rejection returns the task here
+
+  dependencyEnforced Boolean           @default(true)
+
+  isCompleted      Boolean             @default(false)
+  completedAt      DateTime?
+
+  isDeleted        Boolean             @default(false)
+  deletedAt        DateTime?
+
+  version          Int                 @default(1)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  assignees        TaskAssignee[]
+  watchers         TaskWatcher[]
+  checklistItems   ChecklistItem[]
+  attachments      TaskAttachment[]
+  tags             TagOnTask[]
+  comments         Comment[]
+  linkedRecord     TaskLinkedRecord?
+  approvals        TaskApproval[]
+  blockingLinks    TaskDependency[]    @relation("DependencySource")
+  blockedByLinks   TaskDependency[]    @relation("DependencyTarget")
+
+  @@index([boardId])
+  @@index([stageId])
+  @@index([dueDate])
+  @@index([isDeleted])
+  @@index([seriesId])
+}
+
+model TaskAssignee {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isPrimary Boolean  @default(false)
+  assignedAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@index([userId])
+}
+
+model TaskWatcher {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt   DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@index([userId])
+}
+
+model ChecklistItem {
+  id         String   @id @default(uuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  text       String
+  isComplete Boolean  @default(false)
+  completedAt DateTime?
+  ownerId    String?
+  owner      User?    @relation("ChecklistItemOwner", fields: [ownerId], references: [id])
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([taskId])
+}
+
+model TaskAttachment {
+  id           String   @id @default(uuid())
+  taskId       String
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileName     String
+  storageKey   String
+  mimeType     String
+  fileSizeBytes Int
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  scanStatus   String   @default("CLEAN") // PENDING | CLEAN | REJECTED (storage-scan abstraction)
+  createdAt    DateTime @default(now())
+
+  @@index([taskId])
+}
+
+model TaskDependency {
+  id             String         @id @default(uuid())
+  type           DependencyType
+  sourceTaskId   String
+  sourceTask     Task           @relation("DependencySource", fields: [sourceTaskId], references: [id], onDelete: Cascade)
+  targetTaskId   String
+  targetTask     Task           @relation("DependencyTarget", fields: [targetTaskId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+
+  @@unique([sourceTaskId, targetTaskId, type])
+  @@index([targetTaskId])
+}
+
+model TaskApproval {
+  id            String    @id @default(uuid())
+  taskId        String
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  approverId    String
+  approver      User      @relation("ApprovalApprover", fields: [approverId], references: [id])
+  requestedAt   DateTime  @default(now())
+  decision      String?   // APPROVED | REJECTED
+  decidedById   String?
+  decidedBy     User?     @relation("ApprovalDecidedBy", fields: [decidedById], references: [id])
+  decidedAt     DateTime?
+  rejectionReason String?
+
+  @@index([taskId])
+  @@index([approverId])
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+  body       String
+  mentionedUserIds String[] @default([])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([taskId])
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+enum NotificationEvent {
+  TASK_ASSIGNED
+  TASK_REASSIGNED
+  TASK_DUE_TODAY
+  TASK_OVERDUE
+  MENTION
+  APPROVAL_REQUESTED
+  APPROVAL_APPROVED
+  APPROVAL_REJECTED
+  TASK_ACTIVITY
+  CHECKLIST_ASSIGNED
+  ACCOUNT_LOCKED
+}
+
+model Notification {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     NotificationEvent
+  title     String
+  body      String?
+  taskId    String?
+  boardId   String?
+  isRead    Boolean           @default(false)
+  readAt    DateTime?
+  createdAt DateTime          @default(now())
+
+  @@index([userId, isRead])
+}
+
+model NotificationPreference {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     NotificationEvent
+  inApp     Boolean           @default(true)
+  email     Boolean           @default(true)
+
+  @@unique([userId, event])
+}
+
+// ---------------------------------------------------------------------------
+// Audit trail — append only. No update/delete is ever exposed by the service.
+// ---------------------------------------------------------------------------
+
+enum AuditAction {
+  CREATE
+  EDIT
+  DELETE
+  MOVE
+  ASSIGN
+  APPROVE
+  REJECT
+  ARCHIVE
+  LOGIN
+  LOGIN_FAILED
+  LOCK
+  ACTIVATE
+  DEACTIVATE
+}
+
+model AuditLog {
+  id          String       @id @default(uuid())
+  userId      String?
+  user        User?        @relation(fields: [userId], references: [id])
+  actorName   String       // denormalized snapshot in case the user is later deactivated/removed
+  action      AuditAction
+  module      ModuleCode   @default(WORKFLOW)
+  entityType  String       // "Board" | "Task" | "User" | "Role" | ...
+  entityId    String?
+  boardId     String?
+  field       String?
+  beforeValue Json?
+  afterValue  Json?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+
+  @@index([entityType, entityId])
+  @@index([boardId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// HRMS — minimal leave module, only what UC-12 needs to exist as an
+// integration point ("View current workload" from the leave-approval screen).
+// ---------------------------------------------------------------------------
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model LeaveRequest {
+  id          String      @id @default(uuid())
+  employeeId  String
+  employee    Employee    @relation(fields: [employeeId], references: [id])
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?
+  status      LeaveStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  decidedAt   DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Support tickets — any user can raise one; System Admin / Super Admin
+// (MANAGE_TICKETS) triage and resolve them. Screenshot attachments are
+// optional, reusing the same StorageAdapter as avatars/task attachments.
+// ---------------------------------------------------------------------------
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id             String       @id @default(uuid())
+  ticketNumber   Int          @unique @default(autoincrement())
+  ticketId       String       @unique // formatted TKT-000001, generated from ticketNumber
+  title          String
+  description    String
+  status         TicketStatus @default(OPEN)
+  priority       TaskPriority @default(MEDIUM)
+  createdById    String
+  createdBy      User         @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  resolutionNote String?
+  resolvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  attachments TicketAttachment[]
+
+  @@index([status])
+  @@index([createdById])
+}
+
+model TicketAttachment {
+  id            String        @id @default(uuid())
+  ticketId      String
+  ticket        SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fileName      String
+  storageKey    String
+  mimeType      String
+  fileSizeBytes Int
+  uploadedById  String
+  uploadedBy    User          @relation("TicketAttachmentUploader", fields: [uploadedById], references: [id])
+  createdAt     DateTime      @default(now())
+
+  @@index([ticketId])
+}

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "lib": ["ES2021"],
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@dacentric/types": ["../../packages/types/src/index.ts"],
+      "@dacentric/types/*": ["../../packages/types/src/*"]
+    },
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitAny": true,
+    "types": ["node", "jest"]
+  },
+  "include": ["src", "prisma", "tests", "esbuild.config.js"],
+  "exclude": ["node_modules", "dist"]
+}

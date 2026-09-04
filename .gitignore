@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Env files (never commit real secrets)
+.env
+.env.*
+!.env.example
+apps/api/.env
+apps/web/.env
+
+# Build output
+dist/
+apps/web/dist/
+apps/api/dist/
+
+# Uploaded files (local dev storage — production uses S3)
+apps/api/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Prisma
+apps/api/prisma/dev.db
+
+# Test coverage
+coverage/
