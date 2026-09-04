@@ -1,4 +1,5 @@
 FROM node:20-alpine AS build
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY apps/api/package.json apps/api/package.json
@@ -11,6 +12,7 @@ RUN npx prisma generate
 RUN npm run build
 
 FROM node:20-alpine AS runtime
+RUN apk add --no-cache openssl
 WORKDIR /app/apps/api
 ENV NODE_ENV=production
 COPY --from=build /app/apps/api/dist ./dist
