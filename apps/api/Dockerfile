@@ -19,4 +19,4 @@ COPY --from=build /app/apps/api/dist ./dist
 COPY --from=build /app/apps/api/prisma ./prisma
 COPY --from=build /app/node_modules ../../node_modules
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss --skip-generate && node dist/server.js"]
