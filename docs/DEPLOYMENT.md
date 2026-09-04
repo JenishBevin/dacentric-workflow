@@ -20,7 +20,7 @@ Copy `.env.example` to `.env` and change **every** value marked `change-me`, plu
 - `API_PUBLIC_URL`, `WEB_PUBLIC_URL` — your real domains (used in email links and CORS)
 - `EMAIL_PROVIDER=smtp` plus `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`/`SMTP_FROM` — the console adapter is dev-only
 - `STORAGE_PROVIDER=s3` plus `S3_BUCKET`/`S3_REGION`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`/`S3_ENDPOINT` — local disk storage does not survive container replacement or scale past one instance
-- `VITE_API_BASE_URL` — baked into the frontend build (passed as a Docker build arg in `docker-compose.yml`), so it must be set **before** building the `web` image, not just at runtime
+- `VITE_API_BASE_URL` — read by the `web` container **at startup**, not baked into the build: the nginx image's `/docker-entrypoint.d/` hook (`apps/web/docker-entrypoint.d/40-write-env-config.sh`) writes it into a small `env-config.js` file every time the container boots, so the same image can be deployed against any API URL without a rebuild. Set it as a normal runtime env var on the `web` service. (The Docker build arg of the same name in `docker-compose.yml` still exists as a local-dev-only fallback if the runtime var is ever unset.)
 
 Never commit the resulting `.env` file.
 

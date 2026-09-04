@@ -16,6 +16,7 @@ import {
   Contact,
   ClipboardList,
   Ticket as TicketIcon,
+  Activity,
   X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -60,6 +61,7 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
     { to: "/settings/roles", label: "Roles & Permissions", icon: Shield, visible: can(user, "MANAGE_ROLES", "ALL") },
     { to: "/settings/tags", label: "Tags", icon: Tags, visible: true },
     { to: "/settings/notifications", label: "Notifications", icon: Bell, visible: true },
+    { to: "/workflow/activity", label: "Recent Activity", icon: Activity, visible: true },
     { to: "/settings/audit", label: "Audit Trail", icon: History, visible: can(user, "VIEW_AUDIT_TRAIL") },
   ];
 

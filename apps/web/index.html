@@ -10,6 +10,10 @@
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased">
     <div id="root"></div>
+    <!-- Populated at container startup from the runtime VITE_API_BASE_URL env
+         var (see apps/web/Dockerfile's entrypoint) — lets a single Docker
+         image be deployed against different API URLs without rebuilding. -->
+    <script src="/env-config.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

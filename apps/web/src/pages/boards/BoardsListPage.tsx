@@ -19,7 +19,9 @@ export default function BoardsListPage() {
   const { push } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("search") ?? "");
-  const [scope, setScope] = useState(() => (searchParams.get("search") ? "ALL" : "MY"));
+  // Org-wide viewers (CEO/Director, System/Super Admin — anyone with VIEW_WORKFLOW:ALL)
+  // default to seeing every board, not just ones they happen to be an explicit member of.
+  const [scope, setScope] = useState(() => (searchParams.get("search") || can(user, "VIEW_WORKFLOW", "ALL") ? "ALL" : "MY"));
   const [newBoardOpen, setNewBoardOpen] = useState(() => searchParams.get("newBoard") === "1");
   const [pendingDelete, setPendingDelete] = useState<Board | null>(null);
 
@@ -45,7 +47,9 @@ export default function BoardsListPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">Boards</h1>
-          <p className="text-sm text-slate-500">Every board you're a member of, in one place.</p>
+          <p className="text-sm text-slate-500">
+            {can(user, "VIEW_WORKFLOW", "ALL") ? "Every board across the organization." : "Every board you're a member of, in one place."}
+          </p>
         </div>
         {canCreate && (
           <Button onClick={() => setNewBoardOpen(true)}>

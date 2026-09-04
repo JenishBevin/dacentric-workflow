@@ -32,6 +32,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   "my-tasks": "My Tasks",
   team: "Team Workload",
   "time-logs": "Time Logs",
+  activity: "Recent Activity",
   settings: "Settings",
   profile: "My Profile",
   employees: "Employees",

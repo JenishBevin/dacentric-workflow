@@ -1,29 +1,35 @@
 import { prisma } from "../../lib/prisma";
 import { Errors } from "../../common/errors";
 import { AuthedUser } from "../../middleware/authenticate";
-import { isSystemLevelAdmin } from "../../common/permissions";
+import { isSystemLevelAdmin, getPermissionScope } from "../../common/permissions";
+import { PermissionKey } from "@dacentric/types";
 
 export type BoardRole = "OWNER" | "EDITOR" | "VIEWER" | "COMMENTER" | null;
+
+/** Anyone whose effective VIEW_WORKFLOW scope is org-wide (e.g. CEO/Director),
+ *  not just the hardcoded System/Super Admin roles — Section 5's RBAC matrix
+ *  is the source of truth for *visibility*, not a fixed role list. */
+function hasOrgWideViewScope(user: AuthedUser): boolean {
+  return getPermissionScope(user.permissions, PermissionKey.VIEW_WORKFLOW) === "ALL";
+}
 
 /**
  * Business Rule 16 / Section 36: a user who is not a member of a board must
  * never be able to discover it through any list, search, filter or export —
- * except System Administrator, who can always see every board. This helper
- * is the single choke point every board/task query routes through.
+ * except System Administrator (full OWNER-equivalent access) or anyone with
+ * org-wide VIEW_WORKFLOW (read-only VIEWER-equivalent access, since that
+ * scope grants visibility, not board/task configuration authority). This
+ * helper is the single choke point every board/task query routes through.
  */
 export async function getBoardRole(boardId: string, user: AuthedUser): Promise<BoardRole> {
-  if (isSystemLevelAdmin(user.roles)) {
-    // Admin can access any board; treat as OWNER-equivalent for permission checks,
-    // but this does not silently add them as a member record.
-    const membership = await prisma.boardMember.findUnique({
-      where: { boardId_userId: { boardId, userId: user.id } },
-    });
-    return (membership?.role as BoardRole) ?? "OWNER";
-  }
   const membership = await prisma.boardMember.findUnique({
     where: { boardId_userId: { boardId, userId: user.id } },
   });
-  return (membership?.role as BoardRole) ?? null;
+  if (membership) return membership.role as BoardRole;
+
+  if (isSystemLevelAdmin(user.roles)) return "OWNER";
+  if (hasOrgWideViewScope(user)) return "VIEWER";
+  return null;
 }
 
 export async function assertBoardVisible(boardId: string, user: AuthedUser) {
@@ -48,9 +54,9 @@ export function canComment(role: BoardRole) {
   return role === "OWNER" || role === "EDITOR" || role === "COMMENTER";
 }
 
-/** Base Prisma `where` clause enforcing board-membership visibility (or Admin-sees-all). */
+/** Base Prisma `where` clause enforcing board-membership visibility (or org-wide-visibility-sees-all). */
 export function visibleBoardsWhere(user: AuthedUser) {
-  if (isSystemLevelAdmin(user.roles)) {
+  if (isSystemLevelAdmin(user.roles) || hasOrgWideViewScope(user)) {
     return { isDeleted: false };
   }
   return {

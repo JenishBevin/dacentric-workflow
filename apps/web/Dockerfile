@@ -12,4 +12,6 @@ RUN npm run build
 FROM nginx:alpine AS runtime
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/web/docker-entrypoint.d/40-write-env-config.sh /docker-entrypoint.d/40-write-env-config.sh
+RUN chmod +x /docker-entrypoint.d/40-write-env-config.sh
 EXPOSE 80

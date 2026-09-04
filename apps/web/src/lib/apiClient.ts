@@ -1,6 +1,16 @@
 import axios, { AxiosError } from "axios";
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api";
+declare global {
+  interface Window {
+    __RUNTIME_CONFIG__?: { VITE_API_BASE_URL?: string };
+  }
+}
+
+// Runtime value (injected into env-config.js at container startup) wins when
+// present, so one Docker image can be deployed against any API URL without a
+// rebuild; the Vite build-time value and localhost are just dev-time fallbacks.
+export const API_BASE_URL =
+  window.__RUNTIME_CONFIG__?.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
 const TOKEN_STORAGE_KEY = "dacentric_access_token";
 
