@@ -12,6 +12,7 @@ apps/web/.env
 dist/
 apps/web/dist/
 apps/api/dist/
+*.tsbuildinfo
 
 # Uploaded files (local dev storage — production uses S3)
 apps/api/uploads/
