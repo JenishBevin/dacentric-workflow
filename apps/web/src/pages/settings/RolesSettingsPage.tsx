@@ -39,6 +39,7 @@ const ROLE_LABELS: Record<RoleCode, string> = {
   HR: "HR",
   TEAM_LEAD: "Team Lead",
   TEAM_MEMBER: "Team Member",
+  ACCOUNTANT: "Accountant",
 };
 
 interface RoleRow {

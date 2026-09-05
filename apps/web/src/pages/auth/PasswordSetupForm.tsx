@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Input, Label } from "../../components/ui/primitives";
+import { Button, PasswordInput, Label } from "../../components/ui/primitives";
 import { api, extractApiError } from "../../lib/apiClient";
 
 const schema = z
@@ -60,14 +60,14 @@ export const PasswordSetupForm: React.FC<{ endpoint: "/auth/activate" | "/auth/r
         <Label htmlFor="password" required>
           New password
         </Label>
-        <Input id="password" type="password" error={errors.password?.message} {...register("password")} />
+        <PasswordInput id="password" error={errors.password?.message} {...register("password")} />
         <p className="mt-1 text-xs text-slate-400">At least 8 characters, with upper &amp; lower case, a number and a symbol.</p>
       </div>
       <div>
         <Label htmlFor="confirm" required>
           Confirm password
         </Label>
-        <Input id="confirm" type="password" error={errors.confirm?.message} {...register("confirm")} />
+        <PasswordInput id="confirm" error={errors.confirm?.message} {...register("confirm")} />
       </div>
       {serverError && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</div>}
       <Button type="submit" className="w-full" loading={isSubmitting}>

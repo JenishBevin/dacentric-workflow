@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Plus, UploadCloud, RotateCcw, UserX, UserCheck } from "lucide-react";
 import { useUsers, useCreateUser, useUpdateUser, useResendInvite, useBulkImportUsers, useUnlinkedEmployees } from "../../api/misc";
-import { Button, Input, Label, Select, Badge, Skeleton, ErrorState, EmptyState, Checkbox } from "../../components/ui/primitives";
+import { Button, Input, PasswordInput, Label, Select, Badge, Skeleton, ErrorState, EmptyState, Checkbox } from "../../components/ui/primitives";
 import { Drawer } from "../../components/ui/Drawer";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../context/ToastContext";
@@ -16,6 +16,7 @@ const ROLE_LABELS: Record<RoleCode, string> = {
   HR: "HR",
   TEAM_LEAD: "Team Lead",
   TEAM_MEMBER: "Team Member",
+  ACCOUNTANT: "Accountant",
 };
 const ALL_ROLES = Object.keys(ROLE_LABELS) as RoleCode[];
 const ALL_MODULES: ModuleCode[] = ["WORKFLOW", "CRM", "ERP", "HRMS"];
@@ -369,12 +370,12 @@ const NewUserDrawer: React.FC<{ open: boolean; onClose: () => void; onCreate: Re
             <div className="mt-3 space-y-3">
               <div>
                 <Label required>Password</Label>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} />
+                <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} />
                 <p className="mt-1 text-xs text-slate-400">8+ characters, with upper, lower, digit and symbol.</p>
               </div>
               <div>
                 <Label required>Confirm password</Label>
-                <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={8} />
+                <PasswordInput value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={8} />
               </div>
             </div>
           )}

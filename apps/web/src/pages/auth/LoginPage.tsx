@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthLayout } from "../../components/layout/AuthLayout";
-import { Button, Input, Label } from "../../components/ui/primitives";
+import { Button, Input, PasswordInput, Label } from "../../components/ui/primitives";
 import { useAuth } from "../../context/AuthContext";
 import { extractApiError } from "../../lib/apiClient";
 
@@ -52,7 +52,7 @@ export default function LoginPage() {
               Forgot password?
             </Link>
           </div>
-          <Input id="password" type="password" autoComplete="current-password" error={errors.password?.message} {...register("password")} />
+          <PasswordInput id="password" autoComplete="current-password" error={errors.password?.message} {...register("password")} />
         </div>
         {serverError && (
           <div role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { Camera, Trash2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useUpdateMyProfile, useChangeMyPassword, useChangeMyEmail, useUploadMyAvatar, useRemoveMyAvatar, myAvatarUrl } from "../../api/profile";
-import { Avatar, Button, Input, Label } from "../../components/ui/primitives";
+import { Avatar, Button, Input, PasswordInput, Label } from "../../components/ui/primitives";
 import { roleLabel, isSuperAdmin } from "../../lib/permissions";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
@@ -165,16 +165,16 @@ export default function MyProfilePage() {
         <p className="text-sm font-semibold text-slate-800">Change Password</p>
         <div>
           <Label required>Current password</Label>
-          <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+          <PasswordInput value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
         </div>
         <div>
           <Label required>New password</Label>
-          <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
+          <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
           <p className="mt-1 text-xs text-slate-400">8+ characters, with upper, lower, digit and symbol.</p>
         </div>
         <div>
           <Label required>Confirm new password</Label>
-          <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} />
+          <PasswordInput value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} />
         </div>
         <Button type="submit" loading={changePassword.isPending} disabled={!currentPassword || !newPassword || !confirmPassword}>
           Change password
@@ -194,7 +194,7 @@ export default function MyProfilePage() {
           </div>
           <div>
             <Label required>Current password</Label>
-            <Input type="password" value={emailPassword} onChange={(e) => setEmailPassword(e.target.value)} required />
+            <PasswordInput value={emailPassword} onChange={(e) => setEmailPassword(e.target.value)} required />
           </div>
           <Button type="submit" loading={changeEmail.isPending} disabled={!newEmail.trim() || !emailPassword}>
             Change email
