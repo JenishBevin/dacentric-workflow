@@ -56,6 +56,7 @@ function greeting() {
 
 function StatCard({
   icon: Icon,
+  image,
   label,
   value,
   tone,
@@ -63,6 +64,7 @@ function StatCard({
   onClick,
 }: {
   icon: React.ElementType;
+  image: string;
   label: string;
   value: number | string;
   tone: string;
@@ -81,9 +83,9 @@ function StatCard({
           "cursor-pointer text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-[0.97] active:shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
       )}
     >
-      {/* Mild decorative watermark — same icon as the badge, filling the card
-          at low opacity, just enough to give it a topical identity. */}
-      <Icon className="pointer-events-none absolute inset-0 h-full w-full p-1 text-slate-900/[0.07]" />
+      {/* Mild decorative background photo, faded so the number/label on top stay easily readable. */}
+      <img src={image} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.15] grayscale" />
+      <div className="pointer-events-none absolute inset-0 bg-white/40" />
       <div className={`relative mb-1 flex h-5 w-5 items-center justify-center rounded-md transition-transform duration-150 ${onClick ? "group-hover:scale-110" : ""} ${tone}`}>
         <Icon className="h-3 w-3" />
       </div>
@@ -241,24 +243,26 @@ export default function DashboardPage() {
         <>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:flex-1">
-              <StatCard icon={ListTodo} label="Total Open Tasks" value={data.totalOpenTasks} tone="bg-brand-100 text-brand-700" onClick={() => setOpenStat("TOTAL_OPEN")} />
-              <StatCard icon={AlertTriangle} label="Overdue Tasks" value={data.overdueTasks} tone="bg-red-100 text-red-700" onClick={() => setOpenStat("OVERDUE")} />
+              <StatCard icon={ListTodo} image="/images/dashboard/total-open-tasks.jpg" label="Total Open Tasks" value={data.totalOpenTasks} tone="bg-brand-100 text-brand-700" onClick={() => setOpenStat("TOTAL_OPEN")} />
+              <StatCard icon={AlertTriangle} image="/images/dashboard/overdue-tasks.jpg" label="Overdue Tasks" value={data.overdueTasks} tone="bg-red-100 text-red-700" onClick={() => setOpenStat("OVERDUE")} />
               <StatCard
                 icon={Clock}
+                image="/images/dashboard/due-today.jpg"
                 label="Due Today"
                 value={data.dueToday}
                 tone="bg-amber-100 text-amber-700"
                 hint={`${data.dueThisWeek} due this week`}
                 onClick={() => setOpenStat("DUE_TODAY")}
               />
-              <StatCard icon={CheckCircle2} label="Completed This Month" value={data.completedThisMonth} tone="bg-emerald-100 text-emerald-700" onClick={() => setOpenStat("COMPLETED_THIS_MONTH")} />
-              <StatCard icon={LayoutGrid} label="Active Boards" value={data.activeBoards} tone="bg-purple-100 text-purple-700" onClick={() => navigate("/workflow/boards")} />
-              <StatCard icon={ShieldCheck} label="Pending Approvals" value={data.pendingApprovals} tone="bg-orange-100 text-orange-700" onClick={() => setOpenStat("PENDING_APPROVAL")} />
-              <StatCard icon={CalendarClock} label="Due This Week" value={data.dueThisWeek} tone="bg-blue-100 text-blue-700" onClick={() => setOpenStat("DUE_THIS_WEEK")} />
+              <StatCard icon={CheckCircle2} image="/images/dashboard/completed-this-month.jpg" label="Completed This Month" value={data.completedThisMonth} tone="bg-emerald-100 text-emerald-700" onClick={() => setOpenStat("COMPLETED_THIS_MONTH")} />
+              <StatCard icon={LayoutGrid} image="/images/dashboard/active-boards.jpg" label="Active Boards" value={data.activeBoards} tone="bg-purple-100 text-purple-700" onClick={() => navigate("/workflow/boards")} />
+              <StatCard icon={ShieldCheck} image="/images/dashboard/pending-approvals.jpg" label="Pending Approvals" value={data.pendingApprovals} tone="bg-orange-100 text-orange-700" onClick={() => setOpenStat("PENDING_APPROVAL")} />
+              <StatCard icon={CalendarClock} image="/images/dashboard/due-this-week.jpg" label="Due This Week" value={data.dueThisWeek} tone="bg-blue-100 text-blue-700" onClick={() => setOpenStat("DUE_THIS_WEEK")} />
 
               {/* My Work Time — fills the leftover grid cell next to the chart */}
               <Card className="relative overflow-hidden p-2 text-left">
-                <Timer className="pointer-events-none absolute inset-0 h-full w-full p-1 text-slate-900/[0.07]" />
+                <img src="/images/dashboard/work-time.jpg" alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.15] grayscale" />
+                <div className="pointer-events-none absolute inset-0 bg-white/40" />
                 <div className="relative mb-1 flex items-center justify-between">
                   <div className="flex h-5 w-5 items-center justify-center rounded-md bg-teal-100 text-teal-700">
                     <Timer className="h-3 w-3" />
