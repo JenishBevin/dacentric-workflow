@@ -32,6 +32,12 @@ interface NavItem {
   badge?: number;
 }
 
+interface NavSectionProps {
+  title: string;
+  items: NavItem[];
+  onNavigate?: () => void;
+}
+
 export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void }> = ({ mobileOpen, onCloseMobile }) => {
   const { user } = useAuth();
   const { data: myTaskGroups } = useMyTasks();
@@ -79,10 +85,10 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
         </button>
       </div>
 
-      <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} visible badge={undefined} />
+      <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} visible badge={undefined} onNavigate={onCloseMobile} />
 
-      <NavSection title="Workflow" items={workflowItems} />
-      <NavSection title="Settings" items={settingsItems} />
+      <NavSection title="Workflow" items={workflowItems} onNavigate={onCloseMobile} />
+      <NavSection title="Settings" items={settingsItems} onNavigate={onCloseMobile} />
     </nav>
   );
 
@@ -99,7 +105,7 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
   );
 };
 
-const NavSection: React.FC<{ title: string; items: NavItem[] }> = ({ title, items }) => {
+const NavSection: React.FC<NavSectionProps> = ({ title, items, onNavigate }) => {
   const visible = items.filter((i) => i.visible);
   if (!visible.length) return null;
   return (
@@ -107,17 +113,18 @@ const NavSection: React.FC<{ title: string; items: NavItem[] }> = ({ title, item
       <p className="px-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</p>
       <div className="mt-1 flex flex-col gap-0.5">
         {visible.map((item) => (
-          <SidebarLink key={item.to} {...item} />
+          <SidebarLink key={item.to} {...item} onNavigate={onNavigate} />
         ))}
       </div>
     </div>
   );
 };
 
-const SidebarLink: React.FC<NavItem> = ({ to, label, icon: Icon, badge }) => (
+const SidebarLink: React.FC<NavItem & { onNavigate?: () => void }> = ({ to, label, icon: Icon, badge, onNavigate }) => (
   <NavLink
     to={to}
     end={to === "/"}
+    onClick={onNavigate}
     className={({ isActive }) =>
       clsx(
         "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
