@@ -84,8 +84,8 @@ function StatCard({
       )}
     >
       {/* Mild decorative background photo, faded so the number/label on top stay easily readable. */}
-      <img src={image} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.15] grayscale" />
-      <div className="pointer-events-none absolute inset-0 bg-white/40" />
+      <img src={image} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.28] grayscale" />
+      <div className="pointer-events-none absolute inset-0 bg-white/30" />
       <div className={`relative mb-1 flex h-5 w-5 items-center justify-center rounded-md transition-transform duration-150 ${onClick ? "group-hover:scale-110" : ""} ${tone}`}>
         <Icon className="h-3 w-3" />
       </div>
@@ -261,8 +261,8 @@ export default function DashboardPage() {
 
               {/* My Work Time — fills the leftover grid cell next to the chart */}
               <Card className="relative overflow-hidden p-2 text-left">
-                <img src="/images/dashboard/work-time.jpg" alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.15] grayscale" />
-                <div className="pointer-events-none absolute inset-0 bg-white/40" />
+                <img src="/images/dashboard/work-time.jpg" alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.28] grayscale" />
+                <div className="pointer-events-none absolute inset-0 bg-white/30" />
                 <div className="relative mb-1 flex items-center justify-between">
                   <div className="flex h-5 w-5 items-center justify-center rounded-md bg-teal-100 text-teal-700">
                     <Timer className="h-3 w-3" />
