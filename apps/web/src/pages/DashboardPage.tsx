@@ -76,17 +76,20 @@ function StatCard({
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => (e.key === "Enter" || e.key === " ") && onClick() : undefined}
       className={clsx(
-        "group p-2 text-left",
+        "group relative overflow-hidden p-2 text-left",
         onClick &&
           "cursor-pointer text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-[0.97] active:shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
       )}
     >
-      <div className={`mb-1 flex h-5 w-5 items-center justify-center rounded-md transition-transform duration-150 ${onClick ? "group-hover:scale-110" : ""} ${tone}`}>
+      {/* Mild decorative watermark — same icon as the badge, oversized and
+          nearly invisible, just enough to give the card a topical identity. */}
+      <Icon className="pointer-events-none absolute -bottom-2 -right-2 h-14 w-14 rotate-[-10deg] text-slate-900/[0.045]" />
+      <div className={`relative mb-1 flex h-5 w-5 items-center justify-center rounded-md transition-transform duration-150 ${onClick ? "group-hover:scale-110" : ""} ${tone}`}>
         <Icon className="h-3 w-3" />
       </div>
-      <p className="text-base font-semibold text-slate-900">{value}</p>
-      <p className="text-[10px] font-medium leading-tight text-slate-500">{label}</p>
-      {hint && <p className="mt-0.5 text-[9px] text-slate-400">{hint}</p>}
+      <p className="relative text-base font-semibold text-slate-900">{value}</p>
+      <p className="relative text-[10px] font-medium leading-tight text-slate-500">{label}</p>
+      {hint && <p className="relative mt-0.5 text-[9px] text-slate-400">{hint}</p>}
     </Card>
   );
 }
@@ -254,8 +257,9 @@ export default function DashboardPage() {
               <StatCard icon={CalendarClock} label="Due This Week" value={data.dueThisWeek} tone="bg-blue-100 text-blue-700" onClick={() => setOpenStat("DUE_THIS_WEEK")} />
 
               {/* My Work Time — fills the leftover grid cell next to the chart */}
-              <Card className="p-2 text-left">
-                <div className="mb-1 flex items-center justify-between">
+              <Card className="relative overflow-hidden p-2 text-left">
+                <Timer className="pointer-events-none absolute -bottom-2 -right-2 h-14 w-14 rotate-[-10deg] text-slate-900/[0.045]" />
+                <div className="relative mb-1 flex items-center justify-between">
                   <div className="flex h-5 w-5 items-center justify-center rounded-md bg-teal-100 text-teal-700">
                     <Timer className="h-3 w-3" />
                   </div>
@@ -269,9 +273,9 @@ export default function DashboardPage() {
                     {todayTime?.isRunning ? "Tracking" : "Paused"}
                   </span>
                 </div>
-                <p className="text-base font-semibold text-slate-900">{formatDuration(todayTime?.todaySeconds ?? 0)}</p>
-                <p className="text-[10px] font-medium leading-tight text-slate-500">My Work Time Today</p>
-                <p className="mt-0.5 text-[9px] text-slate-400">
+                <p className="relative text-base font-semibold text-slate-900">{formatDuration(todayTime?.todaySeconds ?? 0)}</p>
+                <p className="relative text-[10px] font-medium leading-tight text-slate-500">My Work Time Today</p>
+                <p className="relative mt-0.5 text-[9px] text-slate-400">
                   {formatDuration(weekTime?.totalSeconds ?? 0)} this week · {formatDuration(monthTime?.totalSeconds ?? 0)} this month
                 </p>
               </Card>
