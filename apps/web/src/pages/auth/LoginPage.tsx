@@ -35,7 +35,7 @@ export default function LoginPage() {
   };
 
   return (
-    <AuthLayout title="Sign in" subtitle="One account for CRM, ERP, HRMS and Workflow.">
+    <AuthLayout title="Sign in">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <div>
           <Label htmlFor="email" required>
