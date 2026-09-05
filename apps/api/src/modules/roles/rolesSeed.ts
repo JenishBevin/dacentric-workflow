@@ -10,6 +10,7 @@ const ROLE_NAMES: Record<RoleCode, string> = {
   [RoleCode.HR]: "HR",
   [RoleCode.TEAM_LEAD]: "Team Lead",
   [RoleCode.TEAM_MEMBER]: "Team Member",
+  [RoleCode.ACCOUNTANT]: "Accountant",
 };
 
 const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
@@ -20,6 +21,7 @@ const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
   [RoleCode.HR]: "Org-wide visibility into employee workload and time logs.",
   [RoleCode.TEAM_LEAD]: "Manages and approves their team's day-to-day tasks.",
   [RoleCode.TEAM_MEMBER]: "Does the work: moves tasks, ticks checklists, comments, attaches files.",
+  [RoleCode.ACCOUNTANT]: "Org-wide time-log and export access for payroll, billing, and financial reporting.",
 };
 
 /**

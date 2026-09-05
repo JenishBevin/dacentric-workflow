@@ -19,6 +19,7 @@ export enum RoleCode {
   HR = "HR",
   TEAM_LEAD = "TEAM_LEAD",
   TEAM_MEMBER = "TEAM_MEMBER",
+  ACCOUNTANT = "ACCOUNTANT",
 }
 
 export enum ModuleCode {

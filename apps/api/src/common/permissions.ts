@@ -120,6 +120,15 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.VIEW_TIME_LOGS]: "ALL",
     [PermissionKey.MANAGE_TICKETS]: "NONE",
   },
+  // Finance: org-wide time-log and export access for payroll/billing/reporting,
+  // no board/task configuration authority and no workload visibility (that's
+  // HR's/Manager's lane, not accounting's).
+  [RoleCode.ACCOUNTANT]: {
+    [PermissionKey.LOGIN]: "ALL",
+    [PermissionKey.VIEW_TIME_LOGS]: "ALL",
+    [PermissionKey.EXPORT]: "ALL",
+    [PermissionKey.MANAGE_TICKETS]: "NONE",
+  },
   // Leads a team day-to-day: manages and approves that team's tasks, no
   // board configuration or org-wide visibility.
   [RoleCode.TEAM_LEAD]: {

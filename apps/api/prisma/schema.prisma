@@ -33,6 +33,7 @@ enum RoleCode {
   HR
   TEAM_LEAD
   TEAM_MEMBER
+  ACCOUNTANT
 }
 
 enum ModuleCode {

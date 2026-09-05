@@ -30,6 +30,7 @@ const ROLE_LABELS: Record<string, string> = {
   HR: "HR",
   TEAM_LEAD: "Team Lead",
   TEAM_MEMBER: "Team Member",
+  ACCOUNTANT: "Accountant",
 };
 
 export function roleLabel(role: string): string {
