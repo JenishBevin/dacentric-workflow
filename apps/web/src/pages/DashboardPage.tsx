@@ -81,9 +81,9 @@ function StatCard({
           "cursor-pointer text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-[0.97] active:shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
       )}
     >
-      {/* Mild decorative watermark — same icon as the badge, oversized and
-          nearly invisible, just enough to give the card a topical identity. */}
-      <Icon className="pointer-events-none absolute -bottom-2 -right-2 h-14 w-14 rotate-[-10deg] text-slate-900/[0.045]" />
+      {/* Mild decorative watermark — same icon as the badge, filling the card
+          at low opacity, just enough to give it a topical identity. */}
+      <Icon className="pointer-events-none absolute inset-0 h-full w-full p-1 text-slate-900/[0.07]" />
       <div className={`relative mb-1 flex h-5 w-5 items-center justify-center rounded-md transition-transform duration-150 ${onClick ? "group-hover:scale-110" : ""} ${tone}`}>
         <Icon className="h-3 w-3" />
       </div>
@@ -258,7 +258,7 @@ export default function DashboardPage() {
 
               {/* My Work Time — fills the leftover grid cell next to the chart */}
               <Card className="relative overflow-hidden p-2 text-left">
-                <Timer className="pointer-events-none absolute -bottom-2 -right-2 h-14 w-14 rotate-[-10deg] text-slate-900/[0.045]" />
+                <Timer className="pointer-events-none absolute inset-0 h-full w-full p-1 text-slate-900/[0.07]" />
                 <div className="relative mb-1 flex items-center justify-between">
                   <div className="flex h-5 w-5 items-center justify-center rounded-md bg-teal-100 text-teal-700">
                     <Timer className="h-3 w-3" />
