@@ -25,7 +25,10 @@ export const env = {
   jwtAccessSecret: required("JWT_ACCESS_SECRET", "dev-access-secret-change-me"),
   jwtRefreshSecret: required("JWT_REFRESH_SECRET", "dev-refresh-secret-change-me"),
   jwtAccessTtlMin: num("JWT_ACCESS_TTL_MIN", 30),
-  jwtRefreshTtlDays: num("JWT_REFRESH_TTL_DAYS", 7),
+  // Slides forward on every refresh (see auth.service.ts), so a browser that's
+  // used at least once within this window never forces a re-login — only a
+  // manual sign-out or a browser left fully closed longer than this does.
+  jwtRefreshTtlDays: num("JWT_REFRESH_TTL_DAYS", 365),
   sessionIdleTimeoutMin: num("SESSION_IDLE_TIMEOUT_MIN", 30),
 
   invitationTtlHours: num("INVITATION_TTL_HOURS", 72),
