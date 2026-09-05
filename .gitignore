@@ -32,3 +32,6 @@ apps/api/prisma/dev.db
 
 # Test coverage
 coverage/
+
+# Local database backups (contain real production data — never commit)
+/backups/
