@@ -123,35 +123,6 @@ function BoardOverviewCard({ board }: { board: Board }) {
   );
 }
 
-/** Mobile-only hexagon "carousel" card — same board data as BoardOverviewCard,
- *  styled as a hexagon tile. The scroll-snap container around these gives the
- *  centered-with-neighbors-peeking carousel look without any JS state. */
-function BoardHexCard({ board }: { board: Board }) {
-  const status =
-    board.overdueTaskCount > 0
-      ? { label: "At Risk" }
-      : board.openTaskCount === 0
-      ? { label: "Complete" }
-      : { label: "In Progress" };
-
-  return (
-    <Link
-      to={`/workflow/boards/${board.id}`}
-      className="group relative flex h-40 w-44 shrink-0 snap-center flex-col items-center justify-center gap-1 px-5 text-center text-white"
-    >
-      <div
-        className={clsx("absolute inset-0 bg-gradient-to-br shadow-lg transition-transform duration-150 group-active:scale-95", gradientFor(board.id))}
-        style={{ clipPath: "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)" }}
-      />
-      <Trello className="relative h-6 w-6" />
-      <p className="relative line-clamp-2 text-sm font-semibold leading-tight">{board.name}</p>
-      <p className="relative text-[11px] text-white/85">
-        {status.label} · {board.openTaskCount} open
-      </p>
-    </Link>
-  );
-}
-
 function DonutCenter({ total }: { total: number }) {
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -351,20 +322,11 @@ export default function DashboardPage() {
             </div>
             {boards && boards.length === 0 && <p className="py-6 text-center text-sm text-slate-400">You're not a member of any boards yet.</p>}
             {boards && boards.length > 0 && (
-              <>
-                {/* Desktop/tablet: rectangular scroll row */}
-                <div className="hidden gap-3 overflow-x-auto pb-1 sm:flex">
-                  {boards.map((b) => (
-                    <BoardOverviewCard key={b.id} board={b} />
-                  ))}
-                </div>
-                {/* Mobile: hexagon carousel, current tile snaps to center */}
-                <div className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-[calc(50%-88px)] pb-2 sm:hidden">
-                  {boards.map((b) => (
-                    <BoardHexCard key={b.id} board={b} />
-                  ))}
-                </div>
-              </>
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {boards.map((b) => (
+                  <BoardOverviewCard key={b.id} board={b} />
+                ))}
+              </div>
             )}
           </Card>
 
