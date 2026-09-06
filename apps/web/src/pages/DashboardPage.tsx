@@ -208,8 +208,8 @@ export default function DashboardPage() {
 
   const deadlines = React.useMemo(() => {
     if (!myTaskGroups) return [];
-    const combined = [...(myTaskGroups.OVERDUE ?? []), ...(myTaskGroups.DUE_TODAY ?? []), ...(myTaskGroups.DUE_THIS_WEEK ?? [])];
-    return combined.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()).slice(0, 5);
+    const dueThisWeek = myTaskGroups.DUE_THIS_WEEK ?? [];
+    return [...dueThisWeek].sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [myTaskGroups]);
 
   function dueLabel(dueDate: string) {
@@ -373,8 +373,8 @@ export default function DashboardPage() {
                     View All <ArrowRight className="h-3 w-3" />
                   </Link>
                 </div>
-                {deadlines.length === 0 && <p className="py-4 text-center text-sm text-slate-400">Nothing due soon.</p>}
-                <ul className="space-y-2.5">
+                {deadlines.length === 0 && <p className="py-4 text-center text-sm text-slate-400">Nothing due this week.</p>}
+                <ul className="max-h-72 space-y-2.5 overflow-y-auto pr-1">
                   {deadlines.map((t: any) => (
                     <li key={t.id} className="flex items-start justify-between gap-2 text-sm">
                       <div className="min-w-0">
@@ -383,9 +383,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
                         <PriorityBadge priority={t.priority} />
-                        <span className={clsx("text-[11px] font-medium", t.dueDateStatus === "OVERDUE" ? "text-red-600" : "text-slate-400")}>
-                          {dueLabel(t.dueDate)}
-                        </span>
+                        <span className="text-[11px] font-medium text-slate-400">{dueLabel(t.dueDate)}</span>
                       </div>
                     </li>
                   ))}
