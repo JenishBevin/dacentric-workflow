@@ -14,7 +14,7 @@ import {
   ListChecks,
   Timer,
 } from "lucide-react";
-import { useDashboard, useDashboardTaskList, useMyTasks, useTeamWorkload, useNotifications } from "../api/misc";
+import { useDashboard, useDashboardTaskList, useMyTasks, useTeamWorkload } from "../api/misc";
 import { useBoards } from "../api/boards";
 import { useWorkTimeToday, useWorkTimeSummary } from "../api/workTime";
 import { formatDuration } from "../hooks/useWorkTimer";
@@ -22,7 +22,7 @@ import { Card, Skeleton, ErrorState, Avatar, AvatarGroup, EmptyState, Badge } fr
 import { PriorityBadge, DueDateBadge } from "../components/workflow/badges";
 import { Modal } from "../components/ui/Modal";
 import { TaskDetailDrawer } from "../components/tasks/TaskDetailDrawer";
-import { formatDistanceToNow, format, differenceInCalendarDays } from "date-fns";
+import { format, differenceInCalendarDays } from "date-fns";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../lib/permissions";
 import { Board } from "../lib/types";
@@ -199,7 +199,6 @@ export default function DashboardPage() {
   const canViewWorkload = can(user, "VIEW_TEAM_WORKLOAD");
   const { data: workload } = useTeamWorkload({});
   const { data: myTaskGroups } = useMyTasks();
-  const { data: notifications } = useNotifications();
   const { data: todayTime } = useWorkTimeToday();
   const { data: weekTime } = useWorkTimeSummary("week");
   const { data: monthTime } = useWorkTimeSummary("month");
@@ -364,53 +363,30 @@ export default function DashboardPage() {
               </Card>
             )}
 
-            {/* Upcoming Deadlines + Recent Notifications */}
-            <div className="space-y-4">
-              <Card className="p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-semibold text-slate-800">Upcoming Deadlines</p>
-                  <Link to="/workflow/my-tasks" className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
-                    View All <ArrowRight className="h-3 w-3" />
-                  </Link>
-                </div>
-                {deadlines.length === 0 && <p className="py-4 text-center text-sm text-slate-400">Nothing due this week.</p>}
-                <ul className="max-h-72 space-y-2.5 overflow-y-auto pr-1">
-                  {deadlines.map((t: any) => (
-                    <li key={t.id} className="flex items-start justify-between gap-2 text-sm">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-800">{t.title}</p>
-                        <p className="truncate text-xs text-slate-400">{t.boardName}</p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        <PriorityBadge priority={t.priority} />
-                        <span className="text-[11px] font-medium text-slate-400">{dueLabel(t.dueDate)}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-
-              <Card className="p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-semibold text-slate-800">Recent Notifications</p>
-                  <Link to="/settings/notifications" className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
-                    Manage <ArrowRight className="h-3 w-3" />
-                  </Link>
-                </div>
-                {(!notifications || notifications.data.items.length === 0) && <p className="py-4 text-center text-sm text-slate-400">You're all caught up.</p>}
-                <ul className="space-y-3">
-                  {notifications?.data.items.slice(0, 4).map((n: any) => (
-                    <li key={n.id} className="flex items-start gap-2">
-                      <span className={clsx("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", n.isRead ? "bg-transparent" : "bg-brand-500")} />
-                      <div className="min-w-0">
-                        <p className="truncate text-xs text-slate-700">{n.title}</p>
-                        <p className="text-[11px] text-slate-400">{formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </div>
+            {/* Upcoming Deadlines */}
+            <Card className="p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-800">Upcoming Deadlines</p>
+                <Link to="/workflow/my-tasks" className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
+                  View All <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+              {deadlines.length === 0 && <p className="py-4 text-center text-sm text-slate-400">Nothing due this week.</p>}
+              <ul className="max-h-72 space-y-2.5 overflow-y-auto pr-1">
+                {deadlines.map((t: any) => (
+                  <li key={t.id} className="flex items-start justify-between gap-2 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-800">{t.title}</p>
+                      <p className="truncate text-xs text-slate-400">{t.boardName}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <PriorityBadge priority={t.priority} />
+                      <span className="text-[11px] font-medium text-slate-400">{dueLabel(t.dueDate)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
           </div>
 
           {/* Quick Create */}
