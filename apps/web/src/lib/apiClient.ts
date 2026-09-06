@@ -58,27 +58,42 @@ export function registerUnauthorizedHandler(handler: () => void) {
 
 // The access token is short-lived; the refresh token lives in an httpOnly
 // cookie the browser sends automatically. A single in-flight promise is
-// shared across every 401 that arrives at once, so a burst of concurrent
-// requests triggers exactly one /auth/refresh call, not one per request.
+// shared across every 401 that arrives at once *within this tab*, so a burst
+// of concurrent requests triggers exactly one /auth/refresh call, not one
+// per request.
 let refreshPromise: Promise<string | null> | null = null;
 
-export async function refreshAccessToken(): Promise<string | null> {
-  if (!refreshPromise) {
-    refreshPromise = axios
-      .post(`${API_BASE_URL}/auth/refresh`, null, { withCredentials: true })
-      .then((res) => {
-        const token = res.data?.data?.accessToken as string | undefined;
-        setStoredToken(token ?? null);
-        return token ?? null;
-      })
-      .catch(() => {
-        setStoredToken(null);
-        return null;
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
+async function performRefresh(): Promise<string | null> {
+  try {
+    const res = await axios.post(`${API_BASE_URL}/auth/refresh`, null, { withCredentials: true });
+    const token = res.data?.data?.accessToken as string | undefined;
+    setStoredToken(token ?? null);
+    return token ?? null;
+  } catch {
+    setStoredToken(null);
+    return null;
   }
+}
+
+export async function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    // The refresh token rotates (single-use) — if two tabs of the same
+    // origin both race to refresh at once (e.g. every tab's access token
+    // expires together right when the device wakes from sleep), the second
+    // request presents an already-used token and the server revokes the
+    // whole session as a suspected compromise, force-logging everyone out.
+    // The Web Locks API serializes this across every tab, not just this one,
+    // so only one real /auth/refresh call ever happens at a time.
+    if (typeof navigator !== "undefined" && "locks" in navigator) {
+      return navigator.locks.request("dacentric-auth-refresh", performRefresh);
+    }
+    return performRefresh();
+  })().finally(() => {
+    refreshPromise = null;
+  });
+
   return refreshPromise;
 }
 
