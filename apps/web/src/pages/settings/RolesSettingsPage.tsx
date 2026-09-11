@@ -85,11 +85,11 @@ export default function RolesSettingsPage() {
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+          <thead className="sticky top-0 z-20 border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="sticky left-0 z-10 bg-slate-50 px-4 py-2.5">Permission</th>
+              <th className="sticky left-0 z-30 bg-slate-50 px-4 py-2.5">Permission</th>
               {roleList.map((r) => (
                 <th key={r.id} className="min-w-[160px] px-3 py-2.5">
                   {ROLE_LABELS[r.code] ?? r.name}
