@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { format, differenceInCalendarDays } from "date-fns";
-import { CalendarClock, Eye, Check, X as XIcon, Info, Plus } from "lucide-react";
+import { CalendarClock, Eye, Check, X as XIcon, Info, Plus, Paperclip, Download } from "lucide-react";
 import {
   useHrmsLeaveRequests,
   useHrmsWorkload,
@@ -9,6 +9,7 @@ import {
   useApplyForLeave,
   useMyLeaveBalance,
   useEmployeeDirectory,
+  downloadLeaveAttachment,
 } from "../api/misc";
 import { Badge, Button, Input, Label, Select, Textarea, Skeleton, EmptyState, Card, ErrorState } from "../components/ui/primitives";
 import { PriorityBadge } from "../components/workflow/badges";
@@ -49,6 +50,15 @@ function ApplyForLeaveDrawer({ open, onClose }: { open: boolean; onClose: () => 
   const [reason, setReason] = useState("");
   const [handoverToEmployeeId, setHandoverToEmployeeId] = useState("");
   const [handoverNotes, setHandoverNotes] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isSick = leaveType === "SICK";
+
+  function onFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    setFiles((prev) => [...prev, ...selected]);
+  }
 
   const dayCount = useMemo(() => {
     if (!startDate || !endDate) return null;
@@ -68,6 +78,7 @@ function ApplyForLeaveDrawer({ open, onClose }: { open: boolean; onClose: () => 
         reason: reason || undefined,
         handoverToEmployeeId: handoverToEmployeeId || undefined,
         handoverNotes: handoverNotes || undefined,
+        files,
       });
       push({ variant: "success", title: "Leave request submitted.", description: "You'll be notified once it's decided." });
       setLeaveType("ANNUAL");
@@ -76,6 +87,7 @@ function ApplyForLeaveDrawer({ open, onClose }: { open: boolean; onClose: () => 
       setReason("");
       setHandoverToEmployeeId("");
       setHandoverNotes("");
+      setFiles([]);
       onClose();
     } catch (err) {
       push({ variant: "error", title: "Could not submit request", description: extractApiError(err).message });
@@ -113,6 +125,28 @@ function ApplyForLeaveDrawer({ open, onClose }: { open: boolean; onClose: () => 
           </div>
         </div>
         {dayCount && <p className="text-xs text-slate-500">{dayCount} day{dayCount > 1 ? "s" : ""} total.</p>}
+        {isSick && (
+          <div>
+            <Label required>Medical certificate</Label>
+            <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf" className="hidden" onChange={onFilesSelected} />
+            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Paperclip className="h-3.5 w-3.5" /> Attach certificate
+            </Button>
+            {files.length === 0 && <p className="mt-1 text-xs text-amber-600">A medical certificate is required for sick leave.</p>}
+            {files.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {files.map((f, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
+                    <span className="truncate">{f.name}</span>
+                    <button type="button" onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))} aria-label={`Remove ${f.name}`}>
+                      <XIcon className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div>
           <Label>Reason (optional)</Label>
           <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={1000} placeholder="Annual leave, medical, etc." />
@@ -140,7 +174,7 @@ function ApplyForLeaveDrawer({ open, onClose }: { open: boolean; onClose: () => 
             />
           </div>
         )}
-        <Button type="submit" loading={apply.isPending} disabled={!startDate || !endDate}>
+        <Button type="submit" loading={apply.isPending} disabled={!startDate || !endDate || (isSick && files.length === 0)}>
           Submit request
         </Button>
       </form>
@@ -226,6 +260,19 @@ export default function LeavePage() {
                     </div>
                     {r.reason && <p className="text-xs text-slate-500">{r.reason}</p>}
                     {r.handoverToEmployee && <p className="text-xs text-slate-500">Handover: {r.handoverToEmployee.fullName}</p>}
+                    {r.attachments?.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {r.attachments.map((a: any) => (
+                          <button
+                            key={a.id}
+                            onClick={() => downloadLeaveAttachment(a.id, a.fileName)}
+                            className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-200"
+                          >
+                            <Download className="h-3 w-3" /> {a.fileName}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status] ?? r.status}</Badge>
                 </Card>
@@ -271,6 +318,19 @@ export default function LeavePage() {
                         Handover: {r.handoverToEmployee.fullName}
                         {r.handoverNotes && <> — {r.handoverNotes}</>}
                       </p>
+                    )}
+                    {r.attachments?.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {r.attachments.map((a: any) => (
+                          <button
+                            key={a.id}
+                            onClick={() => downloadLeaveAttachment(a.id, a.fileName)}
+                            className="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[11px] text-slate-600 shadow-sm hover:bg-slate-50"
+                          >
+                            <Download className="h-3 w-3" /> {a.fileName}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">

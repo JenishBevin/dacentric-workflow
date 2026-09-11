@@ -800,6 +800,21 @@ model LeaveRequest {
   decidedById String?
   decidedBy   User?       @relation("LeaveDecision", fields: [decidedById], references: [id])
   decidedAt   DateTime?
+
+  attachments LeaveAttachment[]
+}
+
+model LeaveAttachment {
+  id            String      @id @default(uuid())
+  leaveRequestId String
+  leaveRequest  LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  fileName      String
+  storageKey    String
+  mimeType      String
+  fileSizeBytes Int
+  createdAt     DateTime    @default(now())
+
+  @@index([leaveRequestId])
 }
 
 // ---------------------------------------------------------------------------

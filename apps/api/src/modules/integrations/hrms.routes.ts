@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { z } from "zod";
 import { asyncHandler, ok, created } from "../../common/http";
 import { validate } from "../../common/validate";
@@ -9,6 +10,9 @@ import { getEmployeeWorkloadDetail } from "../teamWorkload/teamWorkload.service"
 import { Errors } from "../../common/errors";
 import { RoleCode } from "@dacentric/types";
 import { LeaveType } from "@prisma/client";
+import { getStorageAdapter, validateFile, scanFile } from "../../lib/storage";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 // Core-essentials leave module: fixed per-type day entitlements (no
 // configurable policy engine — see schema.prisma's LeaveType comment).
@@ -49,7 +53,7 @@ hrmsRouter.get(
     if (!req.user!.employeeId) return ok(res, []);
     const requests = await prisma.leaveRequest.findMany({
       where: { employeeId: req.user!.employeeId },
-      include: { handoverToEmployee: { select: { id: true, fullName: true } } },
+      include: { handoverToEmployee: { select: { id: true, fullName: true } }, attachments: true },
       orderBy: { createdAt: "desc" },
     });
     return ok(res, requests);
@@ -82,6 +86,7 @@ hrmsRouter.get(
 
 hrmsRouter.post(
   "/leave-requests",
+  upload.array("files", 5),
   validate(
     z
       .object({
@@ -99,6 +104,12 @@ hrmsRouter.post(
       throw Errors.badRequest("Your account isn't linked to an employee record, so it can't apply for leave. Ask your administrator to link one.");
     }
     const { leaveType, startDate, endDate, reason, handoverToEmployeeId, handoverNotes } = (req as any).validatedBody;
+    const files = (req.files as Express.Multer.File[]) ?? [];
+
+    // Sick leave needs proof — a medical certificate is mandatory, not optional.
+    if (leaveType === "SICK" && files.length === 0) {
+      throw Errors.badRequest("A medical certificate is required for sick leave.");
+    }
 
     const overlapping = await prisma.leaveRequest.findFirst({
       where: {
@@ -112,11 +123,50 @@ hrmsRouter.post(
       throw Errors.badRequest("You already have a leave request that overlaps these dates.");
     }
 
+    const attachmentsData: Array<{ fileName: string; storageKey: string; mimeType: string; fileSizeBytes: number }> = [];
+    for (const file of files) {
+      const validationError = validateFile(file.originalname, file.size);
+      if (validationError) throw Errors.validation(validationError, { file: validationError });
+      const scanResult = await scanFile(file.buffer);
+      if (scanResult === "REJECTED") throw Errors.validation(`"${file.originalname}" failed the security scan and was not stored.`);
+      const { storageKey } = await getStorageAdapter().save(file.originalname, file.buffer);
+      attachmentsData.push({ fileName: file.originalname, storageKey, mimeType: file.mimetype, fileSizeBytes: file.size });
+    }
+
     const numberOfDays = inclusiveDayCount(startDate, endDate);
     const leave = await prisma.leaveRequest.create({
-      data: { employeeId: req.user!.employeeId, leaveType, startDate, endDate, numberOfDays, reason, handoverToEmployeeId, handoverNotes },
+      data: {
+        employeeId: req.user!.employeeId,
+        leaveType,
+        startDate,
+        endDate,
+        numberOfDays,
+        reason,
+        handoverToEmployeeId,
+        handoverNotes,
+        attachments: { create: attachmentsData },
+      },
+      include: { attachments: true },
     });
     return created(res, leave);
+  })
+);
+
+hrmsRouter.get(
+  "/leave-requests/attachments/:attachmentId/download",
+  asyncHandler(async (req, res) => {
+    const attachment = await prisma.leaveAttachment.findUniqueOrThrow({
+      where: { id: req.params.attachmentId },
+      include: { leaveRequest: true },
+    });
+    const isOwner = req.user!.employeeId && attachment.leaveRequest.employeeId === req.user!.employeeId;
+    const isApprover = req.user!.roles.some((r) => [RoleCode.HR, RoleCode.SYSTEM_ADMIN, RoleCode.SUPER_ADMIN].includes(r));
+    if (!isOwner && !isApprover) throw Errors.forbidden("You do not have permission to view this file.");
+
+    const buffer = await getStorageAdapter().read(attachment.storageKey);
+    res.setHeader("Content-Type", attachment.mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename="${attachment.fileName}"`);
+    res.send(buffer);
   })
 );
 
@@ -128,7 +178,7 @@ hrmsRouter.get(
     // Administrator) — no Project Manager / Management stage.
     const requests = await prisma.leaveRequest.findMany({
       where: { status: "PENDING" },
-      include: { employee: true, handoverToEmployee: { select: { id: true, fullName: true } } },
+      include: { employee: true, handoverToEmployee: { select: { id: true, fullName: true } }, attachments: true },
       orderBy: { createdAt: "desc" },
     });
     return ok(res, requests);

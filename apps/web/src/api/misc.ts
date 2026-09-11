@@ -247,13 +247,36 @@ export function useApplyForLeave() {
       reason?: string;
       handoverToEmployeeId?: string;
       handoverNotes?: string;
-    }) => (await api.post("/integrations/hrms/leave-requests", payload)).data.data,
+      files?: File[];
+    }) => {
+      const form = new FormData();
+      form.append("leaveType", payload.leaveType);
+      form.append("startDate", payload.startDate);
+      form.append("endDate", payload.endDate);
+      if (payload.reason) form.append("reason", payload.reason);
+      if (payload.handoverToEmployeeId) form.append("handoverToEmployeeId", payload.handoverToEmployeeId);
+      if (payload.handoverNotes) form.append("handoverNotes", payload.handoverNotes);
+      (payload.files ?? []).forEach((f) => form.append("files", f));
+      return (await api.post("/integrations/hrms/leave-requests", form, { headers: { "Content-Type": "multipart/form-data" } })).data.data;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-leave-requests"] });
       qc.invalidateQueries({ queryKey: ["my-leave-balance"] });
       qc.invalidateQueries({ queryKey: ["hrms-leave-requests"] });
     },
   });
+}
+
+export async function downloadLeaveAttachment(attachmentId: string, fileName: string) {
+  const res = await api.get(`/integrations/hrms/leave-requests/attachments/${attachmentId}/download`, { responseType: "blob" });
+  const url = window.URL.createObjectURL(new Blob([res.data]));
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", fileName);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 // --- Exports (trigger file download) ---
