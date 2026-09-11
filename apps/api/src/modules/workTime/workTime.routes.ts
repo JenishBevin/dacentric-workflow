@@ -45,9 +45,9 @@ workTimeRouter.get(
   })
 );
 
-// Team Lead, HR, Manager, System Admin and Super Admin only (Section: RBAC
-// row for VIEW_TIME_LOGS) — everyone else is scoped to NONE by default and
-// gets a 403 here, well before the service layer's own scoping kicks in.
+// Project Manager, HR, Accounts, System Admin and Super Admin only (Section:
+// RBAC row for VIEW_TIME_LOGS) — everyone else is scoped to NONE by default
+// and gets a 403 here, well before the service layer's own scoping kicks in.
 workTimeRouter.get(
   "/reports",
   requirePermission(PermissionKey.VIEW_TIME_LOGS, "TEAM"),

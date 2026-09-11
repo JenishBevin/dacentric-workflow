@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { RoleCode, ModuleCode, AccountStatus } from "@dacentric/types";
 import { ensureRolesAndPermissions } from "../src/modules/roles/rolesSeed";
+import { ensureServices } from "../src/modules/boards/servicesSeed";
 
 const prisma = new PrismaClient();
 
@@ -9,7 +10,7 @@ const BOOTSTRAP_EMAIL = "superadmin@dacentric.example";
 const BOOTSTRAP_PASSWORD = "Passw0rd!23";
 
 /**
- * Clean-slate seed: ensures the seven platform roles and their default
+ * Clean-slate seed: ensures the nine platform roles and their default
  * permission matrix exist, then provisions exactly one active Super Admin
  * account so there's a way to log in. Everyone else is invited from
  * Settings -> Users by that Super Admin — there is no self-registration.
@@ -18,6 +19,7 @@ async function main() {
   console.log("Seeding roles and bootstrap admin...");
 
   await ensureRolesAndPermissions(prisma);
+  await ensureServices(prisma);
   const superAdminRole = await prisma.role.findUniqueOrThrow({ where: { code: RoleCode.SUPER_ADMIN } });
 
   const passwordHash = await bcrypt.hash(BOOTSTRAP_PASSWORD, 12);

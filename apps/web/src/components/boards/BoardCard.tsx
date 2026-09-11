@@ -31,21 +31,22 @@ export const BoardCard: React.FC<Props> = ({ board, onEdit, onDuplicate, onArchi
       <div className="flex items-start justify-between gap-2">
         <Link to={`/workflow/boards/${board.id}`} className="min-w-0 flex-1">
           <p className="truncate font-semibold text-slate-900 hover:text-brand-700">{board.name}</p>
+          <p className="text-[11px] font-medium text-slate-400">{board.boardId}</p>
           {board.description && <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{board.description}</p>}
         </Link>
         {canManage && (
           <div className="relative shrink-0" ref={ref}>
-            <button onClick={() => setMenuOpen((o) => !o)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Board menu">
+            <button onClick={() => setMenuOpen((o) => !o)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Project menu">
               <MoreVertical className="h-4 w-4" />
             </button>
             {menuOpen && (
               <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg">
-                <MenuItem onClick={() => { setMenuOpen(false); onEdit(); }}>Edit Board</MenuItem>
-                <MenuItem onClick={() => { setMenuOpen(false); onDuplicate(); }}>Duplicate Board</MenuItem>
-                <MenuItem onClick={() => { setMenuOpen(false); onArchive(); }}>{board.isArchived ? "Unarchive Board" : "Archive Board"}</MenuItem>
+                <MenuItem onClick={() => { setMenuOpen(false); onEdit(); }}>Edit Project</MenuItem>
+                <MenuItem onClick={() => { setMenuOpen(false); onDuplicate(); }}>Duplicate Project</MenuItem>
+                <MenuItem onClick={() => { setMenuOpen(false); onArchive(); }}>{board.isArchived ? "Unarchive Project" : "Archive Project"}</MenuItem>
                 <MenuItem onClick={() => { setMenuOpen(false); onManageMembers(); }}>Manage Members</MenuItem>
                 <MenuItem onClick={() => { setMenuOpen(false); onDelete(); }} destructive>
-                  Delete Board
+                  Delete Project
                 </MenuItem>
               </div>
             )}
@@ -79,7 +80,7 @@ export const BoardCard: React.FC<Props> = ({ board, onEdit, onDuplicate, onArchi
       <div className="mt-auto flex items-center justify-between pt-1">
         <AvatarGroup names={board.members.map((m) => m.name)} />
         <Link to={`/workflow/boards/${board.id}`} className="text-xs font-medium text-brand-600 hover:text-brand-700">
-          Open board →
+          Open project →
         </Link>
       </div>
     </Card>

@@ -52,7 +52,7 @@ export default function TeamWorkloadPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-lg font-semibold text-slate-900">Team Workload</h1>
-        <p className="text-sm text-slate-500">Aggregated open-task load per employee, across every board they're on.</p>
+        <p className="text-sm text-slate-500">Aggregated open-task load per employee, across every project they're on.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -79,7 +79,7 @@ export default function TeamWorkloadPage() {
           </Select>
         </div>
         <div>
-          <Label className="!mb-0.5 !text-xs">Board</Label>
+          <Label className="!mb-0.5 !text-xs">Project</Label>
           <Select value={boardId} onChange={(e) => setBoardId(e.target.value)} className="!py-1.5 !text-xs">
             <option value="">All</option>
             {boards?.map((b) => (
@@ -183,7 +183,7 @@ export default function TeamWorkloadPage() {
         </>
       )}
 
-      <Drawer open={!!drillDownId} onClose={() => setDrillDownId(null)} title={detail?.employee?.name ?? "Workload"} subtitle="Tasks across every board">
+      <Drawer open={!!drillDownId} onClose={() => setDrillDownId(null)} title={detail?.employee?.name ?? "Workload"} subtitle="Tasks across every project">
         {detailLoading && <Skeleton className="h-40 w-full" />}
         {detail && (
           <div className="space-y-2">

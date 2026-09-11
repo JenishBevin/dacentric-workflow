@@ -1,9 +1,11 @@
 import React, { Suspense, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { ChatWidget } from "../chat/ChatWidget";
 import { Spinner } from "../ui/primitives";
+import { useAuth } from "../../context/AuthContext";
 
 function ContentFallback() {
   return (
@@ -13,8 +15,22 @@ function ContentFallback() {
   );
 }
 
+const STAFF_HOME = "/hrms/leave";
+const STAFF_ALLOWED_PATHS = [STAFF_HOME, "/settings/profile"];
+
 export const AppLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user } = useAuth();
+  const location = useLocation();
+
+  // Staff has no Workflow access at all — the only pages they're allowed to
+  // reach are Leave and My Profile (not Notifications), enforced here (not
+  // just by hiding sidebar/header links) so no typed or bookmarked URL can
+  // get them past it. Single choke point: every authenticated route renders
+  // through this layout's <Outlet />.
+  if (user?.roles.includes("STAFF") && !STAFF_ALLOWED_PATHS.includes(location.pathname)) {
+    return <Navigate to={STAFF_HOME} replace />;
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -32,6 +48,7 @@ export const AppLayout: React.FC = () => {
         </main>
         <MobileBottomNav />
       </div>
+      <ChatWidget />
     </div>
   );
 };

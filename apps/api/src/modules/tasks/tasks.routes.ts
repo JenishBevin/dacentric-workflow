@@ -12,6 +12,7 @@ import * as watchersService from "./watchers.service";
 import * as tagsService from "../tags/tags.service";
 import * as approvalsService from "../approvals/approvals.service";
 import { loadTaskWithAccess } from "./task-access";
+import { visibleBoardsWhere } from "../boards/board-access";
 import {
   createTaskSchema,
   updateTaskSchema,
@@ -60,12 +61,18 @@ tasksRouter.post(
 
 // NOTE: must be registered before the generic "/:taskId" GET route below,
 // otherwise Express would treat "search" as a taskId path param.
+// Scoped by visibleBoardsWhere (Business Rule 16 / Section 36) — a task on
+// a board the user isn't a member of must never be discoverable via search.
 tasksRouter.get(
   "/search/lookup",
   asyncHandler(async (req, res) => {
     const q = (req.query.q as string) ?? "";
     const tasks = await prisma.task.findMany({
-      where: { isDeleted: false, OR: [{ title: { contains: q, mode: "insensitive" } }, { taskId: { contains: q, mode: "insensitive" } }] },
+      where: {
+        isDeleted: false,
+        board: visibleBoardsWhere(req.user!),
+        OR: [{ title: { contains: q, mode: "insensitive" } }, { taskId: { contains: q, mode: "insensitive" } }],
+      },
       take: 20,
       select: { id: true, taskId: true, title: true, boardId: true },
     });
@@ -111,6 +118,22 @@ tasksRouter.post(
 tasksRouter.post(
   "/:taskId/complete",
   asyncHandler(async (req, res) => ok(res, await tasksService.quickComplete(req.params.taskId, req.user!)))
+);
+
+// Creates a new Project under the task's Service (if any) and moves this
+// task onto it — the "Awarded" action on an enquiry.
+tasksRouter.post(
+  "/:taskId/award",
+  requirePermission(PermissionKey.CREATE_BOARD, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await tasksService.awardTask(req.params.taskId, req.user!)))
+);
+
+// Moves an enquiry to its board's "Lost" stage — the "Lost" action on an
+// enquiry, the counterpart to "Awarded".
+tasksRouter.post(
+  "/:taskId/lost",
+  requirePermission(PermissionKey.MOVE_TASK, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await tasksService.markTaskLost(req.params.taskId, req.user!)))
 );
 
 tasksRouter.patch(

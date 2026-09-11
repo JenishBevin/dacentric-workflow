@@ -6,7 +6,7 @@ import { PermissionKey } from "@dacentric/types";
 
 export type BoardRole = "OWNER" | "EDITOR" | "VIEWER" | "COMMENTER" | null;
 
-/** Anyone whose effective VIEW_WORKFLOW scope is org-wide (e.g. CEO/Director),
+/** Anyone whose effective VIEW_WORKFLOW scope is org-wide (e.g. Management),
  *  not just the hardcoded System/Super Admin roles — Section 5's RBAC matrix
  *  is the source of truth for *visibility*, not a fixed role list. */
 function hasOrgWideViewScope(user: AuthedUser): boolean {

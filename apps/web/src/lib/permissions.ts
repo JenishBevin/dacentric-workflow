@@ -25,12 +25,14 @@ export function isSuperAdmin(user: CurrentUser | null | undefined): boolean {
 const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: "Super Admin",
   SYSTEM_ADMIN: "System Admin",
-  CEO_DIRECTOR: "CEO / Director",
-  MANAGER: "Manager",
+  MANAGEMENT: "Management",
+  PROJECT_MANAGER: "Project Manager",
   HR: "HR",
-  TEAM_LEAD: "Team Lead",
-  TEAM_MEMBER: "Team Member",
-  ACCOUNTANT: "Accountant",
+  ACCOUNTS: "Accounts",
+  ESTIMATION: "Estimation",
+  SALES: "Sales",
+  PROCUREMENT: "Procurement",
+  STAFF: "Staff",
 };
 
 export function roleLabel(role: string): string {

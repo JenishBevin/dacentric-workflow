@@ -118,7 +118,7 @@ export default function MyTasksPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">My Tasks</h1>
-          <p className="text-sm text-slate-500">Every task assigned to you, across all boards ({totalCount} open).</p>
+          <p className="text-sm text-slate-500">Every task assigned to you, across all projects ({totalCount} open).</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-slate-300 p-0.5">
@@ -211,7 +211,7 @@ export default function MyTasksPage() {
         onSelect={performMove}
       />
 
-      <Modal open={boardPickerOpen} onClose={() => setBoardPickerOpen(false)} title="Create task on which board?">
+      <Modal open={boardPickerOpen} onClose={() => setBoardPickerOpen(false)} title="Create task on which project?">
         <div className="max-h-64 space-y-1 overflow-y-auto">
           {myBoards?.map((b) => (
             <button
@@ -226,7 +226,7 @@ export default function MyTasksPage() {
               <span className="text-xs text-slate-400">{b.stageCount} stages</span>
             </button>
           ))}
-          {myBoards?.length === 0 && <p className="text-sm text-slate-400">You aren't a member of any boards yet.</p>}
+          {myBoards?.length === 0 && <p className="text-sm text-slate-400">You aren't a member of any projects yet.</p>}
         </div>
       </Modal>
 

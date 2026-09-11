@@ -64,7 +64,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
   // Executive oversight: sees and approves everything, doesn't configure
   // boards or manage accounts. Not in the time-logs report audience per the
   // explicit role list given for that feature.
-  [RoleCode.CEO_DIRECTOR]: {
+  [RoleCode.MANAGEMENT]: {
     [PermissionKey.LOGIN]: "ALL",
     [PermissionKey.VIEW_WORKFLOW]: "ALL",
     [PermissionKey.CREATE_BOARD]: "NONE",
@@ -89,7 +89,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.MANAGE_TICKETS]: "NONE",
   },
   // Creates/configures boards, assigns and approves tasks for their team.
-  [RoleCode.MANAGER]: {
+  [RoleCode.PROJECT_MANAGER]: {
     [PermissionKey.LOGIN]: "ALL",
     [PermissionKey.VIEW_WORKFLOW]: "TEAM",
     [PermissionKey.CREATE_BOARD]: "ALL",
@@ -113,50 +113,63 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.VIEW_TIME_LOGS]: "TEAM",
     [PermissionKey.MANAGE_TICKETS]: "NONE",
   },
-  // People-ops: org-wide workload/time visibility, no board/task authority.
+  // People-ops: same Workflow project/task authority as Project Manager
+  // (create/edit boards, create/assign/move tasks), plus HR's own broader
+  // org-wide workload/time visibility (kept at ALL, not downgraded to TEAM).
   [RoleCode.HR]: {
     [PermissionKey.LOGIN]: "ALL",
-    [PermissionKey.VIEW_TEAM_WORKLOAD]: "ALL",
-    [PermissionKey.VIEW_TIME_LOGS]: "ALL",
-    [PermissionKey.MANAGE_TICKETS]: "NONE",
-  },
-  // Finance: org-wide time-log and export access for payroll/billing/reporting,
-  // no board/task configuration authority and no workload visibility (that's
-  // HR's/Manager's lane, not accounting's).
-  [RoleCode.ACCOUNTANT]: {
-    [PermissionKey.LOGIN]: "ALL",
-    [PermissionKey.VIEW_TIME_LOGS]: "ALL",
-    [PermissionKey.EXPORT]: "ALL",
-    [PermissionKey.MANAGE_TICKETS]: "NONE",
-  },
-  // Leads a team day-to-day: manages and approves that team's tasks, no
-  // board configuration or org-wide visibility.
-  [RoleCode.TEAM_LEAD]: {
-    [PermissionKey.LOGIN]: "ALL",
     [PermissionKey.VIEW_WORKFLOW]: "TEAM",
-    [PermissionKey.CREATE_BOARD]: "NONE",
-    [PermissionKey.EDIT_BOARD]: "NONE",
-    [PermissionKey.ARCHIVE_DELETE_BOARD]: "NONE",
-    [PermissionKey.CONFIGURE_STAGES]: "NONE",
-    [PermissionKey.MANAGE_BOARD_MEMBERS]: "NONE",
-    [PermissionKey.CREATE_TASK]: "TEAM",
-    [PermissionKey.EDIT_TASK]: "TEAM",
-    [PermissionKey.DELETE_TASK]: "NONE",
-    [PermissionKey.ASSIGN_TASK]: "TEAM",
-    [PermissionKey.MOVE_TASK]: "TEAM",
-    [PermissionKey.MANAGE_TASK_COLLAB]: "TEAM",
-    [PermissionKey.VIEW_TEAM_WORKLOAD]: "TEAM",
-    [PermissionKey.APPROVE_TASK]: "TEAM",
-    [PermissionKey.CRM_ERP_LINKING]: "NONE",
+    [PermissionKey.CREATE_BOARD]: "ALL",
+    [PermissionKey.EDIT_BOARD]: "OWN",
+    [PermissionKey.ARCHIVE_DELETE_BOARD]: "OWN",
+    [PermissionKey.CONFIGURE_STAGES]: "OWN",
+    [PermissionKey.MANAGE_BOARD_MEMBERS]: "OWN",
+    [PermissionKey.CREATE_TASK]: "ALL",
+    [PermissionKey.EDIT_TASK]: "OWN",
+    [PermissionKey.DELETE_TASK]: "OWN",
+    [PermissionKey.ASSIGN_TASK]: "ALL",
+    [PermissionKey.MOVE_TASK]: "ALL",
+    [PermissionKey.MANAGE_TASK_COLLAB]: "ALL",
+    [PermissionKey.VIEW_TEAM_WORKLOAD]: "ALL",
+    [PermissionKey.APPROVE_TASK]: "OWN",
+    [PermissionKey.CRM_ERP_LINKING]: "OWN",
     [PermissionKey.EXPORT]: "TEAM",
-    [PermissionKey.VIEW_AUDIT_TRAIL]: "NONE",
-    [PermissionKey.MANAGE_ROLES]: "NONE",
-    [PermissionKey.MANAGE_USERS]: "NONE",
-    [PermissionKey.VIEW_TIME_LOGS]: "TEAM",
+    [PermissionKey.VIEW_AUDIT_TRAIL]: "OWN",
+    [PermissionKey.VIEW_TIME_LOGS]: "ALL",
     [PermissionKey.MANAGE_TICKETS]: "NONE",
   },
-  // Does the work: moves tasks, ticks checklists, comments, attaches files.
-  [RoleCode.TEAM_MEMBER]: {
+  // Finance: same operational Workflow authority as HR/Project Manager
+  // (create/edit boards, create/assign/move tasks) so their menus and
+  // features work the same as every other operational role, plus org-wide
+  // visibility (VIEW_WORKFLOW/VIEW_TEAM_WORKLOAD at ALL, not TEAM) since
+  // Accounts isn't a member of any board/team but still needs to see every
+  // project for payroll/billing/reporting. A Super Admin can narrow any of
+  // this per-permission from Settings -> Roles & Permissions.
+  [RoleCode.ACCOUNTS]: {
+    [PermissionKey.LOGIN]: "ALL",
+    [PermissionKey.VIEW_WORKFLOW]: "ALL",
+    [PermissionKey.CREATE_BOARD]: "ALL",
+    [PermissionKey.EDIT_BOARD]: "OWN",
+    [PermissionKey.ARCHIVE_DELETE_BOARD]: "OWN",
+    [PermissionKey.CONFIGURE_STAGES]: "OWN",
+    [PermissionKey.MANAGE_BOARD_MEMBERS]: "OWN",
+    [PermissionKey.CREATE_TASK]: "ALL",
+    [PermissionKey.EDIT_TASK]: "OWN",
+    [PermissionKey.DELETE_TASK]: "OWN",
+    [PermissionKey.ASSIGN_TASK]: "ALL",
+    [PermissionKey.MOVE_TASK]: "ALL",
+    [PermissionKey.MANAGE_TASK_COLLAB]: "ALL",
+    [PermissionKey.VIEW_TEAM_WORKLOAD]: "ALL",
+    [PermissionKey.APPROVE_TASK]: "OWN",
+    [PermissionKey.CRM_ERP_LINKING]: "OWN",
+    [PermissionKey.EXPORT]: "ALL",
+    [PermissionKey.VIEW_AUDIT_TRAIL]: "OWN",
+    [PermissionKey.VIEW_TIME_LOGS]: "ALL",
+    [PermissionKey.MANAGE_TICKETS]: "NONE",
+  },
+  // Prepares cost/time estimates on their own tasks and exports them; no
+  // board configuration or org-wide visibility.
+  [RoleCode.ESTIMATION]: {
     [PermissionKey.LOGIN]: "ALL",
     [PermissionKey.VIEW_WORKFLOW]: "OWN",
     [PermissionKey.CREATE_BOARD]: "NONE",
@@ -170,8 +183,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.ASSIGN_TASK]: "OWN",
     [PermissionKey.MOVE_TASK]: "OWN",
     [PermissionKey.MANAGE_TASK_COLLAB]: "OWN",
-    [PermissionKey.VIEW_TEAM_WORKLOAD]: "OWN",
-    [PermissionKey.APPROVE_TASK]: "OWN",
+    [PermissionKey.VIEW_TEAM_WORKLOAD]: "NONE",
+    [PermissionKey.APPROVE_TASK]: "NONE",
     [PermissionKey.CRM_ERP_LINKING]: "NONE",
     [PermissionKey.EXPORT]: "OWN",
     [PermissionKey.VIEW_AUDIT_TRAIL]: "NONE",
@@ -179,6 +192,64 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.MANAGE_USERS]: "NONE",
     [PermissionKey.VIEW_TIME_LOGS]: "NONE",
     [PermissionKey.MANAGE_TICKETS]: "NONE",
+  },
+  // Works their own tasks and links them to CRM customer/lead records; no
+  // board configuration or org-wide visibility.
+  [RoleCode.SALES]: {
+    [PermissionKey.LOGIN]: "ALL",
+    [PermissionKey.VIEW_WORKFLOW]: "OWN",
+    [PermissionKey.CREATE_BOARD]: "NONE",
+    [PermissionKey.EDIT_BOARD]: "NONE",
+    [PermissionKey.ARCHIVE_DELETE_BOARD]: "NONE",
+    [PermissionKey.CONFIGURE_STAGES]: "NONE",
+    [PermissionKey.MANAGE_BOARD_MEMBERS]: "NONE",
+    [PermissionKey.CREATE_TASK]: "OWN",
+    [PermissionKey.EDIT_TASK]: "OWN",
+    [PermissionKey.DELETE_TASK]: "NONE",
+    [PermissionKey.ASSIGN_TASK]: "OWN",
+    [PermissionKey.MOVE_TASK]: "OWN",
+    [PermissionKey.MANAGE_TASK_COLLAB]: "OWN",
+    [PermissionKey.VIEW_TEAM_WORKLOAD]: "NONE",
+    [PermissionKey.APPROVE_TASK]: "NONE",
+    [PermissionKey.CRM_ERP_LINKING]: "OWN",
+    [PermissionKey.EXPORT]: "OWN",
+    [PermissionKey.VIEW_AUDIT_TRAIL]: "NONE",
+    [PermissionKey.MANAGE_ROLES]: "NONE",
+    [PermissionKey.MANAGE_USERS]: "NONE",
+    [PermissionKey.VIEW_TIME_LOGS]: "NONE",
+    [PermissionKey.MANAGE_TICKETS]: "NONE",
+  },
+  // Works their own tasks and links them to ERP purchase-order/vendor
+  // records; no board configuration or org-wide visibility.
+  [RoleCode.PROCUREMENT]: {
+    [PermissionKey.LOGIN]: "ALL",
+    [PermissionKey.VIEW_WORKFLOW]: "OWN",
+    [PermissionKey.CREATE_BOARD]: "NONE",
+    [PermissionKey.EDIT_BOARD]: "NONE",
+    [PermissionKey.ARCHIVE_DELETE_BOARD]: "NONE",
+    [PermissionKey.CONFIGURE_STAGES]: "NONE",
+    [PermissionKey.MANAGE_BOARD_MEMBERS]: "NONE",
+    [PermissionKey.CREATE_TASK]: "OWN",
+    [PermissionKey.EDIT_TASK]: "OWN",
+    [PermissionKey.DELETE_TASK]: "NONE",
+    [PermissionKey.ASSIGN_TASK]: "OWN",
+    [PermissionKey.MOVE_TASK]: "OWN",
+    [PermissionKey.MANAGE_TASK_COLLAB]: "OWN",
+    [PermissionKey.VIEW_TEAM_WORKLOAD]: "NONE",
+    [PermissionKey.APPROVE_TASK]: "NONE",
+    [PermissionKey.CRM_ERP_LINKING]: "OWN",
+    [PermissionKey.EXPORT]: "OWN",
+    [PermissionKey.VIEW_AUDIT_TRAIL]: "NONE",
+    [PermissionKey.MANAGE_ROLES]: "NONE",
+    [PermissionKey.MANAGE_USERS]: "NONE",
+    [PermissionKey.VIEW_TIME_LOGS]: "NONE",
+    [PermissionKey.MANAGE_TICKETS]: "NONE",
+  },
+  // Front-line staff: no Workflow access of any kind — the only thing this
+  // role can do is log in and apply for/view their own leave, which isn't
+  // gated by any of these permission keys (see hrms.routes.ts).
+  [RoleCode.STAFF]: {
+    [PermissionKey.LOGIN]: "ALL",
   },
 };
 

@@ -28,12 +28,14 @@ enum AccountStatus {
 enum RoleCode {
   SUPER_ADMIN
   SYSTEM_ADMIN
-  CEO_DIRECTOR
-  MANAGER
+  MANAGEMENT
+  PROJECT_MANAGER
   HR
-  TEAM_LEAD
-  TEAM_MEMBER
-  ACCOUNTANT
+  ACCOUNTS
+  ESTIMATION
+  SALES
+  PROCUREMENT
+  STAFF
 }
 
 enum ModuleCode {
@@ -117,7 +119,9 @@ model Employee {
 
   managedTeams Team[]    @relation("TeamManager")
   user         User?
-  leaveRequests LeaveRequest[]
+  leaveRequests LeaveRequest[] @relation("LeaveEmployee")
+  leaveHandovers LeaveRequest[] @relation("LeaveHandoverTo")
+  expenseClaims ExpenseClaim[] @relation("ClaimEmployee")
 
   @@index([departmentId])
   @@index([teamId])
@@ -161,6 +165,11 @@ model User {
   workSessions         WorkSession[]
   createdTickets       SupportTicket[]      @relation("TicketCreatedBy")
   uploadedTicketFiles  TicketAttachment[]   @relation("TicketAttachmentUploader")
+  leaveDecisions        LeaveRequest[]      @relation("LeaveDecision")
+  claimManagementDecisions ExpenseClaim[]   @relation("ClaimManagementDecision")
+  claimSettlements         ExpenseClaim[]   @relation("ClaimSettledBy")
+  conversations         ConversationParticipant[]
+  sentChatMessages      ChatMessage[]
 
   @@index([status])
 }
@@ -294,8 +303,24 @@ model BoardTemplate {
   boardsCreatedFrom Board[]
 }
 
+// The fixed company service catalog (MEP, ELV, IT, ...). Every Project
+// (Board) optionally belongs to one Service; the "Projects" nav shows the
+// Service catalog first, then the projects filed under whichever one you pick.
+model Service {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  boards Board[]
+  tasks  Task[]
+}
+
 model Board {
   id              String     @id @default(uuid())
+  boardNumber     Int        @unique @default(autoincrement())
+  boardId         String     @unique // formatted PRJ-000001, generated from boardNumber — the human-readable Project ID
   name            String
   description     String?
   boardType       BoardType  @default(STANDALONE)
@@ -304,8 +329,14 @@ model Board {
   linkedRecord    LinkedRecord? @relation(fields: [linkedRecordId], references: [id])
   templateId      String?
   template        BoardTemplate? @relation(fields: [templateId], references: [id])
+  serviceId       String?
+  service         Service?   @relation(fields: [serviceId], references: [id])
   isArchived      Boolean    @default(false)
   archivedAt      DateTime?
+  // Manually marked once every task on the project is done — moves it out
+  // of the active Projects view and into Project/Task History.
+  isCompleted     Boolean    @default(false)
+  completedAt     DateTime?
   isDeleted       Boolean    @default(false)
   deletedAt       DateTime?
   createdById     String
@@ -322,6 +353,7 @@ model Board {
   @@index([boardType])
   @@index([linkedRecordId])
   @@index([isArchived, isDeleted])
+  @@index([serviceId])
 }
 
 model BoardStage {
@@ -484,6 +516,11 @@ model Task {
   board            Board               @relation(fields: [boardId], references: [id])
   stageId          String
   stage            BoardStage          @relation(fields: [stageId], references: [id])
+  // Which service catalog entry this task/enquiry is about — set on creation
+  // (Enquiry List's "Service" picker), read by the "Awarded" action to decide
+  // which service the auto-created project belongs to.
+  serviceId        String?
+  service          Service?            @relation(fields: [serviceId], references: [id])
   priority         TaskPriority        @default(MEDIUM)
   startDate        DateTime?
   dueDate          DateTime?
@@ -528,6 +565,7 @@ model Task {
   @@index([dueDate])
   @@index([isDeleted])
   @@index([seriesId])
+  @@index([serviceId])
 }
 
 model TaskAssignee {
@@ -723,21 +761,43 @@ model AuditLog {
 // integration point ("View current workload" from the leave-approval screen).
 // ---------------------------------------------------------------------------
 
+// Single-stage approval: PENDING -> (HR, or System/Super Admin) decides ->
+// APPROVED or REJECTED. No Project Manager / Management stage — every
+// request goes straight to HR.
 enum LeaveStatus {
   PENDING
   APPROVED
   REJECTED
 }
 
+// Core-essentials leave types — day-count entitlements are hardcoded
+// constants (see LEAVE_ENTITLEMENTS in hrms.routes.ts), not a configurable
+// policy engine; that's deliberately out of scope for this pass.
+enum LeaveType {
+  ANNUAL
+  SICK
+  MATERNITY
+  PATERNITY
+  UNPAID
+  EMERGENCY
+}
+
 model LeaveRequest {
   id          String      @id @default(uuid())
   employeeId  String
-  employee    Employee    @relation(fields: [employeeId], references: [id])
+  employee    Employee    @relation("LeaveEmployee", fields: [employeeId], references: [id])
+  leaveType   LeaveType   @default(ANNUAL)
   startDate   DateTime
   endDate     DateTime
+  numberOfDays Int        @default(1)
   reason      String?
+  handoverToEmployeeId String?
+  handoverToEmployee   Employee? @relation("LeaveHandoverTo", fields: [handoverToEmployeeId], references: [id])
+  handoverNotes        String?
   status      LeaveStatus @default(PENDING)
   createdAt   DateTime    @default(now())
+  decidedById String?
+  decidedBy   User?       @relation("LeaveDecision", fields: [decidedById], references: [id])
   decidedAt   DateTime?
 }
 
@@ -788,4 +848,124 @@ model TicketAttachment {
   createdAt     DateTime      @default(now())
 
   @@index([ticketId])
+}
+
+// ---------------------------------------------------------------------------
+// Chat — 1:1 direct messages between any two active users, with optional
+// file attachments. Polling-based (no WebSocket infra); the floating chat
+// widget refetches on an interval, same pattern as Notifications.
+// ---------------------------------------------------------------------------
+
+model Conversation {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     ChatMessage[]
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Messages from the other participant created after this are "unread".
+  lastReadAt     DateTime?
+  // "Delete conversation" is per-viewer: set to now() when this participant
+  // clears it. Only messages created after this are visible to them — the
+  // other participant's view (and clearedAt) is untouched. The conversation
+  // reappears for this participant once a message arrives after clearedAt.
+  clearedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  body           String?      // nullable — a message can be attachment(s)-only
+  createdAt      DateTime     @default(now())
+  editedAt       DateTime?    // set when the sender edits within the 1-minute window
+  // "Delete message" is per-viewer too — the user ids this message is
+  // hidden from. Either participant can hide any message from their own
+  // view; the other side still sees it untouched.
+  deletedFor     String[]     @default([])
+
+  attachments ChatAttachment[]
+
+  @@index([conversationId, createdAt])
+}
+
+model ChatAttachment {
+  id            String      @id @default(uuid())
+  messageId     String
+  message       ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fileName      String
+  storageKey    String
+  mimeType      String
+  fileSizeBytes Int
+  createdAt     DateTime    @default(now())
+
+  @@index([messageId])
+}
+
+// ---------------------------------------------------------------------------
+// Expense Claims — the "Claim" option under the Request menu (alongside
+// Leave). Two-stage: Management approves, then Accounts settles it with the
+// next salary run. Unlike Leave, Accounts' stage is a settlement record,
+// not a second approve/reject gate — Management is the only approval.
+// ---------------------------------------------------------------------------
+
+enum ClaimStatus {
+  PENDING              // awaiting Management
+  MANAGEMENT_APPROVED  // approved, awaiting Accounts settlement
+  SETTLED              // paid out by Accounts
+  REJECTED
+}
+
+model ExpenseClaim {
+  id           String      @id @default(uuid())
+  claimNumber  Int         @unique @default(autoincrement())
+  claimId      String      @unique // formatted CLM-000001, generated from claimNumber
+  employeeId   String
+  employee     Employee    @relation("ClaimEmployee", fields: [employeeId], references: [id])
+  amount       Float
+  reason       String
+  expenseDate  DateTime
+  status       ClaimStatus @default(PENDING)
+  createdAt    DateTime    @default(now())
+
+  managementDecidedById String?
+  managementDecidedBy   User?     @relation("ClaimManagementDecision", fields: [managementDecidedById], references: [id])
+  managementDecidedAt   DateTime?
+  rejectReason          String?
+
+  settledById String?
+  settledBy   User?     @relation("ClaimSettledBy", fields: [settledById], references: [id])
+  settledAt   DateTime?
+
+  attachments ClaimAttachment[]
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model ClaimAttachment {
+  id            String       @id @default(uuid())
+  claimId       String
+  claim         ExpenseClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  fileName      String
+  storageKey    String
+  mimeType      String
+  fileSizeBytes Int
+  createdAt     DateTime     @default(now())
+
+  @@index([claimId])
 }

@@ -33,7 +33,7 @@ export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onCh
         <div className="relative min-w-[160px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
-            placeholder="Search this board…"
+            placeholder="Search this project…"
             className="pl-8"
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
@@ -47,7 +47,7 @@ export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onCh
           <FilterControls filters={filters} onChange={onChange} employees={employees} />
         </div>
 
-        <button onClick={onOpenMembers} className="ml-1 hidden sm:block" aria-label="Board members">
+        <button onClick={onOpenMembers} className="ml-1 hidden sm:block" aria-label="Project members">
           <AvatarGroup names={board.members.map((m) => m.name)} max={4} />
         </button>
 
@@ -62,7 +62,7 @@ export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onCh
           </Button>
         )}
         {canManage && (
-          <Button variant="ghost" size="sm" onClick={onOpenSettings} aria-label="Board settings">
+          <Button variant="ghost" size="sm" onClick={onOpenSettings} aria-label="Project settings">
             <SettingsIcon className="h-4 w-4" />
           </Button>
         )}

@@ -234,13 +234,23 @@ export function useDecideLeaveRequest() {
 export function useMyLeaveRequests() {
   return useQuery({ queryKey: ["my-leave-requests"], queryFn: async () => (await api.get("/integrations/hrms/leave-requests/mine")).data.data });
 }
+export function useMyLeaveBalance() {
+  return useQuery({ queryKey: ["my-leave-balance"], queryFn: async () => (await api.get("/integrations/hrms/leave-requests/balance")).data.data });
+}
 export function useApplyForLeave() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { startDate: string; endDate: string; reason?: string }) =>
-      (await api.post("/integrations/hrms/leave-requests", payload)).data.data,
+    mutationFn: async (payload: {
+      leaveType: string;
+      startDate: string;
+      endDate: string;
+      reason?: string;
+      handoverToEmployeeId?: string;
+      handoverNotes?: string;
+    }) => (await api.post("/integrations/hrms/leave-requests", payload)).data.data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-leave-requests"] });
+      qc.invalidateQueries({ queryKey: ["my-leave-balance"] });
       qc.invalidateQueries({ queryKey: ["hrms-leave-requests"] });
     },
   });

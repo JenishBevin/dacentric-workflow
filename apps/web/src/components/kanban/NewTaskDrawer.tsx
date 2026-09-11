@@ -5,6 +5,7 @@ import { Button, Input, Label, Select, Badge } from "../ui/primitives";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import { PeoplePicker } from "../tasks/PeoplePicker";
 import { useCreateTask } from "../../api/tasks";
+import { useServices } from "../../api/boards";
 import { useTags, useLinkedRecordSearch } from "../../api/misc";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
@@ -36,6 +37,7 @@ interface FormValues {
   title: string;
   description: string;
   stageId: string;
+  serviceId: string;
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   startDate: string;
   dueDate: string;
@@ -55,6 +57,8 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
   const { push } = useToast();
   const createTask = useCreateTask();
   const { data: allTags } = useTags();
+  const { data: services } = useServices();
+  const isEnquiryBoard = board.name === "Enquiry List";
 
   const [assignees, setAssignees] = useState<{ userId: string; name: string }[]>([]);
   const [watchers, setWatchers] = useState<{ userId: string; name: string }[]>([]);
@@ -150,6 +154,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
       await createTask.mutateAsync({
         boardId: board.id,
         stageId: values.stageId,
+        serviceId: values.serviceId || undefined,
         title: values.title,
         description: description || undefined,
         priority: values.priority,
@@ -232,6 +237,21 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
             </Select>
           </div>
         </section>
+
+        {isEnquiryBoard && (
+          <section>
+            <Label required>Service</Label>
+            <Select error={errors.serviceId?.message} {...register("serviceId", { required: "Select which service this enquiry is about." })}>
+              <option value="">Select a service…</option>
+              {services?.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-[11px] text-slate-400">Which service this enquiry is about — used when it's Awarded to start the project.</p>
+          </section>
+        )}
 
         <section>
           <Label required>Assignee(s)</Label>

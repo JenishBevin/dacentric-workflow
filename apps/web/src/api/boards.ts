@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/apiClient";
 import { Board, BoardStage } from "../lib/types";
 
-export function useBoards(params: { search?: string; scope?: string }) {
+export function useBoards(params: { search?: string; scope?: string; serviceId?: string }) {
   return useQuery({
     queryKey: ["boards", params],
     queryFn: async () => (await api.get<{ data: Board[] }>("/boards", { params })).data.data,
@@ -21,6 +21,32 @@ export function useBoardTemplates() {
   return useQuery({
     queryKey: ["board-templates"],
     queryFn: async () => (await api.get("/boards/templates")).data.data,
+  });
+}
+
+/** Resolves (and lazily provisions, on first-ever visit) the single
+ * company-wide Enquiry List board. Callers redirect to `/workflow/boards/:id`
+ * with the returned id rather than rendering anything from this response. */
+export function useEnquiryListBoard() {
+  return useQuery({
+    queryKey: ["enquiry-list-board"],
+    queryFn: async () => (await api.get<{ data: { id: string; name: string } }>("/boards/enquiry-list")).data.data,
+    retry: false,
+  });
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  projectCount: number;
+}
+
+/** The fixed company Service catalog. "Projects" nav shows this list first;
+ * picking one shows the projects filed under it (useBoards({ serviceId })). */
+export function useServices() {
+  return useQuery({
+    queryKey: ["services"],
+    queryFn: async () => (await api.get<{ data: Service[] }>("/boards/services")).data.data,
   });
 }
 
@@ -49,6 +75,18 @@ export function useArchiveBoard() {
     mutationFn: async ({ boardId, archived }: { boardId: string; archived: boolean }) =>
       (await api.post(`/boards/${boardId}/archive`, { archived })).data.data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["boards"] }),
+  });
+}
+
+export function useSetBoardCompleted() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ boardId, completed }: { boardId: string; completed: boolean }) =>
+      (await api.post(`/boards/${boardId}/complete`, { completed })).data.data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["boards"] });
+      qc.invalidateQueries({ queryKey: ["history"] });
+    },
   });
 }
 

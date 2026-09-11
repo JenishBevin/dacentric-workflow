@@ -14,12 +14,14 @@
 export enum RoleCode {
   SUPER_ADMIN = "SUPER_ADMIN",
   SYSTEM_ADMIN = "SYSTEM_ADMIN",
-  CEO_DIRECTOR = "CEO_DIRECTOR",
-  MANAGER = "MANAGER",
+  MANAGEMENT = "MANAGEMENT",
+  PROJECT_MANAGER = "PROJECT_MANAGER",
   HR = "HR",
-  TEAM_LEAD = "TEAM_LEAD",
-  TEAM_MEMBER = "TEAM_MEMBER",
-  ACCOUNTANT = "ACCOUNTANT",
+  ACCOUNTS = "ACCOUNTS",
+  ESTIMATION = "ESTIMATION",
+  SALES = "SALES",
+  PROCUREMENT = "PROCUREMENT",
+  STAFF = "STAFF",
 }
 
 export enum ModuleCode {
@@ -174,6 +176,20 @@ export const TASK_ID_PAD_LENGTH = 6;
 
 export function formatTaskId(sequence: number): string {
   return `${TASK_ID_PREFIX}${String(sequence).padStart(TASK_ID_PAD_LENGTH, "0")}`;
+}
+
+export const PROJECT_ID_PREFIX = "PRJ-";
+export const PROJECT_ID_PAD_LENGTH = 6;
+
+export function formatProjectId(sequence: number): string {
+  return `${PROJECT_ID_PREFIX}${String(sequence).padStart(PROJECT_ID_PAD_LENGTH, "0")}`;
+}
+
+export const CLAIM_ID_PREFIX = "CLM-";
+export const CLAIM_ID_PAD_LENGTH = 6;
+
+export function formatClaimId(sequence: number): string {
+  return `${CLAIM_ID_PREFIX}${String(sequence).padStart(CLAIM_ID_PAD_LENGTH, "0")}`;
 }
 
 // ---------------------------------------------------------------------------

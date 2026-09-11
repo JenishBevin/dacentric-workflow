@@ -4,7 +4,7 @@
 // build — it only needs to agree on the JSON shape, which these types
 // describe.
 
-export type RoleCode = "SUPER_ADMIN" | "SYSTEM_ADMIN" | "CEO_DIRECTOR" | "MANAGER" | "HR" | "TEAM_LEAD" | "TEAM_MEMBER" | "ACCOUNTANT";
+export type RoleCode = "SUPER_ADMIN" | "SYSTEM_ADMIN" | "MANAGEMENT" | "PROJECT_MANAGER" | "HR" | "ACCOUNTS" | "ESTIMATION" | "SALES" | "PROCUREMENT" | "STAFF";
 export type ModuleCode = "CRM" | "ERP" | "HRMS" | "WORKFLOW";
 export type PermissionScope = "NONE" | "OWN" | "TEAM" | "ALL";
 
@@ -67,6 +67,7 @@ export interface CurrentUser {
 
 export interface Board {
   id: string;
+  boardId: string;
   name: string;
   description?: string | null;
   boardType: BoardType;
@@ -98,6 +99,8 @@ export interface TaskSummary {
   board?: { id: string; name: string };
   stageId: string;
   stage?: { id: string; name: string; color: string; isTerminal: boolean };
+  serviceId?: string | null;
+  service?: { id: string; name: string };
   priority: TaskPriority;
   startDate: string | null;
   dueDate: string | null;

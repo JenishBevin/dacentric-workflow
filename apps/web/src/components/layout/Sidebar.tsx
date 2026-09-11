@@ -4,6 +4,7 @@ import clsx from "clsx";
 import {
   LayoutDashboard,
   Trello,
+  Inbox,
   ListChecks,
   Users2,
   Clock3,
@@ -17,6 +18,7 @@ import {
   ClipboardList,
   Ticket as TicketIcon,
   Activity,
+  Archive,
   X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -43,32 +45,43 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
   const { data: myTaskGroups } = useMyTasks();
   const myTaskCount = myTaskGroups ? Object.values(myTaskGroups).reduce((sum: number, arr: any) => sum + arr.length, 0) : 0;
 
-  const isLeaveApprover = user?.roles.some((r) => ["HR", "MANAGER", "SYSTEM_ADMIN", "SUPER_ADMIN"].includes(r)) ?? false;
+  const isLeaveApprover = user?.roles.some((r) => ["HR", "SYSTEM_ADMIN", "SUPER_ADMIN"].includes(r)) ?? false;
   const { data: leaveRequests } = useHrmsLeaveRequests({ enabled: isLeaveApprover });
 
   const isTicketManager = can(user, "MANAGE_TICKETS", "ALL");
   const { data: openTickets } = useAllTickets("OPEN", { enabled: isTicketManager });
 
+  // Staff has no Workflow access — Leave is the only page they can reach
+  // (enforced in AppLayout.tsx, not just hidden here), so every other nav
+  // item is force-hidden rather than left to permission scopes.
+  const isStaff = user?.roles.includes("STAFF") ?? false;
+
   const workflowItems: NavItem[] = [
-    { to: "/workflow/boards", label: "Boards", icon: Trello, visible: can(user, "VIEW_WORKFLOW") },
-    { to: "/workflow/my-tasks", label: "My Tasks", icon: ListChecks, visible: true, badge: myTaskCount || undefined },
-    { to: "/workflow/team", label: "Team Workload", icon: Users2, visible: can(user, "VIEW_TEAM_WORKLOAD") },
-    { to: "/workflow/time-logs", label: "Time Logs", icon: Clock3, visible: can(user, "VIEW_TIME_LOGS", "TEAM") },
-    // Everyone can apply for their own leave here; approving others' leave
-    // (the pending-count badge below) is additionally gated server-side.
-    { to: "/hrms/leave", label: "Leave", icon: ClipboardList, visible: true, badge: isLeaveApprover ? leaveRequests?.length || undefined : undefined },
-    { to: "/tickets", label: "Support Tickets", icon: TicketIcon, visible: true, badge: isTicketManager ? openTickets?.length || undefined : undefined },
+    { to: "/workflow/enquiries", label: "Enquiry List", icon: Inbox, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
+    { to: "/workflow/boards", label: "Projects", icon: Trello, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
+    { to: "/workflow/my-tasks", label: "My Tasks", icon: ListChecks, visible: !isStaff, badge: myTaskCount || undefined },
+    { to: "/workflow/team", label: "Team Workload", icon: Users2, visible: !isStaff && can(user, "VIEW_TEAM_WORKLOAD") },
+    { to: "/workflow/history", label: "Project/Task History", icon: Archive, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
+    { to: "/workflow/time-logs", label: "Time Logs", icon: Clock3, visible: !isStaff && can(user, "VIEW_TIME_LOGS", "TEAM") },
+    // "Request" covers both Leave and Claim. Management is excluded from
+    // Leave (RequestPage hides that tab for them) but does approve Claims,
+    // so the menu stays visible for them too; approving others' leave (the
+    // pending-count badge below) is additionally gated server-side.
+    { to: "/hrms/leave", label: "Request", icon: ClipboardList, visible: true, badge: isLeaveApprover ? leaveRequests?.length || undefined : undefined },
+    { to: "/tickets", label: "Support Tickets", icon: TicketIcon, visible: !isStaff, badge: isTicketManager ? openTickets?.length || undefined : undefined },
   ];
 
   const settingsItems: NavItem[] = [
+    // My Profile is allowed for Staff too (see STAFF_ALLOWED_PATHS in
+    // AppLayout.tsx); Notifications stays out of reach for them.
     { to: "/settings/profile", label: "My Profile", icon: UserCircle, visible: true },
-    { to: "/settings/users", label: "Users", icon: UserCog, visible: can(user, "MANAGE_USERS", "ALL") },
-    { to: "/settings/employees", label: "Employees", icon: Contact, visible: can(user, "MANAGE_USERS", "ALL") },
-    { to: "/settings/roles", label: "Roles & Permissions", icon: Shield, visible: can(user, "MANAGE_ROLES", "ALL") },
-    { to: "/settings/tags", label: "Tags", icon: Tags, visible: true },
-    { to: "/settings/notifications", label: "Notifications", icon: Bell, visible: true },
-    { to: "/workflow/activity", label: "Recent Activity", icon: Activity, visible: true },
-    { to: "/settings/audit", label: "Audit Trail", icon: History, visible: can(user, "VIEW_AUDIT_TRAIL") },
+    { to: "/settings/users", label: "Users", icon: UserCog, visible: !isStaff && can(user, "MANAGE_USERS", "ALL") },
+    { to: "/settings/employees", label: "Employees", icon: Contact, visible: !isStaff && can(user, "MANAGE_USERS", "ALL") },
+    { to: "/settings/roles", label: "Roles & Permissions", icon: Shield, visible: !isStaff && can(user, "MANAGE_ROLES", "ALL") },
+    { to: "/settings/tags", label: "Tags", icon: Tags, visible: !isStaff },
+    { to: "/settings/notifications", label: "Notifications", icon: Bell, visible: !isStaff },
+    { to: "/workflow/activity", label: "Recent Activity", icon: Activity, visible: !isStaff },
+    { to: "/settings/audit", label: "Audit Trail", icon: History, visible: !isStaff && can(user, "VIEW_AUDIT_TRAIL") },
   ];
 
   const content = (
@@ -85,7 +98,7 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
         </button>
       </div>
 
-      <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} visible badge={undefined} onNavigate={onCloseMobile} />
+      {!isStaff && <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} visible badge={undefined} onNavigate={onCloseMobile} />}
 
       <NavSection title="Workflow" items={workflowItems} onNavigate={onCloseMobile} />
       <NavSection title="Settings" items={settingsItems} onNavigate={onCloseMobile} />

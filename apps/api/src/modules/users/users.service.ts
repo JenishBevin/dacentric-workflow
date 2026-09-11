@@ -150,7 +150,7 @@ export async function listUsers(filters: { status?: string; search?: string }) {
 
 export async function updateUser(
   userId: string,
-  input: { name?: string; roles?: RoleCode[]; moduleAccess?: ModuleCode[]; status?: "ACTIVE" | "DEACTIVATED" },
+  input: { name?: string; workEmail?: string; roles?: RoleCode[]; moduleAccess?: ModuleCode[]; status?: "ACTIVE" | "DEACTIVATED" },
   actor: AuthedUser
 ) {
   const existing = await prisma.user.findUnique({ where: { id: userId }, include: { roles: { include: { role: true } } } });
@@ -165,8 +165,24 @@ export async function updateUser(
     throw Errors.forbidden("Only a Super Admin can modify a Super Admin account or grant the Super Admin role.");
   }
 
+  // Changing someone else's sign-in email is also Super Admin only — same
+  // tier as changing your own (auth.service.ts#changeMyEmail) — regardless
+  // of whether the target is a Super Admin.
+  let normalizedEmail: string | undefined;
+  if (input.workEmail) {
+    if (!actorIsSuperAdmin) {
+      throw Errors.forbidden("Only a Super Admin can change another user's work email.");
+    }
+    normalizedEmail = input.workEmail.toLowerCase();
+    if (normalizedEmail !== existing.workEmail) {
+      const emailTaken = await prisma.user.findUnique({ where: { workEmail: normalizedEmail } });
+      if (emailTaken) throw Errors.conflict("That email address is already in use by another account.");
+    }
+  }
+
   const data: any = {};
   if (input.name) data.name = input.name;
+  if (normalizedEmail) data.workEmail = normalizedEmail;
   if (input.moduleAccess) data.moduleAccess = input.moduleAccess;
   if (input.status) data.status = input.status;
 
@@ -189,7 +205,7 @@ export async function updateUser(
     action: input.status === "DEACTIVATED" ? AuditAction.DEACTIVATE : input.status === "ACTIVE" ? AuditAction.ACTIVATE : AuditAction.EDIT,
     entityType: "User",
     entityId: userId,
-    beforeValue: { status: existing.status, roles: existing.roles.map((r) => r.roleId) },
+    beforeValue: { status: existing.status, roles: existing.roles.map((r) => r.roleId), workEmail: existing.workEmail },
     afterValue: input,
   });
 

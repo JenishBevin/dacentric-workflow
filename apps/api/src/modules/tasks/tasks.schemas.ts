@@ -7,6 +7,7 @@ export const createTaskSchema = z
   .object({
     boardId: z.string().uuid("Board is required."),
     stageId: z.string().uuid().optional(),
+    serviceId: z.string().uuid().optional(),
     title: z.string().min(1, "Title is required.").max(150, "Title cannot exceed 150 characters."),
     description: z.string().max(20000).optional(),
     priority: z.nativeEnum(TaskPriority).default(TaskPriority.MEDIUM),

@@ -8,6 +8,24 @@ import { prisma } from "../../lib/prisma";
 import { getEmployeeWorkloadDetail } from "../teamWorkload/teamWorkload.service";
 import { Errors } from "../../common/errors";
 import { RoleCode } from "@dacentric/types";
+import { LeaveType } from "@prisma/client";
+
+// Core-essentials leave module: fixed per-type day entitlements (no
+// configurable policy engine — see schema.prisma's LeaveType comment).
+// `null` means no balance cap (unpaid leave).
+const LEAVE_ENTITLEMENTS: Record<LeaveType, number | null> = {
+  ANNUAL: 21,
+  SICK: 10,
+  MATERNITY: 90,
+  PATERNITY: 7,
+  UNPAID: null,
+  EMERGENCY: 5,
+};
+
+function inclusiveDayCount(startDate: Date, endDate: Date) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.round((endDate.getTime() - startDate.getTime()) / msPerDay) + 1;
+}
 
 /**
  * Minimal HRMS surface — only what UC-12 needs to exist: a leave-request
@@ -31,9 +49,34 @@ hrmsRouter.get(
     if (!req.user!.employeeId) return ok(res, []);
     const requests = await prisma.leaveRequest.findMany({
       where: { employeeId: req.user!.employeeId },
+      include: { handoverToEmployee: { select: { id: true, fullName: true } } },
       orderBy: { createdAt: "desc" },
     });
     return ok(res, requests);
+  })
+);
+
+// Balance per leave type for the current year: entitlement minus days
+// already used by APPROVED requests, computed on the fly — no running
+// counter stored anywhere.
+hrmsRouter.get(
+  "/leave-requests/balance",
+  asyncHandler(async (req, res) => {
+    if (!req.user!.employeeId) return ok(res, []);
+    const yearStart = new Date(new Date().getFullYear(), 0, 1);
+    const yearEnd = new Date(new Date().getFullYear() + 1, 0, 1);
+    const approved = await prisma.leaveRequest.findMany({
+      where: { employeeId: req.user!.employeeId, status: "APPROVED", startDate: { gte: yearStart, lt: yearEnd } },
+      select: { leaveType: true, numberOfDays: true },
+    });
+    const used: Record<string, number> = {};
+    for (const r of approved) used[r.leaveType] = (used[r.leaveType] ?? 0) + r.numberOfDays;
+    const balance = (Object.keys(LEAVE_ENTITLEMENTS) as LeaveType[]).map((leaveType) => {
+      const entitlement = LEAVE_ENTITLEMENTS[leaveType];
+      const usedDays = used[leaveType] ?? 0;
+      return { leaveType, entitlement, used: usedDays, remaining: entitlement === null ? null : entitlement - usedDays };
+    });
+    return ok(res, balance);
   })
 );
 
@@ -42,9 +85,12 @@ hrmsRouter.post(
   validate(
     z
       .object({
+        leaveType: z.nativeEnum(LeaveType),
         startDate: z.coerce.date(),
         endDate: z.coerce.date(),
         reason: z.string().max(1000).optional(),
+        handoverToEmployeeId: z.string().uuid().optional(),
+        handoverNotes: z.string().max(2000).optional(),
       })
       .refine((v) => v.endDate >= v.startDate, { message: "End date must be on or after the start date.", path: ["endDate"] })
   ),
@@ -52,9 +98,23 @@ hrmsRouter.post(
     if (!req.user!.employeeId) {
       throw Errors.badRequest("Your account isn't linked to an employee record, so it can't apply for leave. Ask your administrator to link one.");
     }
-    const { startDate, endDate, reason } = (req as any).validatedBody;
+    const { leaveType, startDate, endDate, reason, handoverToEmployeeId, handoverNotes } = (req as any).validatedBody;
+
+    const overlapping = await prisma.leaveRequest.findFirst({
+      where: {
+        employeeId: req.user!.employeeId,
+        status: { in: ["PENDING", "APPROVED"] },
+        startDate: { lte: endDate },
+        endDate: { gte: startDate },
+      },
+    });
+    if (overlapping) {
+      throw Errors.badRequest("You already have a leave request that overlaps these dates.");
+    }
+
+    const numberOfDays = inclusiveDayCount(startDate, endDate);
     const leave = await prisma.leaveRequest.create({
-      data: { employeeId: req.user!.employeeId, startDate, endDate, reason },
+      data: { employeeId: req.user!.employeeId, leaveType, startDate, endDate, numberOfDays, reason, handoverToEmployeeId, handoverNotes },
     });
     return created(res, leave);
   })
@@ -62,11 +122,13 @@ hrmsRouter.post(
 
 hrmsRouter.get(
   "/leave-requests",
-  requireAnyRole(RoleCode.HR, RoleCode.MANAGER, RoleCode.SYSTEM_ADMIN, RoleCode.SUPER_ADMIN),
+  requireAnyRole(RoleCode.HR, RoleCode.SYSTEM_ADMIN, RoleCode.SUPER_ADMIN),
   asyncHandler(async (_req, res) => {
+    // Single-stage approval: every request goes straight to HR (or an
+    // Administrator) — no Project Manager / Management stage.
     const requests = await prisma.leaveRequest.findMany({
       where: { status: "PENDING" },
-      include: { employee: true },
+      include: { employee: true, handoverToEmployee: { select: { id: true, fullName: true } } },
       orderBy: { createdAt: "desc" },
     });
     return ok(res, requests);
@@ -75,7 +137,7 @@ hrmsRouter.get(
 
 hrmsRouter.get(
   "/leave-requests/:id/workload",
-  requireAnyRole(RoleCode.HR, RoleCode.MANAGER, RoleCode.SYSTEM_ADMIN, RoleCode.SUPER_ADMIN),
+  requireAnyRole(RoleCode.HR, RoleCode.SYSTEM_ADMIN, RoleCode.SUPER_ADMIN),
   asyncHandler(async (req, res) => {
     const leave = await prisma.leaveRequest.findUnique({ where: { id: req.params.id } });
     if (!leave) throw Errors.notFound("Leave request");
@@ -93,13 +155,18 @@ hrmsRouter.get(
 
 hrmsRouter.post(
   "/leave-requests/:id/decision",
-  requireAnyRole(RoleCode.HR, RoleCode.MANAGER, RoleCode.SYSTEM_ADMIN, RoleCode.SUPER_ADMIN),
+  requireAnyRole(RoleCode.HR, RoleCode.SYSTEM_ADMIN, RoleCode.SUPER_ADMIN),
   validate(z.object({ decision: z.enum(["APPROVED", "REJECTED"]) })),
   asyncHandler(async (req, res) => {
-    const leave = await prisma.leaveRequest.update({
-      where: { id: req.params.id },
-      data: { status: (req as any).validatedBody.decision, decidedAt: new Date() },
+    const { decision } = (req as any).validatedBody as { decision: "APPROVED" | "REJECTED" };
+    const leave = await prisma.leaveRequest.findUnique({ where: { id: req.params.id } });
+    if (!leave) throw Errors.notFound("Leave request");
+    if (leave.status !== "PENDING") throw Errors.conflict("This leave request has already been decided.");
+
+    const updated = await prisma.leaveRequest.update({
+      where: { id: leave.id },
+      data: { status: decision, decidedById: req.user!.id, decidedAt: new Date() },
     });
-    return ok(res, leave);
+    return ok(res, updated);
   })
 );

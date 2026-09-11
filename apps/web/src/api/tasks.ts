@@ -89,6 +89,30 @@ export function useMoveTask() {
   });
 }
 
+/** "Awarded": creates a new Project under the task's Service and moves the
+ * task onto it. Returns the new project so the caller can navigate there. */
+export function useAwardTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (taskId: string) => (await api.post<{ data: { id: string; name: string } }>(`/tasks/${taskId}/award`)).data.data,
+    onSuccess: (board, taskId) => {
+      invalidateTaskEverywhere(qc, taskId, board.id);
+      qc.invalidateQueries({ queryKey: ["services"] });
+    },
+  });
+}
+
+export function useMarkTaskLost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (taskId: string) => (await api.post(`/tasks/${taskId}/lost`)).data.data,
+    onSuccess: (task: any, taskId) => {
+      invalidateTaskEverywhere(qc, taskId, task.boardId);
+      qc.invalidateQueries({ queryKey: ["history"] });
+    },
+  });
+}
+
 export function useQuickComplete() {
   const qc = useQueryClient();
   return useMutation({

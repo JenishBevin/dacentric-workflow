@@ -28,6 +28,9 @@ export const bulkImportSchema = z.object({
 
 export const updateUserSchema = z.object({
   name: z.string().min(1).max(150).optional(),
+  // Changing another user's sign-in email is Super Admin only — enforced in
+  // users.service.ts#updateUser, not just by this schema.
+  workEmail: z.string().email("Enter a valid work email.").optional(),
   roles: z.array(z.nativeEnum(RoleCode)).min(1).optional(),
   moduleAccess: z.array(z.nativeEnum(ModuleCode)).min(1).optional(),
   status: z.enum(["ACTIVE", "DEACTIVATED"]).optional(),

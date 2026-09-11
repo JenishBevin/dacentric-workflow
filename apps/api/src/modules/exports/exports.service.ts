@@ -53,6 +53,30 @@ export function workloadExportColumns() {
   ];
 }
 
+export function historyExportColumns() {
+  return [
+    { header: "Type", key: "type", width: 12 },
+    { header: "ID", key: "code", width: 16 },
+    { header: "Name", key: "name", width: 40 },
+    { header: "Service", key: "service", width: 20 },
+    { header: "Status", key: "status", width: 14 },
+    { header: "Date", key: "date", width: 14 },
+  ];
+}
+
+export function settledClaimsExportColumns() {
+  return [
+    { header: "Claim ID", key: "claimId", width: 16 },
+    { header: "Employee", key: "employee", width: 24 },
+    { header: "Amount (AED)", key: "amount", width: 14 },
+    { header: "Reason", key: "reason", width: 40 },
+    { header: "Expense Date", key: "expenseDate", width: 16 },
+    { header: "Approved By", key: "approvedBy", width: 20 },
+    { header: "Settled By", key: "settledBy", width: 20 },
+    { header: "Settled Date", key: "settledDate", width: 16 },
+  ];
+}
+
 export function auditExportColumns() {
   return [
     { header: "Date/Time", key: "createdAt", width: 22 },

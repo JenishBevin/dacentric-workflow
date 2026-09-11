@@ -68,7 +68,7 @@ export default function AuditTrailPage() {
         </div>
         <div>
           <Label className="!mb-0.5 !text-xs">Search entity ID</Label>
-          <Input placeholder="Task or board ID…" onChange={(e) => setFilter("taskId", e.target.value)} className="!py-1.5 !text-xs" />
+          <Input placeholder="Task or project ID…" onChange={(e) => setFilter("taskId", e.target.value)} className="!py-1.5 !text-xs" />
         </div>
       </div>
 

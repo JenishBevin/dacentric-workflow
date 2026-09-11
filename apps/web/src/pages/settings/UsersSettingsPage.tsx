@@ -5,18 +5,22 @@ import { Button, Input, PasswordInput, Label, Select, Badge, Skeleton, ErrorStat
 import { Drawer } from "../../components/ui/Drawer";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../context/ToastContext";
+import { useAuth } from "../../context/AuthContext";
+import { isSuperAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { RoleCode, ModuleCode } from "../../lib/types";
 
 const ROLE_LABELS: Record<RoleCode, string> = {
   SUPER_ADMIN: "Super Admin",
   SYSTEM_ADMIN: "System Admin",
-  CEO_DIRECTOR: "CEO / Director",
-  MANAGER: "Manager",
+  MANAGEMENT: "Management",
+  PROJECT_MANAGER: "Project Manager",
   HR: "HR",
-  TEAM_LEAD: "Team Lead",
-  TEAM_MEMBER: "Team Member",
-  ACCOUNTANT: "Accountant",
+  ACCOUNTS: "Accounts",
+  ESTIMATION: "Estimation",
+  SALES: "Sales",
+  PROCUREMENT: "Procurement",
+  STAFF: "Staff",
 };
 const ALL_ROLES = Object.keys(ROLE_LABELS) as RoleCode[];
 const ALL_MODULES: ModuleCode[] = ["WORKFLOW", "CRM", "ERP", "HRMS"];
@@ -386,16 +390,19 @@ const NewUserDrawer: React.FC<{ open: boolean; onClose: () => void; onCreate: Re
 };
 
 const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: ReturnType<typeof useUpdateUser> }> = ({ user, onClose, onUpdate }) => {
+  const { user: actor } = useAuth();
   const { push } = useToast();
   const [roles, setRoles] = useState<RoleCode[]>(user.roles.map((r) => r.role.code));
   const [modules, setModules] = useState<ModuleCode[]>(user.moduleAccess);
+  const [workEmail, setWorkEmail] = useState(user.workEmail);
+  const canEditEmail = isSuperAdmin(actor);
 
   return (
     <Drawer
       open
       onClose={onClose}
       title={`Edit ${user.name}`}
-      subtitle={user.workEmail}
+      subtitle={canEditEmail ? undefined : user.workEmail}
       footer={
         <>
           <Button variant="outline" onClick={onClose}>
@@ -405,7 +412,13 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
             loading={onUpdate.isPending}
             onClick={async () => {
               try {
-                await onUpdate.mutateAsync({ userId: user.id, roles, moduleAccess: modules });
+                const emailChanged = canEditEmail && workEmail.trim() !== user.workEmail;
+                await onUpdate.mutateAsync({
+                  userId: user.id,
+                  roles,
+                  moduleAccess: modules,
+                  ...(emailChanged ? { workEmail: workEmail.trim() } : {}),
+                });
                 push({ variant: "success", title: "User updated." });
                 onClose();
               } catch (err) {
@@ -419,6 +432,13 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
       }
     >
       <div className="space-y-4">
+        {canEditEmail && (
+          <div>
+            <Label required>Work Email</Label>
+            <Input type="email" value={workEmail} onChange={(e) => setWorkEmail(e.target.value)} />
+            <p className="mt-1 text-xs text-slate-400">Only Super Admin can change another user's sign-in email. The change takes effect immediately.</p>
+          </div>
+        )}
         <RoleModuleCheckboxes roles={roles} setRoles={setRoles} modules={modules} setModules={setModules} />
       </div>
     </Drawer>
@@ -427,7 +447,7 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
 
 const BulkImportModal: React.FC<{ open: boolean; onClose: () => void; onImport: ReturnType<typeof useBulkImportUsers> }> = ({ open, onClose, onImport }) => {
   const { push } = useToast();
-  const [csv, setCsv] = useState("name,workEmail,roles,moduleAccess\nJane Doe,jane.doe@example.com,TEAM_MEMBER,WORKFLOW");
+  const [csv, setCsv] = useState("name,workEmail,roles,moduleAccess\nJane Doe,jane.doe@example.com,ESTIMATION,WORKFLOW");
 
   async function submit() {
     const lines = csv.trim().split("\n").filter(Boolean);
@@ -460,7 +480,7 @@ const BulkImportModal: React.FC<{ open: boolean; onClose: () => void; onImport: 
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Bulk import users" description="One row per user. roles and moduleAccess are pipe-separated (e.g. TEAM_MEMBER|VIEWER)." size="lg">
+    <Modal open={open} onClose={onClose} title="Bulk import users" description="One row per user. roles and moduleAccess are pipe-separated (e.g. ESTIMATION|VIEWER)." size="lg">
       <textarea
         rows={10}
         value={csv}

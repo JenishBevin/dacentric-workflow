@@ -9,6 +9,7 @@ export const createBoardSchema = z
     linkedRecordType: z.nativeEnum(LinkedRecordType).optional(),
     linkedRecordId: z.string().uuid().optional(),
     templateId: z.string().uuid().optional(),
+    serviceId: z.string().uuid().optional(),
     members: z
       .array(
         z.object({

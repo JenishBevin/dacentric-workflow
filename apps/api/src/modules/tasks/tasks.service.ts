@@ -6,13 +6,15 @@ import { sanitizeDescription } from "../../common/richtext";
 import { loadTaskWithAccess, assertCanEditTask, assertCanDeleteTask } from "./task-access";
 import { AuthedUser } from "../../middleware/authenticate";
 import { computeDueDateStatus } from "./task-formatting";
-import { formatTaskId, AuditAction, TaskApprovalStatus, TaskType, NotificationEvent, RoleCode, PermissionKey } from "@dacentric/types";
+import { formatTaskId, formatProjectId, AuditAction, TaskApprovalStatus, TaskType, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
 import { getPermissionScope, scopeAtLeast } from "../../common/permissions";
 import { createRecurringSeries, attachTemplateAndScheduleFirst } from "../recurrence/recurrence.service";
+import { DEFAULT_STAGES } from "../boards/boards.service";
 
 export interface CreateTaskInput {
   boardId: string;
   stageId?: string;
+  serviceId?: string;
   title: string;
   description?: string;
   priority: string;
@@ -71,6 +73,7 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
       data: {
         boardId: input.boardId,
         stageId: stage.id,
+        serviceId: input.serviceId ?? null,
         title: input.title,
         description: sanitizeDescription(input.description),
         priority: input.priority as any,
@@ -172,6 +175,8 @@ function serializeTask(task: any) {
     board: task.board ? { id: task.board.id, name: task.board.name } : undefined,
     stageId: task.stageId,
     stage: task.stage ? { id: task.stage.id, name: task.stage.name, color: task.stage.color, isTerminal: task.stage.isTerminal } : undefined,
+    serviceId: task.serviceId,
+    service: task.service ? { id: task.service.id, name: task.service.name } : undefined,
     priority: task.priority,
     startDate: task.startDate,
     dueDate: task.dueDate,
@@ -218,6 +223,7 @@ function serializeTask(task: any) {
 const TASK_DETAIL_INCLUDE = {
   board: true,
   stage: true,
+  service: true,
   createdBy: true,
   assignees: { include: { user: true } },
   watchers: { include: { user: true } },
@@ -479,6 +485,89 @@ export async function moveTask(taskId: string, targetStageId: string, actor: Aut
   });
 
   return serializeTask(updated);
+}
+
+// ---------------------------------------------------------------------------
+// Awarded — an enquiry's client accepted the quote: spin up a real Project
+// (under the enquiry's chosen Service, if any) and move this task onto it,
+// landing in the new project's first stage. There is no other place in the
+// app that reassigns a task's boardId — every other write only ever moves a
+// task between stages of the SAME board — so this is the one path that does.
+// ---------------------------------------------------------------------------
+
+export async function awardTask(taskId: string, actor: AuthedUser) {
+  const ctx = await loadTaskWithAccess(taskId, actor);
+  assertCanEditTask(ctx);
+
+  const canCreateBoard = scopeAtLeast(getPermissionScope(actor.permissions, PermissionKey.CREATE_BOARD), "OWN");
+  if (!canCreateBoard) throw Errors.forbidden("You do not have permission to create a project.");
+
+  const { board: newBoard, firstStageId } = await prisma.$transaction(async (tx) => {
+    const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
+    const created = await tx.board.create({
+      data: {
+        boardId: placeholderId,
+        name: ctx.task.title,
+        boardType: BoardType.STANDALONE,
+        serviceId: (ctx.task as any).serviceId ?? null,
+        createdById: actor.id,
+        stages: {
+          create: DEFAULT_STAGES.map((s, idx) => ({
+            name: s.name,
+            color: s.color,
+            position: idx,
+            isTerminal: (s as any).isTerminal ?? idx === DEFAULT_STAGES.length - 1,
+          })),
+        },
+        members: { create: [{ userId: actor.id, role: "OWNER" }] },
+      },
+      include: { stages: { orderBy: { position: "asc" } } },
+    });
+    const board = await tx.board.update({
+      where: { id: created.id },
+      data: { boardId: formatProjectId(created.boardNumber) },
+      include: { stages: { orderBy: { position: "asc" } } },
+    });
+
+    await tx.task.update({
+      where: { id: taskId },
+      data: { boardId: board.id, stageId: board.stages[0].id, version: { increment: 1 } },
+    });
+
+    return { board, firstStageId: board.stages[0].id };
+  });
+
+  await writeAudit({
+    actor,
+    action: AuditAction.CREATE,
+    entityType: "Board",
+    entityId: newBoard.id,
+    boardId: newBoard.id,
+    afterValue: { name: newBoard.name, awardedFromTaskId: ctx.task.taskId },
+  });
+  await writeAudit({
+    actor,
+    action: AuditAction.MOVE,
+    entityType: "Task",
+    entityId: taskId,
+    boardId: newBoard.id,
+    metadata: { awarded: true, fromBoardId: ctx.task.boardId, toBoardId: newBoard.id, toStageId: firstStageId },
+  });
+
+  return { id: newBoard.id, name: newBoard.name };
+}
+
+/** The "Lost" action on an enquiry — moves it to its board's "Lost" stage
+ *  (via the same moveTask() every drag-and-drop move uses, so WIP limits,
+ *  approval gates, and notifications all still apply), so it shows up in
+ *  Project/Task History as Lost instead of ever becoming a Project. */
+export async function markTaskLost(taskId: string, actor: AuthedUser) {
+  const ctx = await loadTaskWithAccess(taskId, actor);
+  const lostStage = await prisma.boardStage.findFirst({
+    where: { boardId: ctx.task.boardId, name: { equals: "Lost", mode: "insensitive" } },
+  });
+  if (!lostStage) throw Errors.badRequest('This board has no "Lost" stage.');
+  return moveTask(taskId, lostStage.id, actor);
 }
 
 async function assertDependenciesCleared(taskId: string) {

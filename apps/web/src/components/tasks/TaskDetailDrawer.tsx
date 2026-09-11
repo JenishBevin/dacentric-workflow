@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Drawer } from "../ui/Drawer";
 import {
   Button,
@@ -19,7 +20,7 @@ import { AttachmentsSection } from "./AttachmentsSection";
 import { DependenciesSection } from "./DependenciesSection";
 import { ActivitySection } from "./ActivitySection";
 import { PriorityBadge, ApprovalStatusBadge } from "../workflow/badges";
-import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask } from "../../api/tasks";
+import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask, useAwardTask, useMarkTaskLost } from "../../api/tasks";
 import { useBoardDetail } from "../../api/boards";
 import { useTags, useCreateTag } from "../../api/misc";
 import { useAuth } from "../../context/AuthContext";
@@ -27,8 +28,9 @@ import { useToast } from "../../context/ToastContext";
 import { can, isAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { Repeat, Link2, Copy, Trash2, Check, X as XIcon } from "lucide-react";
+import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, Award, ThumbsDown } from "lucide-react";
 import { format } from "date-fns";
+import clsx from "clsx";
 
 interface Props {
   taskId: string | null;
@@ -45,6 +47,7 @@ interface Props {
 export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }) => {
   const { user } = useAuth();
   const { push } = useToast();
+  const navigate = useNavigate();
   const { data: task, isLoading } = useTask(taskId ?? undefined);
   const { data: board } = useBoardDetail(task?.boardId);
   const updateTask = useUpdateTask(taskId ?? "");
@@ -55,6 +58,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const { approve, reject } = useApprovalMutations(taskId ?? "");
   const duplicateTask = useDuplicateTask();
   const deleteTask = useDeleteTask();
+  const awardTask = useAwardTask();
+  const markTaskLost = useMarkTaskLost();
   const { data: allTags } = useTags();
   const createTag = useCreateTag();
 
@@ -157,6 +162,43 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         task && (
           <div className="flex w-full items-center justify-between">
             <div className="flex gap-2">
+              {task.board?.name === "Enquiry List" && task.stage?.name?.toLowerCase() !== "lost" && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={awardTask.isPending}
+                    onClick={async () => {
+                      try {
+                        const newBoard = await awardTask.mutateAsync(task.id);
+                        push({ variant: "success", title: "Awarded — project created.", description: newBoard.name });
+                        onClose();
+                        navigate(`/workflow/boards/${newBoard.id}`);
+                      } catch (err) {
+                        push({ variant: "error", title: "Could not award", description: extractApiError(err).message });
+                      }
+                    }}
+                  >
+                    <Award className="h-3.5 w-3.5 text-emerald-600" /> Awarded
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={markTaskLost.isPending}
+                    onClick={async () => {
+                      try {
+                        await markTaskLost.mutateAsync(task.id);
+                        push({ variant: "success", title: "Enquiry marked as Lost.", description: "Moved to Project/Task History." });
+                        onClose();
+                      } catch (err) {
+                        push({ variant: "error", title: "Could not mark as Lost", description: extractApiError(err).message });
+                      }
+                    }}
+                  >
+                    <ThumbsDown className="h-3.5 w-3.5 text-red-500" /> Lost
+                  </Button>
+                </>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -225,11 +267,17 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
           </section>
 
           {/* Workflow */}
-          <section className="grid grid-cols-2 gap-3">
+          <section className={clsx("grid gap-3", task.service ? "grid-cols-3" : "grid-cols-2")}>
             <div>
-              <Label>Board</Label>
+              <Label>Project</Label>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{task.board?.name}</p>
             </div>
+            {task.service && (
+              <div>
+                <Label>Service</Label>
+                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{task.service.name}</p>
+              </div>
+            )}
             <div>
               <Label>Stage</Label>
               <Select value={task.stageId} disabled={!canMove} onChange={(e) => performMove(e.target.value)}>

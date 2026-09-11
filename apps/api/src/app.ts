@@ -25,6 +25,9 @@ import { crmRouter } from "./modules/integrations/crm.routes";
 import { hrmsRouter } from "./modules/integrations/hrms.routes";
 import { workTimeRouter } from "./modules/workTime/workTime.routes";
 import { ticketsRouter } from "./modules/tickets/tickets.routes";
+import { chatRouter } from "./modules/chat/chat.routes";
+import { historyRouter } from "./modules/history/history.routes";
+import { claimsRouter } from "./modules/claims/claims.routes";
 
 export function createApp() {
   const app = express();
@@ -65,6 +68,9 @@ export function createApp() {
   app.use("/api/integrations/hrms", hrmsRouter);
   app.use("/api/work-time", workTimeRouter);
   app.use("/api/tickets", ticketsRouter);
+  app.use("/api/chat", chatRouter);
+  app.use("/api/history", historyRouter);
+  app.use("/api/claims", claimsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

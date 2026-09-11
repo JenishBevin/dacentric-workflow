@@ -45,7 +45,7 @@ export default function TagsSettingsPage() {
     <div className="max-w-2xl space-y-4">
       <div>
         <h1 className="text-lg font-semibold text-slate-900">Tags</h1>
-        <p className="text-sm text-slate-500">Organization-wide labels used to classify and filter tasks and boards.</p>
+        <p className="text-sm text-slate-500">Organization-wide labels used to classify and filter tasks and projects.</p>
       </div>
 
       <Input placeholder="Search tags…" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -111,7 +111,7 @@ export default function TagsSettingsPage() {
         title="Delete tag"
         message={
           <>
-            Are you sure you want to delete the tag <strong>&ldquo;{pendingDelete?.name}&rdquo;</strong>? It will be removed from every task and board that uses it.
+            Are you sure you want to delete the tag <strong>&ldquo;{pendingDelete?.name}&rdquo;</strong>? It will be removed from every task and project that uses it.
           </>
         }
         confirmLabel="Delete tag"

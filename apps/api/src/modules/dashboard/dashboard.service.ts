@@ -65,7 +65,11 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     prisma.task.count({ where: { ...baseWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfToday } } }),
     prisma.task.count({ where: { ...baseWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfWeek } } }),
     prisma.task.count({ where: { ...baseWhere, isCompleted: true, completedAt: { gte: startOfMonth } } }),
-    prisma.board.count({ where: { ...boardWhere, isArchived: false } }),
+    // Enquiry List is a distinct feature from "Projects" (its own nav item,
+    // not filed under any Service) — excluded here so this count matches
+    // what the Projects page actually shows, even though its tasks still
+    // count toward every task-based stat above via boardIds.
+    prisma.board.count({ where: { ...boardWhere, isArchived: false, isCompleted: false, name: { not: "Enquiry List" } } }),
     prisma.task.groupBy({ by: ["priority"], where: { ...baseWhere, isCompleted: false }, _count: { _all: true } }),
     prisma.task.groupBy({ by: ["stageId"], where: { ...baseWhere }, _count: { _all: true } }),
     prisma.task.count({ where: { ...baseWhere, approvalStatus: "PENDING_APPROVAL" } }),
@@ -74,6 +78,17 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
 
   const stages = await prisma.boardStage.findMany({ where: { id: { in: statusBreakdown.map((s) => s.stageId) } } });
   const stageNameById = new Map(stages.map((s) => [s.id, s.name]));
+
+  // Every board has its own BoardStage rows, so two projects each named
+  // "Backlog" produce two different stageIds — merge by stage name here,
+  // otherwise the same status shows up as separate, repeated slices/legend
+  // rows instead of one combined count.
+  const countByStageName = new Map<string, number>();
+  for (const s of statusBreakdown) {
+    const name = stageNameById.get(s.stageId) ?? "Unknown";
+    countByStageName.set(name, (countByStageName.get(name) ?? 0) + s._count._all);
+  }
+  const statusDistribution = Array.from(countByStageName, ([stage, count]) => ({ stage, count }));
 
   return {
     totalOpenTasks: totalOpen,
@@ -84,7 +99,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     activeBoards,
     pendingApprovals,
     priorityDistribution: priorityBreakdown.map((p) => ({ priority: p.priority, count: p._count._all })),
-    statusDistribution: statusBreakdown.map((s) => ({ stage: stageNameById.get(s.stageId) ?? "Unknown", count: s._count._all })),
+    statusDistribution,
     recentActivity,
   };
 }

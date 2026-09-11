@@ -33,12 +33,13 @@ export async function createFixtures(namespace: string) {
   }
 
   const admin = await makeUser("admin@test.local", "Test Admin", [RoleCode.SYSTEM_ADMIN]);
-  const manager = await makeUser("manager@test.local", "Test Manager", [RoleCode.MANAGER]);
-  const memberA = await makeUser("membera@test.local", "Member A", [RoleCode.TEAM_MEMBER]);
-  const memberB = await makeUser("memberb@test.local", "Member B", [RoleCode.TEAM_MEMBER]);
+  const manager = await makeUser("manager@test.local", "Test Manager", [RoleCode.PROJECT_MANAGER]);
+  const memberA = await makeUser("membera@test.local", "Member A", [RoleCode.ESTIMATION]);
+  const memberB = await makeUser("memberb@test.local", "Member B", [RoleCode.ESTIMATION]);
 
   const board = await prisma.board.create({
     data: {
+      boardId: `TEST-${namespace}-${Date.now()}`,
       name: `${namespace} Test Board`,
       boardType: "STANDALONE",
       createdById: manager.id,

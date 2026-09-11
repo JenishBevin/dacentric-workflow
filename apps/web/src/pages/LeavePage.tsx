@@ -1,31 +1,81 @@
-import React, { useState } from "react";
-import { format } from "date-fns";
+import React, { useMemo, useState } from "react";
+import { format, differenceInCalendarDays } from "date-fns";
 import { CalendarClock, Eye, Check, X as XIcon, Info, Plus } from "lucide-react";
-import { useHrmsLeaveRequests, useHrmsWorkload, useDecideLeaveRequest, useMyLeaveRequests, useApplyForLeave } from "../api/misc";
-import { Badge, Button, Input, Label, Textarea, Skeleton, EmptyState, Card, ErrorState } from "../components/ui/primitives";
+import {
+  useHrmsLeaveRequests,
+  useHrmsWorkload,
+  useDecideLeaveRequest,
+  useMyLeaveRequests,
+  useApplyForLeave,
+  useMyLeaveBalance,
+  useEmployeeDirectory,
+} from "../api/misc";
+import { Badge, Button, Input, Label, Select, Textarea, Skeleton, EmptyState, Card, ErrorState } from "../components/ui/primitives";
 import { PriorityBadge } from "../components/workflow/badges";
 import { Drawer } from "../components/ui/Drawer";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { extractApiError } from "../lib/apiClient";
 
-const STATUS_TONE: Record<string, "amber" | "green" | "red"> = { PENDING: "amber", APPROVED: "green", REJECTED: "red" };
+const STATUS_TONE: Record<string, "amber" | "green" | "red" | "blue"> = {
+  PENDING: "amber",
+  APPROVED: "green",
+  REJECTED: "red",
+};
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: "Awaiting HR",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+};
+
+const LEAVE_TYPE_LABEL: Record<string, string> = {
+  ANNUAL: "Annual",
+  SICK: "Sick",
+  MATERNITY: "Maternity",
+  PATERNITY: "Paternity",
+  UNPAID: "Unpaid",
+  EMERGENCY: "Emergency",
+};
+const LEAVE_TYPES = Object.keys(LEAVE_TYPE_LABEL);
 
 function ApplyForLeaveDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { push } = useToast();
   const apply = useApplyForLeave();
+  const { data: balance } = useMyLeaveBalance();
+  const { data: directory } = useEmployeeDirectory();
+  const [leaveType, setLeaveType] = useState("ANNUAL");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
+  const [handoverToEmployeeId, setHandoverToEmployeeId] = useState("");
+  const [handoverNotes, setHandoverNotes] = useState("");
+
+  const dayCount = useMemo(() => {
+    if (!startDate || !endDate) return null;
+    const days = differenceInCalendarDays(new Date(endDate), new Date(startDate)) + 1;
+    return days > 0 ? days : null;
+  }, [startDate, endDate]);
+
+  const selectedBalance = balance?.find((b: any) => b.leaveType === leaveType);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await apply.mutateAsync({ startDate, endDate, reason: reason || undefined });
+      await apply.mutateAsync({
+        leaveType,
+        startDate,
+        endDate,
+        reason: reason || undefined,
+        handoverToEmployeeId: handoverToEmployeeId || undefined,
+        handoverNotes: handoverNotes || undefined,
+      });
       push({ variant: "success", title: "Leave request submitted.", description: "You'll be notified once it's decided." });
+      setLeaveType("ANNUAL");
       setStartDate("");
       setEndDate("");
       setReason("");
+      setHandoverToEmployeeId("");
+      setHandoverNotes("");
       onClose();
     } catch (err) {
       push({ variant: "error", title: "Could not submit request", description: extractApiError(err).message });
@@ -35,6 +85,23 @@ function ApplyForLeaveDrawer({ open, onClose }: { open: boolean; onClose: () => 
   return (
     <Drawer open={open} onClose={onClose} title="Apply for Leave" subtitle="Submit a date range for HR or your manager to review.">
       <form onSubmit={submit} className="space-y-4">
+        <div>
+          <Label required>Leave type</Label>
+          <Select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
+            {LEAVE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {LEAVE_TYPE_LABEL[t]}
+              </option>
+            ))}
+          </Select>
+          {selectedBalance && (
+            <p className="mt-1 text-xs text-slate-500">
+              {selectedBalance.remaining === null
+                ? "No balance cap for this leave type."
+                : `${selectedBalance.remaining} of ${selectedBalance.entitlement} days remaining this year.`}
+            </p>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label required>Start date</Label>
@@ -45,10 +112,34 @@ function ApplyForLeaveDrawer({ open, onClose }: { open: boolean; onClose: () => 
             <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={startDate || undefined} required />
           </div>
         </div>
+        {dayCount && <p className="text-xs text-slate-500">{dayCount} day{dayCount > 1 ? "s" : ""} total.</p>}
         <div>
           <Label>Reason (optional)</Label>
           <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={1000} placeholder="Annual leave, medical, etc." />
         </div>
+        <div>
+          <Label>Hand over to (optional)</Label>
+          <Select value={handoverToEmployeeId} onChange={(e) => setHandoverToEmployeeId(e.target.value)}>
+            <option value="">No handover</option>
+            {directory?.map((e: any) => (
+              <option key={e.employeeId} value={e.employeeId}>
+                {e.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+        {handoverToEmployeeId && (
+          <div>
+            <Label>Handover notes</Label>
+            <Textarea
+              value={handoverNotes}
+              onChange={(e) => setHandoverNotes(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="Pending tasks and instructions for the person covering you."
+            />
+          </div>
+        )}
         <Button type="submit" loading={apply.isPending} disabled={!startDate || !endDate}>
           Submit request
         </Button>
@@ -74,26 +165,36 @@ export default function LeavePage() {
 
   const { data: myRequests, isLoading: myLoading, isError: myError, refetch: refetchMine } = useMyLeaveRequests();
 
-  const isApprover = user?.roles.some((r) => ["HR", "MANAGER", "SYSTEM_ADMIN", "SUPER_ADMIN"].includes(r)) ?? false;
+  // Single-stage approval: every request goes straight to HR (or a
+  // System/Super Admin) — no Project Manager / Management stage.
+  const isAdminUser = user?.roles.some((r) => ["SYSTEM_ADMIN", "SUPER_ADMIN"].includes(r)) ?? false;
+  const isHr = user?.roles.includes("HR") ?? false;
+  const isApprover = isAdminUser || isHr;
   const { data: pending, isLoading: pendingLoading } = useHrmsLeaveRequests({ enabled: isApprover });
   const decide = useDecideLeaveRequest();
   const { data: workload, isLoading: workloadLoading } = useHrmsWorkload(workloadFor ?? undefined);
+
+  // HR is independent of the leave-approval workflow — they decide everyone
+  // else's requests but don't apply for or track their own leave here.
+  const showSelfService = !isHr;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">Leave</h1>
-          <p className="text-sm text-slate-500">Apply for annual or other leave, and track your requests.</p>
+          <p className="text-sm text-slate-500">
+            {showSelfService ? "Apply for annual or other leave, and track your requests." : "Review and decide on employee leave requests."}
+          </p>
         </div>
-        {user?.employee && (
+        {showSelfService && user?.employee && (
           <Button onClick={() => setApplyOpen(true)}>
             <Plus className="h-4 w-4" /> Apply for Leave
           </Button>
         )}
       </div>
 
-      {!user?.employee && (
+      {showSelfService && !user?.employee && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
           <Info className="mt-0.5 h-4 w-4 shrink-0" />
           Your account isn't linked to an employee record, so you can't apply for leave here. Ask your administrator to link one from
@@ -101,41 +202,49 @@ export default function LeavePage() {
         </div>
       )}
 
-      {/* My requests */}
-      <div className="space-y-2">
-        <p className="text-sm font-semibold text-slate-800">My Requests</p>
-        {myLoading && <Skeleton className="h-24 w-full" />}
-        {myError && <ErrorState message="Could not load your leave requests." onRetry={() => refetchMine()} />}
-        {myRequests && myRequests.length === 0 && (
-          <EmptyState icon={<CalendarClock className="h-8 w-8" />} title="No leave requests yet." description={user?.employee ? "Apply above to submit one." : undefined} />
-        )}
-        {myRequests && myRequests.length > 0 && (
-          <div className="space-y-2">
-            {myRequests.map((r: any) => (
-              <Card key={r.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-800">
-                    {format(new Date(r.startDate), "d MMM yyyy")} – {format(new Date(r.endDate), "d MMM yyyy")}
-                  </p>
-                  {r.reason && <p className="text-xs text-slate-500">{r.reason}</p>}
-                </div>
-                <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+      {showSelfService && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-slate-800">My Requests</p>
+          {myLoading && <Skeleton className="h-24 w-full" />}
+          {myError && <ErrorState message="Could not load your leave requests." onRetry={() => refetchMine()} />}
+          {myRequests && myRequests.length === 0 && (
+            <EmptyState icon={<CalendarClock className="h-8 w-8" />} title="No leave requests yet." description={user?.employee ? "Apply above to submit one." : undefined} />
+          )}
+          {myRequests && myRequests.length > 0 && (
+            <div className="space-y-2">
+              {myRequests.map((r: any) => (
+                <Card key={r.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-slate-800">
+                        {format(new Date(r.startDate), "d MMM yyyy")} – {format(new Date(r.endDate), "d MMM yyyy")}
+                      </p>
+                      <Badge tone="slate">{LEAVE_TYPE_LABEL[r.leaveType] ?? r.leaveType}</Badge>
+                      <span className="text-xs text-slate-400">
+                        {r.numberOfDays} day{r.numberOfDays > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    {r.reason && <p className="text-xs text-slate-500">{r.reason}</p>}
+                    {r.handoverToEmployee && <p className="text-xs text-slate-500">Handover: {r.handoverToEmployee.fullName}</p>}
+                  </div>
+                  <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status] ?? r.status}</Badge>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      <ApplyForLeaveDrawer open={applyOpen} onClose={() => setApplyOpen(false)} />
+      {showSelfService && <ApplyForLeaveDrawer open={applyOpen} onClose={() => setApplyOpen(false)} />}
 
-      {/* Approvals — HR / Manager / System Admin / Super Admin only */}
+      {/* Approvals — HR / System Admin / Super Admin only */}
       {isApprover && (
         <div className="space-y-2">
           <p className="text-sm font-semibold text-slate-800">Pending Approvals</p>
           <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            "View Current Workload" shows the employee's open Workflow tasks, read-only — any reassignment happens in Workflow itself,
-            never here.
+            Every leave request goes straight to HR for approval. "View Current Workload" shows the employee's open Workflow tasks,
+            read-only — any reassignment happens in Workflow itself, never here.
           </div>
 
           {pendingLoading && <Skeleton className="h-40 w-full" />}
@@ -147,11 +256,22 @@ export default function LeavePage() {
               {pending.map((r: any) => (
                 <Card key={r.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-medium text-slate-800">{r.employee?.fullName}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-slate-800">{r.employee?.fullName}</p>
+                      <Badge tone="slate">{LEAVE_TYPE_LABEL[r.leaveType] ?? r.leaveType}</Badge>
+                      <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status] ?? r.status}</Badge>
+                    </div>
                     <p className="text-xs text-slate-500">
-                      {format(new Date(r.startDate), "d MMM yyyy")} – {format(new Date(r.endDate), "d MMM yyyy")}
+                      {format(new Date(r.startDate), "d MMM yyyy")} – {format(new Date(r.endDate), "d MMM yyyy")} · {r.numberOfDays} day
+                      {r.numberOfDays > 1 ? "s" : ""}
                       {r.reason && <> · {r.reason}</>}
                     </p>
+                    {r.handoverToEmployee && (
+                      <p className="text-xs text-slate-500">
+                        Handover: {r.handoverToEmployee.fullName}
+                        {r.handoverNotes && <> — {r.handoverNotes}</>}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => setWorkloadFor(r.id)}>
@@ -209,7 +329,10 @@ export default function LeavePage() {
             {workload.tasks.map((t: any) => (
               <div key={t.id} className="rounded-lg border border-slate-200 p-3 text-sm">
                 <div className="flex items-center justify-between">
-                  <p className="font-medium text-slate-800">{t.title}</p>
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-400">{t.taskId}</p>
+                    <p className="font-medium text-slate-800">{t.title}</p>
+                  </div>
                   <PriorityBadge priority={t.priority} />
                 </div>
                 <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">

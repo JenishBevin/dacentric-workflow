@@ -28,8 +28,8 @@ boardsRouter.get(
   "/",
   requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
   asyncHandler(async (req, res) => {
-    const { search, scope } = req.query as Record<string, string>;
-    const boards = await boardsService.listBoards(req.user!, { search, scope: scope as any });
+    const { search, scope, serviceId } = req.query as Record<string, string>;
+    const boards = await boardsService.listBoards(req.user!, { search, scope: scope as any, serviceId });
     return ok(res, boards);
   })
 );
@@ -41,6 +41,31 @@ boardsRouter.post(
   asyncHandler(async (req, res) => {
     const board = await boardsService.createBoard((req as any).validatedBody, req.user!);
     return created(res, board);
+  })
+);
+
+// Must come before "/:boardId" — otherwise Express would capture
+// "enquiry-list" as a boardId path param and never reach this handler.
+boardsRouter.get(
+  "/enquiry-list",
+  requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await boardsService.getOrCreateEnquiryBoard(req.user!)))
+);
+
+// Same ordering requirement as "/enquiry-list" above.
+boardsRouter.get(
+  "/services",
+  requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
+  asyncHandler(async (_req, res) => ok(res, await boardsService.listServices()))
+);
+
+// Must come before "/:boardId" — otherwise Express would capture
+// "search" as a boardId path param and never reach this handler.
+boardsRouter.get(
+  "/search/lookup",
+  asyncHandler(async (req, res) => {
+    const q = (req.query.q as string) ?? "";
+    return ok(res, await boardsService.searchBoards(q, req.user!));
   })
 );
 
@@ -64,6 +89,12 @@ boardsRouter.post(
   "/:boardId/archive",
   validate(z.object({ archived: z.boolean() })),
   asyncHandler(async (req, res) => ok(res, await boardsService.archiveBoard(req.params.boardId, (req as any).validatedBody.archived, req.user!)))
+);
+
+boardsRouter.post(
+  "/:boardId/complete",
+  validate(z.object({ completed: z.boolean() })),
+  asyncHandler(async (req, res) => ok(res, await boardsService.setBoardCompleted(req.params.boardId, (req as any).validatedBody.completed, req.user!)))
 );
 
 boardsRouter.delete(

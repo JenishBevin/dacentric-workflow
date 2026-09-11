@@ -7,6 +7,8 @@ import { NotificationBell } from "./NotificationBell";
 import { Avatar } from "../ui/primitives";
 import { useWorkTimer, formatDuration } from "../../hooks/useWorkTimer";
 import { myAvatarUrl } from "../../api/profile";
+import { api } from "../../lib/apiClient";
+import { useToast } from "../../context/ToastContext";
 import clsx from "clsx";
 
 const WorkTimerBadge: React.FC = () => {
@@ -28,7 +30,8 @@ const WorkTimerBadge: React.FC = () => {
 
 const BREADCRUMB_LABELS: Record<string, string> = {
   workflow: "Workflow",
-  boards: "Boards",
+  boards: "Projects",
+  service: "Service",
   "my-tasks": "My Tasks",
   team: "Team Workload",
   "time-logs": "Time Logs",
@@ -42,7 +45,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   notifications: "Notifications",
   audit: "Audit Trail",
   hrms: "Workflow",
-  leave: "Leave",
+  leave: "Request",
   tickets: "Support Tickets",
 };
 
@@ -52,13 +55,20 @@ function useBreadcrumbs() {
   return segments.map((s) => BREADCRUMB_LABELS[s] ?? s);
 }
 
+// A Task ID (WF-000001), Project ID (PRJ-000001) or Claim ID (CLM-000001)
+// typed into the search box — searched for an exact match so it jumps
+// straight to that record.
+const ID_LOOKUP_PATTERN = /^(WF|PRJ|CLM)-\d+$/i;
+
 export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobileMenu }) => {
   const { user, logout } = useAuth();
+  const { push } = useToast();
   const crumbs = useBreadcrumbs();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [searching, setSearching] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -83,14 +93,62 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  function submitSearch(e: React.FormEvent) {
+  async function submitSearch(e: React.FormEvent) {
     e.preventDefault();
-    if (!search.trim()) return;
-    navigate(`/workflow/boards?search=${encodeURIComponent(search.trim())}`);
+    const q = search.trim();
+    if (!q) return;
+
+    if (ID_LOOKUP_PATTERN.test(q)) {
+      setSearching(true);
+      try {
+        const upper = q.toUpperCase();
+        const isProjectId = upper.startsWith("PRJ-");
+        const isClaimId = upper.startsWith("CLM-");
+        if (isProjectId) {
+          const { data } = await api.get("/boards/search/lookup", { params: { q } });
+          const match = (data.data as any[]).find((b) => b.boardId.toLowerCase() === q.toLowerCase());
+          if (match) {
+            setSearch("");
+            navigate(`/workflow/boards/${match.id}`);
+            return;
+          }
+        } else if (isClaimId) {
+          const { data } = await api.get("/claims/search/lookup", { params: { q } });
+          const match = data.data as { id: string; claimId: string; status: string } | null;
+          if (match) {
+            setSearch("");
+            const tab = match.status === "SETTLED" ? "settlements" : "claim";
+            navigate(`/hrms/leave?tab=${tab}&claim=${match.id}`);
+            return;
+          }
+        } else {
+          const { data } = await api.get("/tasks/search/lookup", { params: { q } });
+          const match = (data.data as any[]).find((t) => t.taskId.toLowerCase() === q.toLowerCase());
+          if (match) {
+            setSearch("");
+            navigate(`/workflow/boards/${match.boardId}?task=${match.id}`);
+            return;
+          }
+        }
+        push({
+          variant: "error",
+          title: "Not found",
+          description: `No ${isProjectId ? "project" : isClaimId ? "claim" : "task"} found for "${q}".`,
+        });
+      } catch {
+        push({ variant: "error", title: "Search failed", description: "Could not look up that ID right now." });
+      } finally {
+        setSearching(false);
+      }
+      return;
+    }
+
+    navigate(`/workflow/boards?search=${encodeURIComponent(q)}`);
   }
 
   const canCreateBoard = can(user, "CREATE_BOARD");
   const canCreateTask = can(user, "CREATE_TASK");
+  const isStaff = user?.roles.includes("STAFF") ?? false;
 
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur">
@@ -116,8 +174,9 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
               ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search boards, tasks, records…"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-14 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:focus-ring"
+              disabled={searching}
+              placeholder="Search by Task ID (WF-000001), Project ID (PRJ-000001) or Claim ID (CLM-000001)…"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-14 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:focus-ring disabled:opacity-60"
             />
             <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
               Ctrl K
@@ -155,7 +214,7 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
                     onClick={() => setCreateOpen(false)}
                     className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
                   >
-                    <Trello className="h-4 w-4" /> New Board
+                    <Trello className="h-4 w-4" /> New Project
                   </Link>
                 )}
               </div>
@@ -182,9 +241,11 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
               <Link to="/settings/profile" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
                 <User className="h-4 w-4" /> My Profile
               </Link>
-              <Link to="/settings/notifications" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
-                <Bell className="h-4 w-4" /> Notification settings
-              </Link>
+              {!isStaff && (
+                <Link to="/settings/notifications" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
+                  <Bell className="h-4 w-4" /> Notification settings
+                </Link>
+              )}
               <button onClick={logout} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
                 <LogOut className="h-4 w-4" /> Sign out
               </button>

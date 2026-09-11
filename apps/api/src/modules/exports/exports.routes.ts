@@ -5,7 +5,9 @@ import { requirePermission } from "../../middleware/authorize";
 import { listBoardTasks } from "../tasks/tasks.service";
 import { getTeamWorkload } from "../teamWorkload/teamWorkload.service";
 import { queryAuditLog } from "../audit/audit.service";
-import { buildWorkbook, boardExportColumns, workloadExportColumns, auditExportColumns } from "./exports.service";
+import { getHistory } from "../history/history.service";
+import { listSettledClaims } from "../claims/claims.service";
+import { buildWorkbook, boardExportColumns, workloadExportColumns, auditExportColumns, historyExportColumns, settledClaimsExportColumns } from "./exports.service";
 import { PermissionKey } from "@dacentric/types";
 import { writeAudit } from "../../common/audit";
 import { AuditAction } from "@dacentric/types";
@@ -67,6 +69,56 @@ exportsRouter.get(
     const buffer = await buildWorkbook("Team Workload", workloadExportColumns(), rows as any);
     await writeAudit({ actor: req.user!, action: AuditAction.EDIT, entityType: "Export", metadata: { type: "team-workload" } });
     sendXlsx(res, `team-workload-${Date.now()}.xlsx`, buffer);
+  })
+);
+
+exportsRouter.get(
+  "/history",
+  requirePermission(PermissionKey.EXPORT, "OWN"),
+  asyncHandler(async (req, res) => {
+    const q = req.query as Record<string, string>;
+    const rows = await getHistory(req.user!, {
+      type: q.type as any,
+      status: q.status as any,
+      dateFrom: q.dateFrom ? new Date(q.dateFrom) : undefined,
+      dateTo: q.dateTo ? new Date(q.dateTo) : undefined,
+    });
+    const exportRows = rows.map((r) => ({
+      type: r.kind === "PROJECT" ? "Project" : "Enquiry",
+      code: r.code,
+      name: r.name,
+      service: r.service ?? "",
+      status: r.status,
+      date: r.eventDate.toISOString().slice(0, 10),
+    }));
+    const buffer = await buildWorkbook("Project-Task History", historyExportColumns(), exportRows);
+    await writeAudit({ actor: req.user!, action: AuditAction.EDIT, entityType: "Export", metadata: { type: "history" } });
+    sendXlsx(res, `history-export-${Date.now()}.xlsx`, buffer);
+  })
+);
+
+exportsRouter.get(
+  "/claims-settled",
+  requirePermission(PermissionKey.EXPORT, "OWN"),
+  asyncHandler(async (req, res) => {
+    const q = req.query as Record<string, string>;
+    const rows = await listSettledClaims(req.user!, {
+      dateFrom: q.dateFrom ? new Date(q.dateFrom) : undefined,
+      dateTo: q.dateTo ? new Date(q.dateTo) : undefined,
+    });
+    const exportRows = rows.map((c) => ({
+      claimId: c.claimId,
+      employee: c.employee.fullName,
+      amount: c.amount,
+      reason: c.reason,
+      expenseDate: c.expenseDate.toISOString().slice(0, 10),
+      approvedBy: c.managementDecidedBy?.name ?? "",
+      settledBy: c.settledBy?.name ?? "",
+      settledDate: c.settledAt ? c.settledAt.toISOString().slice(0, 10) : "",
+    }));
+    const buffer = await buildWorkbook("Approved Settlements", settledClaimsExportColumns(), exportRows);
+    await writeAudit({ actor: req.user!, action: AuditAction.EDIT, entityType: "Export", metadata: { type: "claims-settled" } });
+    sendXlsx(res, `approved-settlements-${Date.now()}.xlsx`, buffer);
   })
 );
 

@@ -174,10 +174,11 @@ export async function getSummary(userId: string, range: "week" | "month") {
 }
 
 /**
- * Time-log report for Team Lead, HR, Manager, System Admin and Super Admin
- * (VIEW_TIME_LOGS) — per-employee totals for the range, scoped exactly like
- * Team Workload: TEAM sees employees on a team you manage or a board you
- * own, ALL sees everyone, NONE (Team Member, CEO/Director) sees nothing.
+ * Time-log report for Project Manager, HR, Accounts, System Admin and Super
+ * Admin (VIEW_TIME_LOGS) — per-employee totals for the range, scoped exactly
+ * like Team Workload: TEAM sees employees on a team you manage or a board
+ * you own, ALL sees everyone, NONE (Estimation, Sales, Procurement,
+ * Management) sees nothing.
  */
 export async function getReport(actor: AuthedUser, range: "week" | "month") {
   const scopedIds = await resolveScopedEmployeeIds(actor, PermissionKey.VIEW_TIME_LOGS);

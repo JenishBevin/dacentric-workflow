@@ -11,11 +11,14 @@ const ActivateAccountPage = lazy(() => import("./pages/auth/ActivateAccountPage"
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const BoardsListPage = lazy(() => import("./pages/boards/BoardsListPage"));
+const ServiceProjectsPage = lazy(() => import("./pages/boards/ServiceProjectsPage"));
 const BoardKanbanPage = lazy(() => import("./pages/boards/BoardKanbanPage"));
+const EnquiryListPage = lazy(() => import("./pages/boards/EnquiryListPage"));
 const MyTasksPage = lazy(() => import("./pages/MyTasksPage"));
 const TeamWorkloadPage = lazy(() => import("./pages/TeamWorkloadPage"));
 const TimeLogsPage = lazy(() => import("./pages/TimeLogsPage"));
 const RecentActivityPage = lazy(() => import("./pages/RecentActivityPage"));
+const HistoryPage = lazy(() => import("./pages/HistoryPage"));
 const MyProfilePage = lazy(() => import("./pages/settings/MyProfilePage"));
 const UsersSettingsPage = lazy(() => import("./pages/settings/UsersSettingsPage"));
 const EmployeesSettingsPage = lazy(() => import("./pages/settings/EmployeesSettingsPage"));
@@ -23,7 +26,7 @@ const RolesSettingsPage = lazy(() => import("./pages/settings/RolesSettingsPage"
 const TagsSettingsPage = lazy(() => import("./pages/settings/TagsSettingsPage"));
 const NotificationSettingsPage = lazy(() => import("./pages/settings/NotificationSettingsPage"));
 const AuditTrailPage = lazy(() => import("./pages/settings/AuditTrailPage"));
-const LeavePage = lazy(() => import("./pages/LeavePage"));
+const RequestPage = lazy(() => import("./pages/RequestPage"));
 const TicketsPage = lazy(() => import("./pages/TicketsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
@@ -60,12 +63,15 @@ export default function App() {
         >
           <Route path="/" element={<DashboardPage />} />
           <Route path="/workflow/boards" element={<BoardsListPage />} />
+          <Route path="/workflow/boards/service/:serviceId" element={<ServiceProjectsPage />} />
           <Route path="/workflow/boards/:boardId" element={<BoardKanbanPage />} />
+          <Route path="/workflow/enquiries" element={<EnquiryListPage />} />
           <Route path="/workflow/my-tasks" element={<MyTasksPage />} />
           <Route path="/workflow/team" element={<TeamWorkloadPage />} />
           <Route path="/workflow/time-logs" element={<TimeLogsPage />} />
           <Route path="/workflow/activity" element={<RecentActivityPage />} />
-          <Route path="/hrms/leave" element={<LeavePage />} />
+          <Route path="/workflow/history" element={<HistoryPage />} />
+          <Route path="/hrms/leave" element={<RequestPage />} />
           <Route path="/tickets" element={<TicketsPage />} />
           <Route path="/settings/profile" element={<MyProfilePage />} />
           <Route path="/settings/users" element={<UsersSettingsPage />} />

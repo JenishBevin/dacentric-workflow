@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Drawer } from "../ui/Drawer";
 import { Button, Input, Label, Select, Textarea } from "../ui/primitives";
-import { useCreateBoard, useBoardTemplates } from "../../api/boards";
+import { useCreateBoard, useBoardTemplates, useServices } from "../../api/boards";
 import { useEmployeeDirectory } from "../../api/misc";
 import { useLinkedRecordSearch } from "../../api/misc";
 import { useToast } from "../../context/ToastContext";
@@ -23,12 +23,26 @@ interface FormValues {
   linkedRecordId?: string;
   linkedRecordType?: string;
   templateId?: string;
+  serviceId?: string;
 }
 
-export const NewBoardDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+interface NewBoardDrawerProps {
+  open: boolean;
+  onClose: () => void;
+  /** Locks the project to this service (no picker shown) — used when creating
+   * from inside a specific service's project list. */
+  serviceId?: string;
+  /** Only used when `serviceId` is not locked: pre-selects the picker. */
+  initialServiceId?: string;
+  initialName?: string;
+  onCreated?: (board: { id: string; name: string }) => void;
+}
+
+export const NewBoardDrawer: React.FC<NewBoardDrawerProps> = ({ open, onClose, serviceId, initialServiceId, initialName, onCreated }) => {
   const { user } = useAuth();
   const { push } = useToast();
   const { data: templates } = useBoardTemplates();
+  const { data: services } = useServices();
   const createBoard = useCreateBoard();
   const [members, setMembers] = useState<MemberRow[]>(user ? [{ userId: user.id, name: user.name, role: "OWNER" }] : []);
   const [recordQuery, setRecordQuery] = useState("");
@@ -48,8 +62,16 @@ export const NewBoardDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
 
   const boardType = watch("boardType");
 
+  // Re-seed defaults every time the drawer opens, since it stays mounted
+  // between uses — e.g. the "Awarded" action on a task opens this with the
+  // task's title and service already filled in.
+  useEffect(() => {
+    if (open) reset({ boardType: "STANDALONE", name: initialName ?? "", serviceId: initialServiceId ?? "" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   const close = () => {
-    if (dirty && !window.confirm("Discard unsaved changes to this board?")) return;
+    if (dirty && !window.confirm("Discard unsaved changes to this project?")) return;
     reset();
     setMembers(user ? [{ userId: user.id, name: user.name, role: "OWNER" }] : []);
     setDirty(false);
@@ -58,25 +80,27 @@ export const NewBoardDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
 
   const onSubmit = async (values: FormValues) => {
     if (!members.some((m) => m.role === "OWNER")) {
-      push({ variant: "error", title: "A board must have at least one Owner." });
+      push({ variant: "error", title: "A project must have at least one Owner." });
       return;
     }
     try {
-      await createBoard.mutateAsync({
+      const board = await createBoard.mutateAsync({
         name: values.name,
         description: values.description || undefined,
         boardType: values.boardType,
         linkedRecordId: values.boardType === "LINKED" ? values.linkedRecordId : undefined,
         linkedRecordType: values.boardType === "LINKED" ? values.linkedRecordType : undefined,
         templateId: values.templateId || undefined,
+        serviceId: serviceId ?? values.serviceId ?? undefined,
         members: members.map((m) => ({ userId: m.userId, role: m.role })),
       });
-      push({ variant: "success", title: "Board created." });
+      push({ variant: "success", title: "Project created." });
       reset();
       setDirty(false);
       onClose();
+      onCreated?.(board);
     } catch (err) {
-      push({ variant: "error", title: "Could not create board", description: extractApiError(err).message });
+      push({ variant: "error", title: "Could not create project", description: extractApiError(err).message });
     }
   };
 
@@ -84,8 +108,8 @@ export const NewBoardDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
     <Drawer
       open={open}
       onClose={close}
-      title="Create board"
-      subtitle="Set up a new board for internal work, optionally linked to a commercial record."
+      title="Create project"
+      subtitle="Set up a new project for internal work, optionally linked to a commercial record."
       footer={
         <>
           <Button variant="outline" onClick={close}>
@@ -101,18 +125,31 @@ export const NewBoardDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
         <section className="space-y-3">
           <div>
             <Label htmlFor="name" required>
-              Board name
+              Project name
             </Label>
-            <Input id="name" placeholder="e.g. Website Development" error={errors.name?.message} {...register("name", { required: "Board name is required." })} />
+            <Input id="name" placeholder="e.g. Website Development" error={errors.name?.message} {...register("name", { required: "Project name is required." })} />
           </div>
           <div>
             <Label htmlFor="description">Description</Label>
-            <Textarea id="description" rows={2} placeholder="What is this board for?" {...register("description")} />
+            <Textarea id="description" rows={2} placeholder="What is this project for?" {...register("description")} />
           </div>
+          {!serviceId && (
+            <div>
+              <Label htmlFor="serviceId">Service</Label>
+              <Select id="serviceId" {...register("serviceId")}>
+                <option value="">None</option>
+                {services?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
         </section>
 
         <section className="space-y-3">
-          <Label>Board type</Label>
+          <Label>Project type</Label>
           <div className="flex gap-2">
             <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
               <input type="radio" value="STANDALONE" {...register("boardType")} /> Standalone
@@ -162,7 +199,7 @@ export const NewBoardDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
             ))}
           </Select>
           <p className="mt-1 text-xs text-slate-400">
-            You can fine-tune stages, colours and WIP limits afterward from Board Settings.
+            You can fine-tune stages, colours and WIP limits afterward from Project Settings.
           </p>
         </section>
 

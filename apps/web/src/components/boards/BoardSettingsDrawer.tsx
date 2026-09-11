@@ -58,7 +58,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
   const stages = [...(board.stages ?? [])].sort((a: any, b: any) => a.position - b.position);
 
   return (
-    <Drawer open={open} onClose={onClose} title="Board Settings" subtitle={board.name} widthClassName="md:w-[640px]">
+    <Drawer open={open} onClose={onClose} title="Project Settings" subtitle={board.name} widthClassName="md:w-[640px]">
       <div className="mb-4 flex gap-1 border-b border-slate-200">
         {(["general", "stages", "members", "templates"] as Tab[]).map((t) => (
           <button
@@ -74,7 +74,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
       {tab === "general" && (
         <div className="space-y-4">
           <div>
-            <Label required>Board name</Label>
+            <Label required>Project name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
@@ -85,7 +85,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
             onClick={async () => {
               try {
                 await updateBoard.mutateAsync({ name, description, version: board.version });
-                push({ variant: "success", title: "Board updated." });
+                push({ variant: "success", title: "Project updated." });
               } catch (err) {
                 push({ variant: "error", title: "Could not save", description: extractApiError(err).message });
               }
@@ -105,7 +105,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
                 className="mt-2"
                 onClick={async () => {
                   await updateBoard.mutateAsync({ linkedRecordId: null, linkedRecordType: null });
-                  push({ variant: "success", title: "Board unlinked." });
+                  push({ variant: "success", title: "Project unlinked." });
                 }}
               >
                 Unlink record
@@ -121,13 +121,13 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
                 size="sm"
                 onClick={async () => {
                   await archiveBoard.mutateAsync({ boardId: board.id, archived: !board.isArchived });
-                  push({ variant: "success", title: board.isArchived ? "Board unarchived." : "Board archived." });
+                  push({ variant: "success", title: board.isArchived ? "Project unarchived." : "Project archived." });
                 }}
               >
-                {board.isArchived ? "Unarchive Board" : "Archive Board"}
+                {board.isArchived ? "Unarchive Project" : "Archive Project"}
               </Button>
               <Button variant="danger" size="sm" onClick={() => setConfirmDeleteBoard(true)}>
-                Delete Board
+                Delete Project
               </Button>
             </div>
           </div>
@@ -273,7 +273,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
 
       {tab === "templates" && (
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Save this board's current stage structure as a reusable template for future boards.</p>
+          <p className="text-sm text-slate-500">Save this project's current stage structure as a reusable template for future projects.</p>
           <div className="flex gap-2">
             <Input placeholder="Template name" value={templateName} onChange={(e) => setTemplateName(e.target.value)} />
             <Button
@@ -297,22 +297,22 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
 
       <ConfirmDialog
         open={confirmDeleteBoard}
-        title="Delete board"
+        title="Delete project"
         message={
           <>
-            Are you sure you want to delete the board <strong>&ldquo;{board.name}&rdquo;</strong>? This cannot be undone.
+            Are you sure you want to delete the project <strong>&ldquo;{board.name}&rdquo;</strong>? This cannot be undone.
           </>
         }
-        confirmLabel="Delete board"
+        confirmLabel="Delete project"
         loading={deleteBoard.isPending}
         onCancel={() => setConfirmDeleteBoard(false)}
         onConfirm={async () => {
           try {
             await deleteBoard.mutateAsync({ boardId: board.id, confirmCascade: true });
-            push({ variant: "success", title: "Board deleted." });
+            push({ variant: "success", title: "Project deleted." });
             navigate("/workflow/boards");
           } catch (err) {
-            push({ variant: "error", title: "Could not delete board", description: extractApiError(err).message });
+            push({ variant: "error", title: "Could not delete project", description: extractApiError(err).message });
           }
         }}
       />

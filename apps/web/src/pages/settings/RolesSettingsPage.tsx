@@ -8,11 +8,11 @@ import { PermissionKey, PermissionScope, RoleCode } from "../../lib/types";
 const PERMISSION_LABELS: Record<PermissionKey, string> = {
   LOGIN: "Login",
   VIEW_WORKFLOW: "View Workflow",
-  CREATE_BOARD: "Create Board",
-  EDIT_BOARD: "Edit Board",
-  ARCHIVE_DELETE_BOARD: "Archive / Delete Board",
+  CREATE_BOARD: "Create Project",
+  EDIT_BOARD: "Edit Project",
+  ARCHIVE_DELETE_BOARD: "Archive / Delete Project",
   CONFIGURE_STAGES: "Configure Stages",
-  MANAGE_BOARD_MEMBERS: "Manage Board Members",
+  MANAGE_BOARD_MEMBERS: "Manage Project Members",
   CREATE_TASK: "Create Task",
   EDIT_TASK: "Edit Task",
   DELETE_TASK: "Delete Task",
@@ -34,12 +34,14 @@ const SCOPES: PermissionScope[] = ["NONE", "OWN", "TEAM", "ALL"];
 const ROLE_LABELS: Record<RoleCode, string> = {
   SUPER_ADMIN: "Super Admin",
   SYSTEM_ADMIN: "System Admin",
-  CEO_DIRECTOR: "CEO / Director",
-  MANAGER: "Manager",
+  MANAGEMENT: "Management",
+  PROJECT_MANAGER: "Project Manager",
   HR: "HR",
-  TEAM_LEAD: "Team Lead",
-  TEAM_MEMBER: "Team Member",
-  ACCOUNTANT: "Accountant",
+  ACCOUNTS: "Accounts",
+  ESTIMATION: "Estimation",
+  SALES: "Sales",
+  PROCUREMENT: "Procurement",
+  STAFF: "Staff",
 };
 
 interface RoleRow {

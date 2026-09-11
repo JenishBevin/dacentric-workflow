@@ -48,7 +48,7 @@ describe("Full workflow scenario (Section 55)", () => {
       .send({
         name: "New Hire",
         workEmail: `${NAMESPACE}-newhire@test.local`,
-        roles: ["TEAM_MEMBER"],
+        roles: ["ESTIMATION"],
         moduleAccess: ["WORKFLOW"],
       });
     expect(res.status).toBe(201);

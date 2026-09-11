@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { useBoardDetail, useReorderStages } from "../../api/boards";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { useBoardDetail, useReorderStages, useSetBoardCompleted } from "../../api/boards";
 import { useBoardTasks, useDuplicateTask, useDeleteTask } from "../../api/tasks";
 import { downloadExport } from "../../api/misc";
 import { KanbanToolbar } from "../../components/kanban/KanbanToolbar";
@@ -37,8 +37,17 @@ function sortTasks(tasks: TaskSummary[], key?: string): TaskSummary[] {
   return list;
 }
 
-export default function BoardKanbanPage() {
-  const { boardId } = useParams<{ boardId: string }>();
+/**
+ * `boardId` is normally taken from the `/workflow/boards/:boardId` route
+ * param, but this page doubles as the Enquiry List view: EnquiryListPage
+ * renders it directly with an explicit `boardId` so the URL stays at
+ * `/workflow/enquiries` — redirecting to `/workflow/boards/:id` would make
+ * the sidebar's "Projects" link light up instead of "Enquiry List", since
+ * NavLink matches any URL starting with its own path.
+ */
+export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: string } = {}) {
+  const { boardId: boardIdParam } = useParams<{ boardId: string }>();
+  const boardId = boardIdProp ?? boardIdParam;
   const navigate = useNavigate();
   const { user } = useAuth();
   const { push } = useToast();
@@ -55,10 +64,12 @@ export default function BoardKanbanPage() {
   const [newTaskStageId, setNewTaskStageId] = useState<string | null>(null);
   const [recurringPrefill, setRecurringPrefill] = useState<any>(null);
   const [pendingDeleteTask, setPendingDeleteTask] = useState<TaskSummary | null>(null);
+  const [confirmComplete, setConfirmComplete] = useState(false);
 
   const reorderStages = useReorderStages(boardId ?? "");
   const duplicateTask = useDuplicateTask();
   const deleteTask = useDeleteTask();
+  const setBoardCompleted = useSetBoardCompleted();
 
   const settingsTab = searchParams.get("settings") as "general" | "stages" | "members" | "templates" | null;
   const openTaskId = searchParams.get("task");
@@ -160,18 +171,23 @@ export default function BoardKanbanPage() {
   }
 
   if (isError || !board) {
-    return <ErrorState message="Could not load this board. You may not have access to it." onRetry={() => refetch()} />;
+    return <ErrorState message="Could not load this project. You may not have access to it." onRetry={() => refetch()} />;
   }
 
   return (
     <div className="flex h-full flex-col">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <button onClick={() => navigate("/workflow/boards")} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Back to boards">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
+          {!boardIdProp && (
+            <button onClick={() => navigate("/workflow/boards")} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Back to projects">
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          )}
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold text-slate-900">{board.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="truncate text-lg font-semibold text-slate-900">{board.name}</h1>
+              <span className="shrink-0 text-xs font-medium text-slate-400">{board.boardId}</span>
+            </div>
             {board.description && <p className="truncate text-xs text-slate-500">{board.description}</p>}
           </div>
           {board.isArchived && <Badge tone="slate">Archived</Badge>}
@@ -203,7 +219,7 @@ export default function BoardKanbanPage() {
           ))}
         </div>
       ) : stages.length === 0 ? (
-        <ErrorState message="This board has no stages yet. Add one from Board Settings." onRetry={() => openSettings("stages")} />
+        <ErrorState message="This project has no stages yet. Add one from Project Settings." onRetry={() => openSettings("stages")} />
       ) : (
         <KanbanBoard
           stages={stages}
@@ -215,6 +231,15 @@ export default function BoardKanbanPage() {
           canManageStages={canManageBoard}
           canMoveTasks={canMoveTasks}
         />
+      )}
+
+      {canManageBoard && board.name !== "Enquiry List" && !board.isCompleted && (
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">Once every task on this project is done, mark it Completed to move it into Project/Task History.</p>
+          <Button variant="outline" size="sm" onClick={() => setConfirmComplete(true)}>
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Mark as Completed
+          </Button>
+        </div>
       )}
 
       {newTaskStageId && (
@@ -253,6 +278,30 @@ export default function BoardKanbanPage() {
             push({ variant: "error", title: "Could not delete task", description: extractApiError(err).message });
           }
           setPendingDeleteTask(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmComplete}
+        title="Mark project as completed"
+        message={
+          <>
+            <strong>&ldquo;{board.name}&rdquo;</strong> will move to Project/Task History and no longer show up in your active Projects list. You can&apos;t undo this from here.
+          </>
+        }
+        confirmLabel="Mark as Completed"
+        destructive={false}
+        loading={setBoardCompleted.isPending}
+        onCancel={() => setConfirmComplete(false)}
+        onConfirm={async () => {
+          try {
+            await setBoardCompleted.mutateAsync({ boardId: boardId!, completed: true });
+            push({ variant: "success", title: "Project marked as completed.", description: `${board.name} has moved to Project/Task History.` });
+            setConfirmComplete(false);
+            navigate("/workflow/boards");
+          } catch (err) {
+            push({ variant: "error", title: "Could not mark project as completed", description: extractApiError(err).message });
+          }
         }}
       />
     </div>

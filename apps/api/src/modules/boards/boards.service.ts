@@ -3,9 +3,10 @@ import { Errors } from "../../common/errors";
 import { writeAudit } from "../../common/audit";
 import { AuthedUser } from "../../middleware/authenticate";
 import { getBoardRole, assertBoardVisible, assertCanEditBoard, assertIsBoardOwnerOrAdmin, visibleBoardsWhere } from "./board-access";
-import { AuditAction, BoardType, RoleCode } from "@dacentric/types";
+import { getPermissionScope, scopeAtLeast } from "../../common/permissions";
+import { AuditAction, BoardType, RoleCode, PermissionKey, formatProjectId } from "@dacentric/types";
 
-const DEFAULT_STAGES = [
+export const DEFAULT_STAGES = [
   { name: "Backlog", color: "#94a3b8" },
   { name: "To Do", color: "#60a5fa" },
   { name: "In Progress", color: "#f59e0b" },
@@ -20,15 +21,18 @@ export interface CreateBoardInput {
   linkedRecordType?: string;
   linkedRecordId?: string;
   templateId?: string;
+  serviceId?: string;
   members: Array<{ userId: string; role: string }>;
 }
 
 export async function listBoards(
   user: AuthedUser,
-  filters: { search?: string; scope?: "MY" | "ALL" | "LINKED" | "ARCHIVED"; }
+  filters: { search?: string; scope?: "MY" | "ALL" | "LINKED" | "ARCHIVED"; serviceId?: string }
 ) {
   const base = visibleBoardsWhere(user);
-  const where: any = { ...base };
+  // Completed projects have moved to Project/Task History — they never show
+  // up in the regular Projects browsing view, archived or not.
+  const where: any = { ...base, isCompleted: false };
 
   if (filters.scope === "ARCHIVED") {
     where.isArchived = true;
@@ -42,11 +46,15 @@ export async function listBoards(
   if (filters.scope === "LINKED") {
     where.boardType = BoardType.LINKED;
   }
+  if (filters.serviceId) {
+    where.serviceId = filters.serviceId;
+  }
 
   if (filters.search) {
     where.OR = [
       { name: { contains: filters.search, mode: "insensitive" } },
       { description: { contains: filters.search, mode: "insensitive" } },
+      { boardId: { contains: filters.search, mode: "insensitive" } },
       { linkedRecord: { name: { contains: filters.search, mode: "insensitive" } } },
     ];
   }
@@ -78,6 +86,7 @@ export async function listBoards(
 
   return boards.map((b) => ({
     id: b.id,
+    boardId: b.boardId,
     name: b.name,
     description: b.description,
     boardType: b.boardType,
@@ -89,6 +98,21 @@ export async function listBoards(
     members: b.members.map((m) => ({ userId: m.userId, name: m.user.name, role: m.role })),
     updatedAt: b.updatedAt,
   }));
+}
+
+// Global "search by Project ID or name" lookup for the header search box.
+// Scoped by visibleBoardsWhere (Business Rule 16 / Section 36) — a board a
+// user isn't a member of must never be discoverable through search.
+export async function searchBoards(q: string, user: AuthedUser) {
+  const boards = await prisma.board.findMany({
+    where: {
+      ...visibleBoardsWhere(user),
+      OR: [{ name: { contains: q, mode: "insensitive" } }, { boardId: { contains: q, mode: "insensitive" } }],
+    },
+    take: 20,
+    select: { id: true, boardId: true, name: true },
+  });
+  return boards;
 }
 
 export async function getBoardDetail(boardId: string, user: AuthedUser) {
@@ -130,14 +154,17 @@ export async function createBoard(input: CreateBoardInput, actor: AuthedUser) {
   }
 
   const board = await prisma.$transaction(async (tx) => {
+    const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
     const created = await tx.board.create({
       data: {
+        boardId: placeholderId,
         name: input.name,
         description: input.description,
         boardType: input.boardType,
         linkedRecordType: input.boardType === BoardType.LINKED ? (input.linkedRecordType as any) : null,
         linkedRecordId: input.boardType === BoardType.LINKED ? input.linkedRecordId : null,
         templateId: input.templateId,
+        serviceId: input.serviceId ?? null,
         createdById: actor.id,
         stages: {
           create: stageDefs.map((s, idx) => ({
@@ -152,7 +179,11 @@ export async function createBoard(input: CreateBoardInput, actor: AuthedUser) {
       },
       include: { stages: true, members: true },
     });
-    return created;
+    return tx.board.update({
+      where: { id: created.id },
+      data: { boardId: formatProjectId(created.boardNumber) },
+      include: { stages: true, members: true },
+    });
   });
 
   await writeAudit({
@@ -165,6 +196,107 @@ export async function createBoard(input: CreateBoardInput, actor: AuthedUser) {
   });
 
   return board;
+}
+
+// ---------------------------------------------------------------------------
+// Named system boards — company-wide boards (currently just Enquiry List)
+// that every environment lazily provisions itself the first time someone
+// opens it, rather than depending on a per-environment seed step. Every item
+// on them is just a Task, so it gets the full create/assign/monitor flow
+// (NewTaskDrawer, approvals, comments, notifications) for free.
+// ---------------------------------------------------------------------------
+
+async function getOrCreateNamedBoard(
+  name: string,
+  description: string,
+  stageDefs: Array<{ name: string; color: string; isTerminal?: boolean }>,
+  actor: AuthedUser
+) {
+  let board = await prisma.board.findFirst({ where: { name, isDeleted: false } });
+
+  if (!board) {
+    const canCreateBoard = scopeAtLeast(getPermissionScope(actor.permissions, PermissionKey.CREATE_BOARD), "OWN");
+    if (!canCreateBoard) {
+      throw Errors.forbidden(`"${name}" hasn't been set up yet. Ask a Project Manager or Administrator to open it once to create it.`);
+    }
+
+    const activeUsers = await prisma.user.findMany({ where: { status: "ACTIVE" }, select: { id: true } });
+    const otherMembers = activeUsers.filter((u) => u.id !== actor.id).map((u) => ({ userId: u.id, role: "EDITOR" }));
+
+    board = await prisma.$transaction(async (tx) => {
+      const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
+      const created = await tx.board.create({
+        data: {
+          boardId: placeholderId,
+          name,
+          description,
+          boardType: BoardType.STANDALONE,
+          createdById: actor.id,
+          stages: {
+            create: stageDefs.map((s, idx) => ({ name: s.name, color: s.color, position: idx, isTerminal: s.isTerminal ?? false })),
+          },
+          members: { create: [{ userId: actor.id, role: "OWNER" }, ...otherMembers] },
+        },
+      });
+      return tx.board.update({ where: { id: created.id }, data: { boardId: formatProjectId(created.boardNumber) } });
+    });
+
+    await writeAudit({
+      actor,
+      action: AuditAction.CREATE,
+      entityType: "Board",
+      entityId: board.id,
+      boardId: board.id,
+      afterValue: { name: board.name, boardType: board.boardType, system: true },
+    });
+  } else {
+    // Self-heal: anyone who can already reach this endpoint (VIEW_WORKFLOW)
+    // should be able to use a company-wide board even if they were added to
+    // the company after the board was first created.
+    await prisma.boardMember.upsert({
+      where: { boardId_userId: { boardId: board.id, userId: actor.id } },
+      create: { boardId: board.id, userId: actor.id, role: "EDITOR" },
+      update: {},
+    });
+  }
+
+  return board;
+}
+
+const ENQUIRY_BOARD_NAME = "Enquiry List";
+const ENQUIRY_STAGES = [
+  { name: "New", color: "#60a5fa", isTerminal: false },
+  { name: "In Progress", color: "#f59e0b", isTerminal: false },
+  { name: "Converted", color: "#22c55e", isTerminal: true },
+  { name: "Lost", color: "#ef4444", isTerminal: true },
+];
+
+export async function getOrCreateEnquiryBoard(actor: AuthedUser) {
+  const board = await getOrCreateNamedBoard(
+    ENQUIRY_BOARD_NAME,
+    "Every incoming enquiry, tracked and assigned like any other task.",
+    ENQUIRY_STAGES,
+    actor
+  );
+  return { id: board.id, name: board.name };
+}
+
+// ---------------------------------------------------------------------------
+// List of Services — the fixed company service catalog (seeded by
+// servicesSeed.ts). "Projects" nav shows this list first; picking one shows
+// the projects filed under it (listBoards with serviceId), each an ordinary
+// board with the usual stages/task flow.
+// ---------------------------------------------------------------------------
+
+export async function listServices() {
+  const services = await prisma.service.findMany({
+    // Must match listBoards()'s filtering exactly, or the tile count and the
+    // list it links to disagree — completed projects have moved to History,
+    // so they don't count here either.
+    include: { _count: { select: { boards: { where: { isDeleted: false, isCompleted: false } } } } },
+    orderBy: { position: "asc" },
+  });
+  return services.map((s) => ({ id: s.id, name: s.name, projectCount: s._count.boards }));
 }
 
 export async function updateBoard(
@@ -214,24 +346,33 @@ export async function duplicateBoard(boardId: string, actor: AuthedUser) {
     include: { stages: { orderBy: { position: "asc" } }, members: true },
   });
 
-  const copy = await prisma.board.create({
-    data: {
-      name: `${original.name} (Copy)`,
-      description: original.description,
-      boardType: BoardType.STANDALONE,
-      createdById: actor.id,
-      stages: {
-        create: original.stages.map((s) => ({
-          name: s.name,
-          color: s.color,
-          position: s.position,
-          wipLimit: s.wipLimit,
-          isTerminal: s.isTerminal,
-        })),
+  const copy = await prisma.$transaction(async (tx) => {
+    const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
+    const created = await tx.board.create({
+      data: {
+        boardId: placeholderId,
+        name: `${original.name} (Copy)`,
+        description: original.description,
+        boardType: BoardType.STANDALONE,
+        createdById: actor.id,
+        stages: {
+          create: original.stages.map((s) => ({
+            name: s.name,
+            color: s.color,
+            position: s.position,
+            wipLimit: s.wipLimit,
+            isTerminal: s.isTerminal,
+          })),
+        },
+        members: { create: original.members.map((m) => ({ userId: m.userId, role: m.role })) },
       },
-      members: { create: original.members.map((m) => ({ userId: m.userId, role: m.role })) },
-    },
-    include: { stages: true, members: true },
+      include: { stages: true, members: true },
+    });
+    return tx.board.update({
+      where: { id: created.id },
+      data: { boardId: formatProjectId(created.boardNumber) },
+      include: { stages: true, members: true },
+    });
   });
 
   await writeAudit({
@@ -262,6 +403,31 @@ export async function archiveBoard(boardId: string, archived: boolean, actor: Au
     entityId: boardId,
     boardId,
     afterValue: { isArchived: archived },
+  });
+
+  return board;
+}
+
+/** Marks the whole project done and moves it out of the active Projects
+ *  view into Project/Task History — no per-task completion is required by
+ *  the system; the Owner/Admin decides when every task is actually done. */
+export async function setBoardCompleted(boardId: string, completed: boolean, actor: AuthedUser) {
+  const role = await assertBoardVisible(boardId, actor);
+  assertIsBoardOwnerOrAdmin(role, actor);
+
+  const board = await prisma.board.update({
+    where: { id: boardId },
+    data: { isCompleted: completed, completedAt: completed ? new Date() : null },
+  });
+
+  await writeAudit({
+    actor,
+    action: AuditAction.EDIT,
+    entityType: "Board",
+    entityId: boardId,
+    boardId,
+    field: "isCompleted",
+    afterValue: { isCompleted: completed },
   });
 
   return board;
