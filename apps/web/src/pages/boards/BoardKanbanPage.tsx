@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, List, LayoutGrid } from "lucide-react";
 import { useBoardDetail, useReorderStages, useSetBoardCompleted } from "../../api/boards";
 import { useBoardTasks, useDuplicateTask, useDeleteTask } from "../../api/tasks";
 import { downloadExport } from "../../api/misc";
 import { KanbanToolbar } from "../../components/kanban/KanbanToolbar";
 import { KanbanBoard } from "../../components/kanban/KanbanBoard";
+import { TaskListView } from "../../components/kanban/TaskListView";
 import { NewTaskDrawer } from "../../components/kanban/NewTaskDrawer";
 import { TaskDetailDrawer } from "../../components/tasks/TaskDetailDrawer";
 import { BoardSettingsDrawer } from "../../components/boards/BoardSettingsDrawer";
@@ -16,6 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 import { can, isAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { TaskSummary, BoardStage } from "../../lib/types";
+import clsx from "clsx";
 
 interface Filters {
   search: string;
@@ -65,6 +67,11 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   const [recurringPrefill, setRecurringPrefill] = useState<any>(null);
   const [pendingDeleteTask, setPendingDeleteTask] = useState<TaskSummary | null>(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
+  // List/Kanban toggle is only offered on the Enquiry List embed (identified
+  // the same way the back-button and "Mark Completed" banner already are —
+  // by whether this page was handed an explicit boardId prop), not on every
+  // ordinary project board.
+  const [view, setView] = useState<"kanban" | "list">("kanban");
 
   const reorderStages = useReorderStages(boardId ?? "");
   const duplicateTask = useDuplicateTask();
@@ -192,11 +199,29 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
           </div>
           {board.isArchived && <Badge tone="slate">Archived</Badge>}
         </div>
-        {canCreateTask && !board.isArchived && (
-          <Button onClick={() => { setRecurringPrefill(null); setNewTaskStageId(stages[0]?.id ?? null); }} disabled={stages.length === 0}>
-            Add Task
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {boardIdProp && (
+            <div className="flex rounded-lg border border-slate-300 p-0.5">
+              <button
+                onClick={() => setView("list")}
+                className={clsx("flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium", view === "list" ? "bg-brand-600 text-white" : "text-slate-500")}
+              >
+                <List className="h-3.5 w-3.5" /> List
+              </button>
+              <button
+                onClick={() => setView("kanban")}
+                className={clsx("flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium", view === "kanban" ? "bg-brand-600 text-white" : "text-slate-500")}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Kanban
+              </button>
+            </div>
+          )}
+          {canCreateTask && !board.isArchived && (
+            <Button onClick={() => { setRecurringPrefill(null); setNewTaskStageId(stages[0]?.id ?? null); }} disabled={stages.length === 0}>
+              Add Task
+            </Button>
+          )}
+        </div>
       </div>
 
       <KanbanToolbar
@@ -220,6 +245,8 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         </div>
       ) : stages.length === 0 ? (
         <ErrorState message="This project has no stages yet. Add one from Project Settings." onRetry={() => openSettings("stages")} />
+      ) : view === "list" ? (
+        <TaskListView stages={stages} tasksByStage={tasksByStage} onOpenTask={(task) => openTask(task.id)} />
       ) : (
         <KanbanBoard
           stages={stages}
