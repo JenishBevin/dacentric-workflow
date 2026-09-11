@@ -36,6 +36,7 @@ enum RoleCode {
   SALES
   PROCUREMENT
   STAFF
+  PROJECT_SALES_COORDINATOR
 }
 
 enum ModuleCode {

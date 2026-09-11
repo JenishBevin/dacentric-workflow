@@ -251,6 +251,32 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
   [RoleCode.STAFF]: {
     [PermissionKey.LOGIN]: "ALL",
   },
+  // Bridges Project Manager's board/task authority with Sales' CRM linking —
+  // coordinates project delivery for deals the sales side has brought in.
+  [RoleCode.PROJECT_SALES_COORDINATOR]: {
+    [PermissionKey.LOGIN]: "ALL",
+    [PermissionKey.VIEW_WORKFLOW]: "TEAM",
+    [PermissionKey.CREATE_BOARD]: "ALL",
+    [PermissionKey.EDIT_BOARD]: "OWN",
+    [PermissionKey.ARCHIVE_DELETE_BOARD]: "OWN",
+    [PermissionKey.CONFIGURE_STAGES]: "OWN",
+    [PermissionKey.MANAGE_BOARD_MEMBERS]: "OWN",
+    [PermissionKey.CREATE_TASK]: "ALL",
+    [PermissionKey.EDIT_TASK]: "OWN",
+    [PermissionKey.DELETE_TASK]: "OWN",
+    [PermissionKey.ASSIGN_TASK]: "ALL",
+    [PermissionKey.MOVE_TASK]: "ALL",
+    [PermissionKey.MANAGE_TASK_COLLAB]: "ALL",
+    [PermissionKey.VIEW_TEAM_WORKLOAD]: "TEAM",
+    [PermissionKey.APPROVE_TASK]: "OWN",
+    [PermissionKey.CRM_ERP_LINKING]: "ALL",
+    [PermissionKey.EXPORT]: "TEAM",
+    [PermissionKey.VIEW_AUDIT_TRAIL]: "OWN",
+    [PermissionKey.MANAGE_ROLES]: "NONE",
+    [PermissionKey.MANAGE_USERS]: "NONE",
+    [PermissionKey.VIEW_TIME_LOGS]: "TEAM",
+    [PermissionKey.MANAGE_TICKETS]: "NONE",
+  },
 };
 
 /** System Admin and Super Admin both get the "sees/can-touch everything"

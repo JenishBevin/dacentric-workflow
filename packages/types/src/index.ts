@@ -22,6 +22,7 @@ export enum RoleCode {
   SALES = "SALES",
   PROCUREMENT = "PROCUREMENT",
   STAFF = "STAFF",
+  PROJECT_SALES_COORDINATOR = "PROJECT_SALES_COORDINATOR",
 }
 
 export enum ModuleCode {

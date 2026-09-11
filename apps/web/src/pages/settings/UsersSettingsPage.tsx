@@ -21,6 +21,7 @@ const ROLE_LABELS: Record<RoleCode, string> = {
   SALES: "Sales",
   PROCUREMENT: "Procurement",
   STAFF: "Staff",
+  PROJECT_SALES_COORDINATOR: "Project and Sales Coordinator",
 };
 const ALL_ROLES = Object.keys(ROLE_LABELS) as RoleCode[];
 const ALL_MODULES: ModuleCode[] = ["WORKFLOW", "CRM", "ERP", "HRMS"];

@@ -42,6 +42,7 @@ const ROLE_LABELS: Record<RoleCode, string> = {
   SALES: "Sales",
   PROCUREMENT: "Procurement",
   STAFF: "Staff",
+  PROJECT_SALES_COORDINATOR: "Project and Sales Coordinator",
 };
 
 interface RoleRow {

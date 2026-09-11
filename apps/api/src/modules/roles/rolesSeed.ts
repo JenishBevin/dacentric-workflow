@@ -13,6 +13,7 @@ const ROLE_NAMES: Record<RoleCode, string> = {
   [RoleCode.SALES]: "Sales",
   [RoleCode.PROCUREMENT]: "Procurement",
   [RoleCode.STAFF]: "Staff",
+  [RoleCode.PROJECT_SALES_COORDINATOR]: "Project and Sales Coordinator",
 };
 
 const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
@@ -26,6 +27,7 @@ const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
   [RoleCode.SALES]: "Works their own tasks and links them to CRM customer/lead records.",
   [RoleCode.PROCUREMENT]: "Works their own tasks and links them to ERP purchase-order/vendor records.",
   [RoleCode.STAFF]: "Front-line staff — no Workflow access, can only apply for and track their own leave.",
+  [RoleCode.PROJECT_SALES_COORDINATOR]: "Same project/task authority as Project Manager, plus org-wide CRM linking to coordinate delivery on deals sales has brought in.",
 };
 
 /**

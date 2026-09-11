@@ -4,7 +4,7 @@
 // build — it only needs to agree on the JSON shape, which these types
 // describe.
 
-export type RoleCode = "SUPER_ADMIN" | "SYSTEM_ADMIN" | "MANAGEMENT" | "PROJECT_MANAGER" | "HR" | "ACCOUNTS" | "ESTIMATION" | "SALES" | "PROCUREMENT" | "STAFF";
+export type RoleCode = "SUPER_ADMIN" | "SYSTEM_ADMIN" | "MANAGEMENT" | "PROJECT_MANAGER" | "HR" | "ACCOUNTS" | "ESTIMATION" | "SALES" | "PROCUREMENT" | "STAFF" | "PROJECT_SALES_COORDINATOR";
 export type ModuleCode = "CRM" | "ERP" | "HRMS" | "WORKFLOW";
 export type PermissionScope = "NONE" | "OWN" | "TEAM" | "ALL";
 

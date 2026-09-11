@@ -33,6 +33,7 @@ const ROLE_LABELS: Record<string, string> = {
   SALES: "Sales",
   PROCUREMENT: "Procurement",
   STAFF: "Staff",
+  PROJECT_SALES_COORDINATOR: "Project and Sales Coordinator",
 };
 
 export function roleLabel(role: string): string {
