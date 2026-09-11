@@ -20,6 +20,9 @@ export interface HistoryRow {
   service: string | null;
   status: HistoryStatus;
   eventDate: Date;
+  // Only set for TASK rows — which pipeline board it currently lives on, so
+  // the UI can label it correctly and route back to the right page.
+  board?: "Enquiry List" | "Estimation";
 }
 
 /**
@@ -39,7 +42,7 @@ export async function getHistory(actor: AuthedUser, filters: HistoryFilters): Pr
 
   if (!filters.type || filters.type === "PROJECT") {
     const projects = await prisma.board.findMany({
-      where: { ...boardWhere, name: { not: "Enquiry List" } },
+      where: { ...boardWhere, name: { notIn: ["Enquiry List", "Estimation"] } },
       select: { id: true, boardId: true, name: true, isCompleted: true, completedAt: true, createdAt: true, service: { select: { name: true } } },
     });
     for (const p of projects) {
@@ -56,10 +59,13 @@ export async function getHistory(actor: AuthedUser, filters: HistoryFilters): Pr
   }
 
   if (!filters.type || filters.type === "TASK") {
-    const enquiryBoard = await prisma.board.findFirst({ where: { ...boardWhere, name: "Enquiry List" } });
-    if (enquiryBoard) {
+    // Both pipeline boards (Enquiry List, then Estimation) feed the same
+    // TASK ledger — a task only ever appears under whichever one currently
+    // holds it, since Awarded reassigns its boardId away from the other.
+    const pipelineBoards = await prisma.board.findMany({ where: { ...boardWhere, name: { in: ["Enquiry List", "Estimation"] } } });
+    for (const pipelineBoard of pipelineBoards) {
       const tasks = await prisma.task.findMany({
-        where: { boardId: enquiryBoard.id, isDeleted: false },
+        where: { boardId: pipelineBoard.id, isDeleted: false },
         select: {
           id: true,
           taskId: true,
@@ -81,6 +87,7 @@ export async function getHistory(actor: AuthedUser, filters: HistoryFilters): Pr
           service: t.service?.name ?? null,
           status,
           eventDate: t.completedAt ?? t.createdAt,
+          board: pipelineBoard.name as "Enquiry List" | "Estimation",
         });
       }
     }

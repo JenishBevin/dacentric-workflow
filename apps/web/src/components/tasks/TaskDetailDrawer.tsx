@@ -154,6 +154,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
       title={
         <span className="flex items-center gap-2">
           <span className="text-slate-400">{task?.taskId ?? "…"}</span>
+          {task?.estimationId && <span className="text-indigo-500">· {task.estimationId}</span>}
           {task && <ApprovalStatusBadge status={task.approvalStatus} />}
         </span>
       }
@@ -162,7 +163,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         task && (
           <div className="flex w-full items-center justify-between">
             <div className="flex gap-2">
-              {task.board?.name === "Enquiry List" && task.stage?.name?.toLowerCase() !== "lost" && (
+              {(task.board?.name === "Enquiry List" || task.board?.name === "Estimation") && task.stage?.name?.toLowerCase() !== "lost" && (
                 <>
                   <Button
                     variant="outline"
@@ -170,10 +171,16 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                     loading={awardTask.isPending}
                     onClick={async () => {
                       try {
-                        const newBoard = await awardTask.mutateAsync(task.id);
-                        push({ variant: "success", title: "Awarded — project created.", description: newBoard.name });
-                        onClose();
-                        navigate(`/workflow/boards/${newBoard.id}`);
+                        const result = await awardTask.mutateAsync(task.id);
+                        if (result.kind === "moved-to-estimation") {
+                          push({ variant: "success", title: "Awarded — moved to Estimation.", description: result.name });
+                          onClose();
+                          navigate(`/workflow/estimation`);
+                        } else {
+                          push({ variant: "success", title: "Awarded — project created.", description: result.name });
+                          onClose();
+                          navigate(`/workflow/boards/${result.id}`);
+                        }
                       } catch (err) {
                         push({ variant: "error", title: "Could not award", description: extractApiError(err).message });
                       }
@@ -188,7 +195,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                     onClick={async () => {
                       try {
                         await markTaskLost.mutateAsync(task.id);
-                        push({ variant: "success", title: "Enquiry marked as Lost.", description: "Moved to Project/Task History." });
+                        push({ variant: "success", title: "Marked as Lost.", description: "Moved to Project/Task History." });
                         onClose();
                       } catch (err) {
                         push({ variant: "error", title: "Could not mark as Lost", description: extractApiError(err).message });

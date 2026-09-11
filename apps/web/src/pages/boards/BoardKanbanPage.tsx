@@ -260,7 +260,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         />
       )}
 
-      {canManageBoard && board.name !== "Enquiry List" && !board.isCompleted && (
+      {canManageBoard && board.name !== "Enquiry List" && board.name !== "Estimation" && !board.isCompleted && (
         <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
           <p className="text-xs text-slate-500">Once every task on this project is done, mark it Completed to move it into Project/Task History.</p>
           <Button variant="outline" size="sm" onClick={() => setConfirmComplete(true)}>

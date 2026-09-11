@@ -32,7 +32,7 @@ export default function DashboardPage() {
   // Enquiry List is a distinct feature from "Projects" (its own nav item,
   // not filed under any Service) — excluded so this count/list matches what
   // the Projects page actually shows.
-  const boards = React.useMemo(() => boardsRaw?.filter((b) => b.name !== "Enquiry List"), [boardsRaw]);
+  const boards = React.useMemo(() => boardsRaw?.filter((b) => b.name !== "Enquiry List" && b.name !== "Estimation"), [boardsRaw]);
   const canViewWorkload = can(user, "VIEW_TEAM_WORKLOAD");
   const { data: workload } = useTeamWorkload({});
   const { data: myTaskGroups } = useMyTasks();

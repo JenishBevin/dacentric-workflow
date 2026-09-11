@@ -69,7 +69,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     // not filed under any Service) — excluded here so this count matches
     // what the Projects page actually shows, even though its tasks still
     // count toward every task-based stat above via boardIds.
-    prisma.board.count({ where: { ...boardWhere, isArchived: false, isCompleted: false, name: { not: "Enquiry List" } } }),
+    prisma.board.count({ where: { ...boardWhere, isArchived: false, isCompleted: false, name: { notIn: ["Enquiry List", "Estimation"] } } }),
     prisma.task.groupBy({ by: ["priority"], where: { ...baseWhere, isCompleted: false }, _count: { _all: true } }),
     prisma.task.groupBy({ by: ["stageId"], where: { ...baseWhere }, _count: { _all: true } }),
     prisma.task.count({ where: { ...baseWhere, approvalStatus: "PENDING_APPROVAL" } }),

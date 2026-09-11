@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { MoreVertical, Link2, LayoutGrid, AlertCircle } from "lucide-react";
+import clsx from "clsx";
 import { Card, Badge, AvatarGroup } from "../ui/primitives";
 import { Board } from "../../lib/types";
 
@@ -27,7 +28,17 @@ export const BoardCard: React.FC<Props> = ({ board, onEdit, onDuplicate, onArchi
   }, []);
 
   return (
-    <Card className="flex flex-col gap-3 p-4 transition-shadow hover:shadow-md">
+    <Card
+      className={clsx(
+        "relative flex flex-col gap-3 p-4 transition-shadow hover:shadow-md",
+        board.isHighlighted && "border-amber-300 ring-2 ring-amber-300"
+      )}
+    >
+      {board.isHighlighted && (
+        <span className="absolute -top-2 left-3 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white shadow-sm">
+          New
+        </span>
+      )}
       <div className="flex items-start justify-between gap-2">
         <Link to={`/workflow/boards/${board.id}`} className="min-w-0 flex-1">
           <p className="truncate font-semibold text-slate-900 hover:text-brand-700">{board.name}</p>

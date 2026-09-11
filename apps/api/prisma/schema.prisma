@@ -340,6 +340,10 @@ model Board {
   completedAt     DateTime?
   isDeleted       Boolean    @default(false)
   deletedAt       DateTime?
+  // Set true the moment this project is created via the Estimation-awarded
+  // flow, so it stands out wherever it's listed; cleared by the next edit
+  // to the project (see updateBoard).
+  isHighlighted   Boolean    @default(false)
   createdById     String
   createdBy       User       @relation("BoardCreatedBy", fields: [createdById], references: [id])
   createdAt       DateTime   @default(now())
@@ -546,6 +550,11 @@ model Task {
   isDeleted        Boolean             @default(false)
   deletedAt        DateTime?
 
+  // Set true when this task just landed here via the Awarded flow (Enquiry
+  // -> Estimation, or Estimation -> Project); cleared by the next edit,
+  // move, or assignment change (see updateTask/moveTask/setAssignees).
+  isHighlighted    Boolean             @default(false)
+
   version          Int                 @default(1)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
@@ -560,6 +569,7 @@ model Task {
   approvals        TaskApproval[]
   blockingLinks    TaskDependency[]    @relation("DependencySource")
   blockedByLinks   TaskDependency[]    @relation("DependencyTarget")
+  estimationRecord EstimationRecord?
 
   @@index([boardId])
   @@index([stageId])
@@ -815,6 +825,21 @@ model LeaveAttachment {
   createdAt     DateTime    @default(now())
 
   @@index([leaveRequestId])
+}
+
+// Only a subset of Task rows ever pass through the Estimation board, so this
+// gets its own genuinely-autoincrementing sequence (like Board/Claim) rather
+// than a sparse nullable column on Task itself. Created once, the first time
+// a task lands on Estimation — created directly there, or Awarded from
+// Enquiry List — and never re-created if it's later Awarded again onward
+// into a Project.
+model EstimationRecord {
+  id               String   @id @default(uuid())
+  taskId           String   @unique
+  task             Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  estimationNumber Int      @unique @default(autoincrement())
+  estimationId     String   @unique // formatted EST-000001, generated from estimationNumber
+  createdAt        DateTime @default(now())
 }
 
 // ---------------------------------------------------------------------------

@@ -54,6 +54,13 @@ boardsRouter.get(
 
 // Same ordering requirement as "/enquiry-list" above.
 boardsRouter.get(
+  "/estimation",
+  requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await boardsService.getOrCreateEstimationBoard(req.user!)))
+);
+
+// Same ordering requirement as "/enquiry-list" above.
+boardsRouter.get(
   "/services",
   requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
   asyncHandler(async (_req, res) => ok(res, await boardsService.listServices()))

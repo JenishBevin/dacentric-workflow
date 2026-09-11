@@ -6,10 +6,10 @@ import { sanitizeDescription } from "../../common/richtext";
 import { loadTaskWithAccess, assertCanEditTask, assertCanDeleteTask } from "./task-access";
 import { AuthedUser } from "../../middleware/authenticate";
 import { computeDueDateStatus } from "./task-formatting";
-import { formatTaskId, formatProjectId, AuditAction, TaskApprovalStatus, TaskType, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
+import { formatTaskId, formatProjectId, formatEstimationId, AuditAction, TaskApprovalStatus, TaskType, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
 import { getPermissionScope, scopeAtLeast } from "../../common/permissions";
 import { createRecurringSeries, attachTemplateAndScheduleFirst } from "../recurrence/recurrence.service";
-import { DEFAULT_STAGES } from "../boards/boards.service";
+import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME } from "../boards/boards.service";
 
 export interface CreateTaskInput {
   boardId: string;
@@ -36,6 +36,18 @@ export interface CreateTaskInput {
     endDate?: Date;
   };
   dependencies?: Array<{ type: string; taskId: string }>;
+}
+
+// Assigns the next EST-000001-style id the first time a task lands on the
+// Estimation board — created directly there, or Awarded onto it from
+// Enquiry List. Kept forever after, even once the task is later Awarded on
+// into a real Project, as a permanent record of its estimation phase.
+async function ensureEstimationRecord(tx: any, taskId: string) {
+  const existing = await tx.estimationRecord.findUnique({ where: { taskId } });
+  if (existing) return existing;
+  const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
+  const created = await tx.estimationRecord.create({ data: { taskId, estimationId: placeholderId } });
+  return tx.estimationRecord.update({ where: { id: created.id }, data: { estimationId: formatEstimationId(created.estimationNumber) } });
 }
 
 async function assertActiveWorkflowUsers(userIds: string[]) {
@@ -100,7 +112,11 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
       },
     });
     const finalTaskId = formatTaskId(created.taskNumber);
-    return tx.task.update({ where: { id: created.id }, data: { taskId: finalTaskId } });
+    const updatedTask = await tx.task.update({ where: { id: created.id }, data: { taskId: finalTaskId } });
+    if (board.name === ESTIMATION_BOARD_NAME) {
+      await ensureEstimationRecord(tx, updatedTask.id);
+    }
+    return updatedTask;
   });
 
   if (input.dependencies?.length) {
@@ -190,6 +206,8 @@ function serializeTask(task: any) {
     taskType: task.taskType,
     seriesId: task.seriesId,
     isCompleted: task.isCompleted,
+    isHighlighted: task.isHighlighted,
+    estimationId: task.estimationRecord?.estimationId ?? null,
     requiresApproval: task.requiresApproval,
     approverUserId: task.approverUserId,
     approvalStatus: task.approvalStatus,
@@ -232,6 +250,7 @@ const TASK_DETAIL_INCLUDE = {
   linkedRecord: { include: { linkedRecord: true } },
   blockingLinks: { include: { targetTask: true } },
   _count: { select: { attachments: true, comments: true } },
+  estimationRecord: { select: { estimationId: true } },
 };
 
 export async function getTaskDetail(taskId: string, actor: AuthedUser) {
@@ -279,7 +298,7 @@ export async function updateTask(taskId: string, input: Record<string, any>, act
   if (input.approverUserId) await assertActiveWorkflowUsers([input.approverUserId]);
 
   const before = { ...ctx.task };
-  const data: any = { version: { increment: 1 } };
+  const data: any = { version: { increment: 1 }, isHighlighted: false };
   const changedFields: string[] = [];
 
   for (const key of ["title", "priority", "startDate", "dueDate", "estimatedEffortHours", "dependencyEnforced"]) {
@@ -339,7 +358,7 @@ export async function setAssignees(taskId: string, assigneeUserIds: string[], ac
     prisma.taskAssignee.createMany({
       data: assigneeUserIds.map((userId, idx) => ({ taskId, userId, isPrimary: idx === 0 })),
     }),
-    prisma.task.update({ where: { id: taskId }, data: { version: { increment: 1 } } }),
+    prisma.task.update({ where: { id: taskId }, data: { version: { increment: 1 }, isHighlighted: false } }),
   ]);
 
   await writeAudit({
@@ -370,7 +389,7 @@ export async function quickEdit(taskId: string, input: { priority?: string; dueD
   assertCanEditTask(ctx);
   const updated = await prisma.task.update({
     where: { id: taskId },
-    data: { priority: input.priority as any, dueDate: input.dueDate, version: { increment: 1 } },
+    data: { priority: input.priority as any, dueDate: input.dueDate, isHighlighted: false, version: { increment: 1 } },
     include: TASK_DETAIL_INCLUDE as any,
   });
   await writeAudit({ actor, action: AuditAction.EDIT, entityType: "Task", entityId: taskId, boardId: ctx.task.boardId, field: "quickEdit", afterValue: input });
@@ -415,6 +434,7 @@ export async function moveTask(taskId: string, targetStageId: string, actor: Aut
         previousStageId: ctx.task.stageId,
         stageId: pendingApprovalStage ? pendingApprovalStage.id : ctx.task.stageId,
         approvalStatus: TaskApprovalStatus.PENDING_APPROVAL,
+        isHighlighted: false,
         version: { increment: 1 },
       },
       include: TASK_DETAIL_INCLUDE as any,
@@ -459,6 +479,7 @@ export async function moveTask(taskId: string, targetStageId: string, actor: Aut
       isCompleted: targetStage.isTerminal,
       completedAt: targetStage.isTerminal ? new Date() : null,
       approvalStatus: targetStage.isTerminal ? TaskApprovalStatus.APPROVED : ctx.task.approvalStatus,
+      isHighlighted: false,
       version: { increment: 1 },
     },
     include: TASK_DETAIL_INCLUDE as any,
@@ -488,11 +509,16 @@ export async function moveTask(taskId: string, targetStageId: string, actor: Aut
 }
 
 // ---------------------------------------------------------------------------
-// Awarded — an enquiry's client accepted the quote: spin up a real Project
-// (under the enquiry's chosen Service, if any) and move this task onto it,
-// landing in the new project's first stage. There is no other place in the
-// app that reassigns a task's boardId — every other write only ever moves a
-// task between stages of the SAME board — so this is the one path that does.
+// Awarded — a two-stage pipeline:
+//   1. An Enquiry List task Awarded lands on the (lazily-provisioned)
+//      Estimation board instead of becoming a Project directly — no board is
+//      created yet, the task just moves and gets highlighted there.
+//   2. An Estimation-board task Awarded is what actually spins up a real
+//      Project (under the task's chosen Service, if any) and moves the task
+//      onto it, landing in the new project's first stage, highlighted.
+// Every other write only ever moves a task between stages of the SAME
+// board — this is the one path that reassigns a task's boardId, and it does
+// so at either of the two hand-off points above.
 // ---------------------------------------------------------------------------
 
 export async function awardTask(taskId: string, actor: AuthedUser) {
@@ -500,8 +526,38 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
   assertCanEditTask(ctx);
 
   const canCreateBoard = scopeAtLeast(getPermissionScope(actor.permissions, PermissionKey.CREATE_BOARD), "OWN");
-  if (!canCreateBoard) throw Errors.forbidden("You do not have permission to create a project.");
+  if (!canCreateBoard) throw Errors.forbidden("You do not have permission to do that.");
 
+  const sourceBoard = await prisma.board.findUniqueOrThrow({ where: { id: ctx.task.boardId } });
+
+  if (sourceBoard.name !== ESTIMATION_BOARD_NAME) {
+    // Stage 1: move onto Estimation — no Project exists yet.
+    const estimationStub = await getOrCreateEstimationBoard(actor);
+    const estimationBoard = await prisma.board.findUniqueOrThrow({
+      where: { id: estimationStub.id },
+      include: { stages: { orderBy: { position: "asc" } } },
+    });
+    const firstStage = estimationBoard.stages[0];
+
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { boardId: estimationBoard.id, stageId: firstStage.id, isHighlighted: true, version: { increment: 1 } },
+    });
+    const estimationRecord = await ensureEstimationRecord(prisma, taskId);
+
+    await writeAudit({
+      actor,
+      action: AuditAction.MOVE,
+      entityType: "Task",
+      entityId: taskId,
+      boardId: estimationBoard.id,
+      metadata: { awarded: true, fromBoardId: sourceBoard.id, toBoardId: estimationBoard.id, toStageId: firstStage.id, estimationId: estimationRecord.estimationId },
+    });
+
+    return { kind: "moved-to-estimation" as const, id: estimationBoard.id, name: estimationBoard.name };
+  }
+
+  // Stage 2: spin up the real Project.
   const { board: newBoard, firstStageId } = await prisma.$transaction(async (tx) => {
     const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
     const created = await tx.board.create({
@@ -510,6 +566,7 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
         name: ctx.task.title,
         boardType: BoardType.STANDALONE,
         serviceId: (ctx.task as any).serviceId ?? null,
+        isHighlighted: true,
         createdById: actor.id,
         stages: {
           create: DEFAULT_STAGES.map((s, idx) => ({
@@ -531,7 +588,7 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
 
     await tx.task.update({
       where: { id: taskId },
-      data: { boardId: board.id, stageId: board.stages[0].id, version: { increment: 1 } },
+      data: { boardId: board.id, stageId: board.stages[0].id, isHighlighted: true, version: { increment: 1 } },
     });
 
     return { board, firstStageId: board.stages[0].id };
@@ -554,7 +611,7 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
     metadata: { awarded: true, fromBoardId: ctx.task.boardId, toBoardId: newBoard.id, toStageId: firstStageId },
   });
 
-  return { id: newBoard.id, name: newBoard.name };
+  return { kind: "project-created" as const, id: newBoard.id, name: newBoard.name };
 }
 
 /** The "Lost" action on an enquiry — moves it to its board's "Lost" stage

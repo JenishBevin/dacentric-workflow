@@ -30,7 +30,7 @@ export default function DashboardManagementPage() {
   // Enquiry List is a distinct feature from "Projects" (its own nav item,
   // not filed under any Service) — excluded so this list matches what the
   // Projects page actually shows.
-  const boards = React.useMemo(() => boardsRaw?.filter((b) => b.name !== "Enquiry List"), [boardsRaw]);
+  const boards = React.useMemo(() => boardsRaw?.filter((b) => b.name !== "Enquiry List" && b.name !== "Estimation"), [boardsRaw]);
   const { data: workload } = useTeamWorkload({});
   const { data: dueThisWeek } = useDashboardTaskList("DUE_THIS_WEEK");
   const [openStat, setOpenStat] = React.useState<StatKind | null>(null);

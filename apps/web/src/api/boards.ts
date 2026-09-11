@@ -35,6 +35,16 @@ export function useEnquiryListBoard() {
   });
 }
 
+/** Same lazy-provisioning pattern as useEnquiryListBoard, for the Estimation
+ * board that sits between Enquiry List and Projects. */
+export function useEstimationBoard() {
+  return useQuery({
+    queryKey: ["estimation-board"],
+    queryFn: async () => (await api.get<{ data: { id: string; name: string } }>("/boards/estimation")).data.data,
+    retry: false,
+  });
+}
+
 export interface Service {
   id: string;
   name: string;

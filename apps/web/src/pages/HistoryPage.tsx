@@ -64,6 +64,7 @@ export default function HistoryPage() {
 
   function openRow(r: any) {
     if (r.kind === "PROJECT") navigate(`/workflow/boards/${r.id}`);
+    else if (r.board === "Estimation") navigate(`/workflow/estimation?task=${r.id}`);
     else navigate(`/workflow/enquiries?task=${r.id}`);
   }
 
@@ -182,7 +183,7 @@ export default function HistoryPage() {
                   <td className="px-4 py-2.5">
                     <span className="inline-flex items-center gap-1 text-xs text-slate-500">
                       {r.kind === "PROJECT" ? <Trello className="h-3.5 w-3.5" /> : <Inbox className="h-3.5 w-3.5" />}
-                      {r.kind === "PROJECT" ? "Project" : "Enquiry"}
+                      {r.kind === "PROJECT" ? "Project" : r.board === "Estimation" ? "Estimation" : "Enquiry"}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-400">{r.code}</td>

@@ -58,7 +58,10 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
   const createTask = useCreateTask();
   const { data: allTags } = useTags();
   const { data: services } = useServices();
-  const isEnquiryBoard = board.name === "Enquiry List";
+  // Both pipeline boards need a Service selected up front — Enquiry List so
+  // an eventual Award has one to hand off, Estimation because a task can be
+  // created here directly, without ever passing through Enquiry List.
+  const isEnquiryBoard = board.name === "Enquiry List" || board.name === "Estimation";
 
   const [assignees, setAssignees] = useState<{ userId: string; name: string }[]>([]);
   const [watchers, setWatchers] = useState<{ userId: string; name: string }[]>([]);

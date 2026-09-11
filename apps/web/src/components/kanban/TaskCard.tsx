@@ -38,10 +38,16 @@ export const TaskCard: React.FC<Props> = ({ task, onOpen, onMenuAction, dragDisa
       ref={setNodeRef}
       style={style}
       className={clsx(
-        "group relative rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:shadow-md",
+        "group relative rounded-lg border bg-white p-3 shadow-sm hover:shadow-md",
+        task.isHighlighted ? "border-amber-300 ring-2 ring-amber-300" : "border-slate-200",
         isDragging && "opacity-50"
       )}
     >
+      {task.isHighlighted && (
+        <span className="absolute -top-2 left-2 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white shadow-sm">
+          New
+        </span>
+      )}
       <div className="flex items-start gap-1.5">
         <button
           {...attributes}
@@ -68,7 +74,10 @@ export const TaskCard: React.FC<Props> = ({ task, onOpen, onMenuAction, dragDisa
           </span>
         </Tooltip>
         <button onClick={onOpen} className="min-w-0 flex-1 text-left">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">{task.taskId}</div>
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+            {task.taskId}
+            {task.estimationId && <span className="text-indigo-500">· {task.estimationId}</span>}
+          </div>
           <p className="mt-0.5 line-clamp-2 text-sm font-medium text-slate-900">{task.title}</p>
         </button>
         <div className="relative shrink-0">

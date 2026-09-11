@@ -193,6 +193,13 @@ export function formatClaimId(sequence: number): string {
   return `${CLAIM_ID_PREFIX}${String(sequence).padStart(CLAIM_ID_PAD_LENGTH, "0")}`;
 }
 
+export const ESTIMATION_ID_PREFIX = "EST-";
+export const ESTIMATION_ID_PAD_LENGTH = 6;
+
+export function formatEstimationId(sequence: number): string {
+  return `${ESTIMATION_ID_PREFIX}${String(sequence).padStart(ESTIMATION_ID_PAD_LENGTH, "0")}`;
+}
+
 // ---------------------------------------------------------------------------
 // Support tickets
 // ---------------------------------------------------------------------------

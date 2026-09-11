@@ -89,15 +89,24 @@ export function useMoveTask() {
   });
 }
 
-/** "Awarded": creates a new Project under the task's Service and moves the
- * task onto it. Returns the new project so the caller can navigate there. */
+export interface AwardTaskResult {
+  kind: "moved-to-estimation" | "project-created";
+  id: string;
+  name: string;
+}
+
+/** "Awarded" is two-stage: from Enquiry List it moves the task onto the
+ * Estimation board (no project yet); from Estimation it creates a new
+ * Project under the task's Service and moves the task onto it. The `kind`
+ * on the result tells the caller which one just happened. */
 export function useAwardTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (taskId: string) => (await api.post<{ data: { id: string; name: string } }>(`/tasks/${taskId}/award`)).data.data,
-    onSuccess: (board, taskId) => {
-      invalidateTaskEverywhere(qc, taskId, board.id);
+    mutationFn: async (taskId: string) => (await api.post<{ data: AwardTaskResult }>(`/tasks/${taskId}/award`)).data.data,
+    onSuccess: (result, taskId) => {
+      invalidateTaskEverywhere(qc, taskId, result.id);
       qc.invalidateQueries({ queryKey: ["services"] });
+      qc.invalidateQueries({ queryKey: ["estimation-board"] });
     },
   });
 }

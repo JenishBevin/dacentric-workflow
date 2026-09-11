@@ -92,6 +92,7 @@ export async function listBoards(
     boardType: b.boardType,
     linkedRecord: b.linkedRecord,
     isArchived: b.isArchived,
+    isHighlighted: b.isHighlighted,
     stageCount: b.stages.length,
     openTaskCount: openMap.get(b.id) ?? 0,
     overdueTaskCount: overdueMap.get(b.id) ?? 0,
@@ -281,6 +282,28 @@ export async function getOrCreateEnquiryBoard(actor: AuthedUser) {
   return { id: board.id, name: board.name };
 }
 
+// Sits between Enquiry List and Projects in the pipeline: an Awarded enquiry
+// lands here first (not yet a real Project), can also be created directly
+// here without ever going through Enquiry List, and only becomes a Project
+// (under its chosen Service) once *it* is Awarded — see awardTask().
+export const ESTIMATION_BOARD_NAME = "Estimation";
+const ESTIMATION_STAGES = [
+  { name: "New", color: "#60a5fa", isTerminal: false },
+  { name: "In Progress", color: "#f59e0b", isTerminal: false },
+  { name: "Converted", color: "#22c55e", isTerminal: true },
+  { name: "Lost", color: "#ef4444", isTerminal: true },
+];
+
+export async function getOrCreateEstimationBoard(actor: AuthedUser) {
+  const board = await getOrCreateNamedBoard(
+    ESTIMATION_BOARD_NAME,
+    "Costing and quoting for awarded enquiries — and anything estimated directly, without an enquiry first.",
+    ESTIMATION_STAGES,
+    actor
+  );
+  return { id: board.id, name: board.name };
+}
+
 // ---------------------------------------------------------------------------
 // List of Services — the fixed company service catalog (seeded by
 // servicesSeed.ts). "Projects" nav shows this list first; picking one shows
@@ -320,6 +343,7 @@ export async function updateBoard(
       linkedRecordType: input.linkedRecordType === null ? null : (input.linkedRecordType as any),
       linkedRecordId: input.linkedRecordId === null ? null : input.linkedRecordId,
       boardType: input.linkedRecordId === null ? BoardType.STANDALONE : undefined,
+      isHighlighted: false,
       version: { increment: 1 },
     },
   });

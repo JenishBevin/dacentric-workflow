@@ -73,6 +73,7 @@ export interface Board {
   boardType: BoardType;
   linkedRecord?: { id: string; recordType: LinkedRecordType; name: string; externalRef: string } | null;
   isArchived: boolean;
+  isHighlighted: boolean;
   stageCount: number;
   openTaskCount: number;
   overdueTaskCount: number;
@@ -114,6 +115,8 @@ export interface TaskSummary {
   taskType: "STANDARD" | "RECURRING_INSTANCE";
   seriesId?: string | null;
   isCompleted: boolean;
+  isHighlighted: boolean;
+  estimationId?: string | null;
   requiresApproval: boolean;
   approverUserId?: string | null;
   approvalStatus: TaskApprovalStatus;

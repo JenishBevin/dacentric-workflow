@@ -37,12 +37,19 @@ export const TaskListView: React.FC<{
                   onClick={() => onOpenTask(task)}
                   className={clsx(
                     "flex w-full flex-wrap items-center gap-3 px-3 py-2.5 text-left sm:flex-nowrap",
-                    idx !== 0 && "border-t border-slate-100"
+                    idx !== 0 && "border-t border-slate-100",
+                    task.isHighlighted && "bg-amber-50"
                   )}
                 >
                   <span className="min-w-0 flex-1">
                     <span className="mr-1.5 text-xs text-slate-400">{task.taskId}</span>
+                    {task.estimationId && <span className="mr-1.5 text-xs text-indigo-500">{task.estimationId}</span>}
                     <span className="text-sm font-medium text-slate-800 hover:text-brand-700">{task.title}</span>
+                    {task.isHighlighted && (
+                      <span className="ml-1.5 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
+                        New
+                      </span>
+                    )}
                   </span>
                   {task.assignees.length > 0 && (
                     <Badge tone="slate">

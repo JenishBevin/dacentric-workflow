@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Trello,
   Inbox,
+  Calculator,
   ListChecks,
   Users2,
   Clock3,
@@ -58,6 +59,7 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
 
   const workflowItems: NavItem[] = [
     { to: "/workflow/enquiries", label: "Enquiry List", icon: Inbox, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
+    { to: "/workflow/estimation", label: "Estimation", icon: Calculator, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
     { to: "/workflow/boards", label: "Projects", icon: Trello, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
     { to: "/workflow/my-tasks", label: "My Tasks", icon: ListChecks, visible: !isStaff, badge: myTaskCount || undefined },
     { to: "/workflow/team", label: "Team Workload", icon: Users2, visible: !isStaff && can(user, "VIEW_TEAM_WORKLOAD") },
