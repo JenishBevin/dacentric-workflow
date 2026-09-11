@@ -94,7 +94,7 @@ function ApplyForLeaveDrawer({ open, onClose }: { open: boolean; onClose: () => 
               </option>
             ))}
           </Select>
-          {selectedBalance && (
+          {leaveType === "ANNUAL" && selectedBalance && (
             <p className="mt-1 text-xs text-slate-500">
               {selectedBalance.remaining === null
                 ? "No balance cap for this leave type."
