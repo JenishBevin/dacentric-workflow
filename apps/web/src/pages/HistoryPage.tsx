@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format, startOfDay, endOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { Download, Archive, Trello, Inbox, ChevronRight } from "lucide-react";
 import { useHistory } from "../api/history";
@@ -28,6 +28,8 @@ type DatePreset = "today" | "week" | "month" | "custom" | null;
 export default function HistoryPage() {
   const navigate = useNavigate();
   const { push } = useToast();
+  const [searchParams] = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
   const [preset, setPreset] = useState<DatePreset>(null);
@@ -61,6 +63,12 @@ export default function HistoryPage() {
   function selectPreset(next: DatePreset) {
     setPreset((p) => (p === next ? null : next));
   }
+
+  useEffect(() => {
+    if (!highlightId) return;
+    const el = document.getElementById(`history-row-${highlightId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId, rows]);
 
   function openRow(r: any) {
     if (r.kind === "PROJECT") navigate(`/workflow/boards/${r.id}`);
@@ -177,8 +185,12 @@ export default function HistoryPage() {
               {rows.map((r: any) => (
                 <tr
                   key={`${r.kind}-${r.id}`}
+                  id={`history-row-${r.id}`}
                   onClick={() => openRow(r)}
-                  className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                  className={clsx(
+                    "cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50",
+                    r.id === highlightId && "bg-amber-50 ring-2 ring-inset ring-amber-300"
+                  )}
                 >
                   <td className="px-4 py-2.5">
                     <span className="inline-flex items-center gap-1 text-xs text-slate-500">

@@ -325,7 +325,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
             await setBoardCompleted.mutateAsync({ boardId: boardId!, completed: true });
             push({ variant: "success", title: "Project marked as completed.", description: `${board.name} has moved to Project/Task History.` });
             setConfirmComplete(false);
-            navigate("/workflow/boards");
+            navigate(`/workflow/history?highlight=${boardId}`);
           } catch (err) {
             push({ variant: "error", title: "Could not mark project as completed", description: extractApiError(err).message });
           }
