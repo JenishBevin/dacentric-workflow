@@ -6,7 +6,7 @@ const ROLE_NAMES: Record<RoleCode, string> = {
   [RoleCode.SUPER_ADMIN]: "Super Admin",
   [RoleCode.SYSTEM_ADMIN]: "System Admin",
   [RoleCode.MANAGEMENT]: "Management",
-  [RoleCode.PROJECT_MANAGER]: "Manager",
+  [RoleCode.PROJECT_MANAGER]: "Project",
   [RoleCode.HR]: "HR",
   [RoleCode.ACCOUNTS]: "Accounts",
   [RoleCode.ESTIMATION]: "Estimation",
@@ -21,13 +21,13 @@ const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
   [RoleCode.SYSTEM_ADMIN]: "Full operational control across every module. Cannot edit the role/permission matrix or a Super Admin's account.",
   [RoleCode.MANAGEMENT]: "Executive oversight: full visibility, approval, and export rights without board/task configuration authority.",
   [RoleCode.PROJECT_MANAGER]: "Creates and configures boards, assigns and approves tasks for their team.",
-  [RoleCode.HR]: "Same project/task authority as Manager, plus org-wide visibility into employee workload and time logs.",
-  [RoleCode.ACCOUNTS]: "Same project/task authority as HR/Manager, plus org-wide visibility for payroll, billing, and financial reporting.",
+  [RoleCode.HR]: "Same project/task authority as Project, plus org-wide visibility into employee workload and time logs.",
+  [RoleCode.ACCOUNTS]: "Same project/task authority as HR/Project, plus org-wide visibility for payroll, billing, and financial reporting.",
   [RoleCode.ESTIMATION]: "Prepares cost and time estimates on their own tasks and exports them.",
   [RoleCode.SALES]: "Works their own tasks and links them to CRM customer/lead records.",
   [RoleCode.PROCUREMENT]: "Works their own tasks and links them to ERP purchase-order/vendor records.",
   [RoleCode.STAFF]: "Front-line staff — no Workflow access, can only apply for and track their own leave.",
-  [RoleCode.PROJECT_SALES_COORDINATOR]: "Same project/task authority as Manager, plus org-wide CRM linking to coordinate delivery on deals sales has brought in.",
+  [RoleCode.PROJECT_SALES_COORDINATOR]: "Same project/task authority as Project, plus org-wide CRM linking to coordinate delivery on deals sales has brought in.",
 };
 
 /**

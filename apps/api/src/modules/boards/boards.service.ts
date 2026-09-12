@@ -221,7 +221,7 @@ async function getOrCreateNamedBoard(
   if (!board) {
     const canCreateBoard = scopeAtLeast(getPermissionScope(actor.permissions, PermissionKey.CREATE_BOARD), "OWN");
     if (!canCreateBoard) {
-      throw Errors.forbidden(`"${name}" hasn't been set up yet. Ask a Manager or Administrator to open it once to create it.`);
+      throw Errors.forbidden(`"${name}" hasn't been set up yet. Ask a Project or Administrator to open it once to create it.`);
     }
 
     const activeUsers = await prisma.user.findMany({ where: { status: "ACTIVE" }, select: { id: true } });

@@ -29,7 +29,7 @@ export default function TagsSettingsPage() {
   const [newColor, setNewColor] = useState(PALETTE[0]);
   const [pendingDelete, setPendingDelete] = useState<Tag | null>(null);
 
-  const canManage = can(user, "MANAGE_ROLES", "ALL") || can(user, "CREATE_BOARD"); // Workflow Manager / Admin
+  const canManage = can(user, "MANAGE_ROLES", "ALL") || can(user, "CREATE_BOARD"); // Workflow Project / Admin
 
   async function handleCreate() {
     if (!newName.trim()) return;

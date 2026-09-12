@@ -185,7 +185,7 @@ function ApplyForLeaveDrawer({ open, onClose }: { open: boolean; onClose: () => 
 /**
  * Section 31 / UC-12 — apply-for-leave is a real, working flow: any user
  * with a linked Employee record can submit a request here and track its
- * status. Deciding it stays restricted to HR/Manager/Admin below. The
+ * status. Deciding it stays restricted to HR/Project/Admin below. The
  * "View Current Workload" panel on that approval side remains the one
  * deliberate Workflow integration point from the original minimal-HRMS
  * scope — everything else here (apply, track, approve) is the real flow
@@ -200,7 +200,7 @@ export default function LeavePage() {
   const { data: myRequests, isLoading: myLoading, isError: myError, refetch: refetchMine } = useMyLeaveRequests();
 
   // Single-stage approval: every request goes straight to HR (or a
-  // System/Super Admin) — no Manager / Management stage.
+  // System/Super Admin) — no Project / Management stage.
   const isAdminUser = user?.roles.some((r) => ["SYSTEM_ADMIN", "SUPER_ADMIN"].includes(r)) ?? false;
   const isHr = user?.roles.includes("HR") ?? false;
   const isApprover = isAdminUser || isHr;

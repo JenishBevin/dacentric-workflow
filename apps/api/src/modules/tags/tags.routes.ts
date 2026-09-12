@@ -17,7 +17,7 @@ tagsRouter.get(
 
 // Section 20: "Tag creation must be permission controlled." There's no
 // dedicated PermissionKey for tag management in the RBAC matrix, so this
-// reuses CREATE_BOARD's scope — granted to Workflow Manager/Board Owner and
+// reuses CREATE_BOARD's scope — granted to Workflow Project role/Board Owner and
 // System Administrator, withheld from Viewer, which matches who the spec
 // expects to curate organization-wide tags.
 tagsRouter.post(

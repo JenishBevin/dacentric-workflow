@@ -45,7 +45,7 @@ workTimeRouter.get(
   })
 );
 
-// Manager, HR, Accounts, System Admin and Super Admin only (Section:
+// Project, HR, Accounts, System Admin and Super Admin only (Section:
 // RBAC row for VIEW_TIME_LOGS) — everyone else is scoped to NONE by default
 // and gets a 403 here, well before the service layer's own scoping kicks in.
 workTimeRouter.get(
