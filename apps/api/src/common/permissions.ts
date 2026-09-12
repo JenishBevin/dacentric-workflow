@@ -113,7 +113,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.VIEW_TIME_LOGS]: "TEAM",
     [PermissionKey.MANAGE_TICKETS]: "NONE",
   },
-  // People-ops: same Workflow project/task authority as Project Manager
+  // People-ops: same Workflow project/task authority as Manager
   // (create/edit boards, create/assign/move tasks), plus HR's own broader
   // org-wide workload/time visibility (kept at ALL, not downgraded to TEAM).
   [RoleCode.HR]: {
@@ -138,7 +138,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.VIEW_TIME_LOGS]: "ALL",
     [PermissionKey.MANAGE_TICKETS]: "NONE",
   },
-  // Finance: same operational Workflow authority as HR/Project Manager
+  // Finance: same operational Workflow authority as HR/Manager
   // (create/edit boards, create/assign/move tasks) so their menus and
   // features work the same as every other operational role, plus org-wide
   // visibility (VIEW_WORKFLOW/VIEW_TEAM_WORKLOAD at ALL, not TEAM) since
@@ -251,7 +251,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
   [RoleCode.STAFF]: {
     [PermissionKey.LOGIN]: "ALL",
   },
-  // Bridges Project Manager's board/task authority with Sales' CRM linking —
+  // Bridges Manager's board/task authority with Sales' CRM linking —
   // coordinates project delivery for deals the sales side has brought in.
   [RoleCode.PROJECT_SALES_COORDINATOR]: {
     [PermissionKey.LOGIN]: "ALL",

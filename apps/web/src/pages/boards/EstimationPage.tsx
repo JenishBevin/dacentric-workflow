@@ -39,7 +39,7 @@ export default function EstimationPage() {
         <EmptyState
           icon={<Calculator className="h-8 w-8" />}
           title="Estimation isn't set up yet"
-          description="Ask a Project Manager or Administrator to open Estimation once — it only needs to happen the first time."
+          description="Ask a Manager or Administrator to open Estimation once — it only needs to happen the first time."
         />
       </div>
     );

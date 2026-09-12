@@ -175,7 +175,7 @@ hrmsRouter.get(
   requireAnyRole(RoleCode.HR, RoleCode.SYSTEM_ADMIN, RoleCode.SUPER_ADMIN),
   asyncHandler(async (_req, res) => {
     // Single-stage approval: every request goes straight to HR (or an
-    // Administrator) — no Project Manager / Management stage.
+    // Administrator) — no Manager / Management stage.
     const requests = await prisma.leaveRequest.findMany({
       where: { status: "PENDING" },
       include: { employee: true, handoverToEmployee: { select: { id: true, fullName: true } }, attachments: true },

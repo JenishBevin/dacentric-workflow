@@ -200,7 +200,7 @@ export default function LeavePage() {
   const { data: myRequests, isLoading: myLoading, isError: myError, refetch: refetchMine } = useMyLeaveRequests();
 
   // Single-stage approval: every request goes straight to HR (or a
-  // System/Super Admin) — no Project Manager / Management stage.
+  // System/Super Admin) — no Manager / Management stage.
   const isAdminUser = user?.roles.some((r) => ["SYSTEM_ADMIN", "SUPER_ADMIN"].includes(r)) ?? false;
   const isHr = user?.roles.includes("HR") ?? false;
   const isApprover = isAdminUser || isHr;
