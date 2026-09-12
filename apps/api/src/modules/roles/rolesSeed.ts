@@ -14,6 +14,13 @@ const ROLE_NAMES: Record<RoleCode, string> = {
   [RoleCode.PROCUREMENT]: "Procurement",
   [RoleCode.STAFF]: "Staff",
   [RoleCode.PROJECT_SALES_COORDINATOR]: "Project and Sales Coordinator",
+  [RoleCode.ESTIMATION_MANAGER]: "Estimation Manager",
+  [RoleCode.ESTIMATION_TEAM_LEAD]: "Estimation Team Lead",
+  [RoleCode.ESTIMATION_ENGINEER]: "Estimation Engineer",
+  [RoleCode.PROJ_MANAGER]: "Proj.Manager",
+  [RoleCode.MEP_ENGINEER]: "MEP Engineer",
+  [RoleCode.SITE_ENGINEER]: "Site Engineer",
+  [RoleCode.TECHNICIAN]: "Technician",
 };
 
 const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
@@ -28,6 +35,13 @@ const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
   [RoleCode.PROCUREMENT]: "Works their own tasks and links them to ERP purchase-order/vendor records.",
   [RoleCode.STAFF]: "Front-line staff — no Workflow access, can only apply for and track their own leave.",
   [RoleCode.PROJECT_SALES_COORDINATOR]: "Same project/task authority as Project, plus org-wide CRM linking to coordinate delivery on deals sales has brought in.",
+  [RoleCode.ESTIMATION_MANAGER]: "Heads the Estimation team: creates and configures boards, assigns and approves estimation tasks.",
+  [RoleCode.ESTIMATION_TEAM_LEAD]: "Coordinates the Estimation team's tasks — assigns and moves work across the team, without board configuration authority.",
+  [RoleCode.ESTIMATION_ENGINEER]: "Prepares cost and time estimates on their own tasks and exports them.",
+  [RoleCode.PROJ_MANAGER]: "Heads a project delivery team: creates and configures boards, assigns and approves tasks for their team.",
+  [RoleCode.MEP_ENGINEER]: "Works their own MEP tasks; no board configuration or org-wide visibility.",
+  [RoleCode.SITE_ENGINEER]: "Works their own site tasks; no board configuration or org-wide visibility.",
+  [RoleCode.TECHNICIAN]: "Front-line execution: works and updates their own assigned tasks only.",
 };
 
 /**

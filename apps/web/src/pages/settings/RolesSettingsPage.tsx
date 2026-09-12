@@ -43,6 +43,13 @@ const ROLE_LABELS: Record<RoleCode, string> = {
   PROCUREMENT: "Procurement",
   STAFF: "Staff",
   PROJECT_SALES_COORDINATOR: "Project and Sales Coordinator",
+  ESTIMATION_MANAGER: "Estimation Manager",
+  ESTIMATION_TEAM_LEAD: "Estimation Team Lead",
+  ESTIMATION_ENGINEER: "Estimation Engineer",
+  PROJ_MANAGER: "Proj.Manager",
+  MEP_ENGINEER: "MEP Engineer",
+  SITE_ENGINEER: "Site Engineer",
+  TECHNICIAN: "Technician",
 };
 
 interface RoleRow {
