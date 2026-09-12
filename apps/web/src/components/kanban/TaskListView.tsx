@@ -43,6 +43,7 @@ export const TaskListView: React.FC<{
                 >
                   <span className="min-w-0 flex-1">
                     <span className="mr-1.5 text-xs text-slate-400">{task.taskId}</span>
+                    {task.enquiryId && <span className="mr-1.5 text-xs text-brand-500">{task.enquiryId}</span>}
                     {task.estimationId && <span className="mr-1.5 text-xs text-indigo-500">{task.estimationId}</span>}
                     <span className="text-sm font-medium text-slate-800 hover:text-brand-700">{task.title}</span>
                     {task.isHighlighted && (

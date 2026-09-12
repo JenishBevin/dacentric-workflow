@@ -76,6 +76,7 @@ export const TaskCard: React.FC<Props> = ({ task, onOpen, onMenuAction, dragDisa
         <button onClick={onOpen} className="min-w-0 flex-1 text-left">
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
             {task.taskId}
+            {task.enquiryId && <span className="text-brand-500">· {task.enquiryId}</span>}
             {task.estimationId && <span className="text-indigo-500">· {task.estimationId}</span>}
           </div>
           <p className="mt-0.5 line-clamp-2 text-sm font-medium text-slate-900">{task.title}</p>

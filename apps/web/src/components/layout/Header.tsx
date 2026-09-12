@@ -55,10 +55,10 @@ function useBreadcrumbs() {
   return segments.map((s) => BREADCRUMB_LABELS[s] ?? s);
 }
 
-// A Task ID (WF-000001), Project ID (PRJ-000001) or Claim ID (CLM-000001)
-// typed into the search box — searched for an exact match so it jumps
-// straight to that record.
-const ID_LOOKUP_PATTERN = /^(WF|PRJ|CLM)-\d+$/i;
+// A Task ID (WF-000001), Project ID (QPTS-PRJ-2026-0001) or Claim ID
+// (CLM-000001) typed into the search box — searched for an exact match so
+// it jumps straight to that record.
+const ID_LOOKUP_PATTERN = /^(WF-\d+|CLM-\d+|QPTS-PRJ-\d{4}-\d+)$/i;
 
 export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobileMenu }) => {
   const { user, logout } = useAuth();
@@ -102,7 +102,7 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
       setSearching(true);
       try {
         const upper = q.toUpperCase();
-        const isProjectId = upper.startsWith("PRJ-");
+        const isProjectId = upper.startsWith("QPTS-PRJ-");
         const isClaimId = upper.startsWith("CLM-");
         if (isProjectId) {
           const { data } = await api.get("/boards/search/lookup", { params: { q } });
@@ -175,7 +175,7 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               disabled={searching}
-              placeholder="Search by Task ID (WF-000001), Project ID (PRJ-000001) or Claim ID (CLM-000001)…"
+              placeholder="Search by Task ID (WF-000001), Project ID (QPTS-PRJ-2026-0001) or Claim ID (CLM-000001)…"
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-14 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:focus-ring disabled:opacity-60"
             />
             <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">

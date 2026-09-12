@@ -179,13 +179,6 @@ export function formatTaskId(sequence: number): string {
   return `${TASK_ID_PREFIX}${String(sequence).padStart(TASK_ID_PAD_LENGTH, "0")}`;
 }
 
-export const PROJECT_ID_PREFIX = "PRJ-";
-export const PROJECT_ID_PAD_LENGTH = 6;
-
-export function formatProjectId(sequence: number): string {
-  return `${PROJECT_ID_PREFIX}${String(sequence).padStart(PROJECT_ID_PAD_LENGTH, "0")}`;
-}
-
 export const CLAIM_ID_PREFIX = "CLM-";
 export const CLAIM_ID_PAD_LENGTH = 6;
 
@@ -193,11 +186,27 @@ export function formatClaimId(sequence: number): string {
   return `${CLAIM_ID_PREFIX}${String(sequence).padStart(CLAIM_ID_PAD_LENGTH, "0")}`;
 }
 
-export const ESTIMATION_ID_PREFIX = "EST-";
-export const ESTIMATION_ID_PAD_LENGTH = 6;
+// Project/Estimation/Enquiry IDs all share one "QPTS" numbering standard:
+// a prefix, the calendar year, and a sequence that resets to 1 every year —
+// so the year segment is always meaningful, not just decorative.
+export const QPTS_PREFIX = "QPTS";
+export const QPTS_SEQUENCE_PAD_LENGTH = 4;
 
-export function formatEstimationId(sequence: number): string {
-  return `${ESTIMATION_ID_PREFIX}${String(sequence).padStart(ESTIMATION_ID_PAD_LENGTH, "0")}`;
+function formatQptsId(middle: string | null, year: number, sequence: number): string {
+  const seq = String(sequence).padStart(QPTS_SEQUENCE_PAD_LENGTH, "0");
+  return middle ? `${QPTS_PREFIX}-${middle}-${year}-${seq}` : `${QPTS_PREFIX}-${year}-${seq}`;
+}
+
+export function formatProjectId(year: number, sequence: number): string {
+  return formatQptsId("PRJ", year, sequence);
+}
+
+export function formatEstimationId(year: number, sequence: number): string {
+  return formatQptsId(null, year, sequence);
+}
+
+export function formatEnquiryId(year: number, sequence: number): string {
+  return formatQptsId("ENQ", year, sequence);
 }
 
 // ---------------------------------------------------------------------------

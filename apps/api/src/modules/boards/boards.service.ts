@@ -5,6 +5,7 @@ import { AuthedUser } from "../../middleware/authenticate";
 import { getBoardRole, assertBoardVisible, assertCanEditBoard, assertIsBoardOwnerOrAdmin, visibleBoardsWhere } from "./board-access";
 import { getPermissionScope, scopeAtLeast } from "../../common/permissions";
 import { AuditAction, BoardType, RoleCode, PermissionKey, formatProjectId } from "@dacentric/types";
+import { nextYearlySequence } from "../../common/sequence";
 
 export const DEFAULT_STAGES = [
   { name: "Backlog", color: "#94a3b8" },
@@ -180,9 +181,11 @@ export async function createBoard(input: CreateBoardInput, actor: AuthedUser) {
       },
       include: { stages: true, members: true },
     });
+    const year = new Date().getFullYear();
+    const sequence = await nextYearlySequence("PROJECT", year, tx);
     return tx.board.update({
       where: { id: created.id },
-      data: { boardId: formatProjectId(created.boardNumber) },
+      data: { boardId: formatProjectId(year, sequence) },
       include: { stages: true, members: true },
     });
   });
@@ -239,7 +242,9 @@ async function getOrCreateNamedBoard(
           members: { create: [{ userId: actor.id, role: "OWNER" }, ...otherMembers] },
         },
       });
-      return tx.board.update({ where: { id: created.id }, data: { boardId: formatProjectId(created.boardNumber) } });
+      const year = new Date().getFullYear();
+      const sequence = await nextYearlySequence("PROJECT", year, tx);
+      return tx.board.update({ where: { id: created.id }, data: { boardId: formatProjectId(year, sequence) } });
     });
 
     await writeAudit({
@@ -392,9 +397,11 @@ export async function duplicateBoard(boardId: string, actor: AuthedUser) {
       },
       include: { stages: true, members: true },
     });
+    const year = new Date().getFullYear();
+    const sequence = await nextYearlySequence("PROJECT", year, tx);
     return tx.board.update({
       where: { id: created.id },
-      data: { boardId: formatProjectId(created.boardNumber) },
+      data: { boardId: formatProjectId(year, sequence) },
       include: { stages: true, members: true },
     });
   });

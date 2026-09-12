@@ -6,10 +6,11 @@ import { sanitizeDescription } from "../../common/richtext";
 import { loadTaskWithAccess, assertCanEditTask, assertCanDeleteTask } from "./task-access";
 import { AuthedUser } from "../../middleware/authenticate";
 import { computeDueDateStatus } from "./task-formatting";
-import { formatTaskId, formatProjectId, formatEstimationId, AuditAction, TaskApprovalStatus, TaskType, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
+import { formatTaskId, formatProjectId, formatEstimationId, formatEnquiryId, AuditAction, TaskApprovalStatus, TaskType, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
 import { getPermissionScope, scopeAtLeast } from "../../common/permissions";
 import { createRecurringSeries, attachTemplateAndScheduleFirst } from "../recurrence/recurrence.service";
 import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME } from "../boards/boards.service";
+import { nextYearlySequence } from "../../common/sequence";
 
 export interface CreateTaskInput {
   boardId: string;
@@ -38,16 +39,27 @@ export interface CreateTaskInput {
   dependencies?: Array<{ type: string; taskId: string }>;
 }
 
-// Assigns the next EST-000001-style id the first time a task lands on the
-// Estimation board — created directly there, or Awarded onto it from
+// Assigns the next QPTS-2026-0001-style id the first time a task lands on
+// the Estimation board — created directly there, or Awarded onto it from
 // Enquiry List. Kept forever after, even once the task is later Awarded on
 // into a real Project, as a permanent record of its estimation phase.
 async function ensureEstimationRecord(tx: any, taskId: string) {
   const existing = await tx.estimationRecord.findUnique({ where: { taskId } });
   if (existing) return existing;
-  const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
-  const created = await tx.estimationRecord.create({ data: { taskId, estimationId: placeholderId } });
-  return tx.estimationRecord.update({ where: { id: created.id }, data: { estimationId: formatEstimationId(created.estimationNumber) } });
+  const year = new Date().getFullYear();
+  const sequence = await nextYearlySequence("ESTIMATION", year, tx);
+  return tx.estimationRecord.create({ data: { taskId, year, sequence, estimationId: formatEstimationId(year, sequence) } });
+}
+
+// Same idea, for a task's first (and only ever) landing on the Enquiry List
+// board — there's no upstream stage before it, so this only ever runs at
+// creation time.
+async function ensureEnquiryRecord(tx: any, taskId: string) {
+  const existing = await tx.enquiryRecord.findUnique({ where: { taskId } });
+  if (existing) return existing;
+  const year = new Date().getFullYear();
+  const sequence = await nextYearlySequence("ENQUIRY", year, tx);
+  return tx.enquiryRecord.create({ data: { taskId, year, sequence, enquiryId: formatEnquiryId(year, sequence) } });
 }
 
 async function assertActiveWorkflowUsers(userIds: string[]) {
@@ -115,6 +127,8 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
     const updatedTask = await tx.task.update({ where: { id: created.id }, data: { taskId: finalTaskId } });
     if (board.name === ESTIMATION_BOARD_NAME) {
       await ensureEstimationRecord(tx, updatedTask.id);
+    } else if (board.name === "Enquiry List") {
+      await ensureEnquiryRecord(tx, updatedTask.id);
     }
     return updatedTask;
   });
@@ -208,6 +222,7 @@ function serializeTask(task: any) {
     isCompleted: task.isCompleted,
     isHighlighted: task.isHighlighted,
     estimationId: task.estimationRecord?.estimationId ?? null,
+    enquiryId: task.enquiryRecord?.enquiryId ?? null,
     requiresApproval: task.requiresApproval,
     approverUserId: task.approverUserId,
     approvalStatus: task.approvalStatus,
@@ -251,6 +266,7 @@ const TASK_DETAIL_INCLUDE = {
   blockingLinks: { include: { targetTask: true } },
   _count: { select: { attachments: true, comments: true } },
   estimationRecord: { select: { estimationId: true } },
+  enquiryRecord: { select: { enquiryId: true } },
 };
 
 export async function getTaskDetail(taskId: string, actor: AuthedUser) {
@@ -580,9 +596,11 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
       },
       include: { stages: { orderBy: { position: "asc" } } },
     });
+    const projectYear = new Date().getFullYear();
+    const projectSequence = await nextYearlySequence("PROJECT", projectYear, tx);
     const board = await tx.board.update({
       where: { id: created.id },
-      data: { boardId: formatProjectId(created.boardNumber) },
+      data: { boardId: formatProjectId(projectYear, projectSequence) },
       include: { stages: { orderBy: { position: "asc" } } },
     });
 

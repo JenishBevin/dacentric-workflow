@@ -117,6 +117,7 @@ export interface TaskSummary {
   isCompleted: boolean;
   isHighlighted: boolean;
   estimationId?: string | null;
+  enquiryId?: string | null;
   requiresApproval: boolean;
   approverUserId?: string | null;
   approvalStatus: TaskApprovalStatus;

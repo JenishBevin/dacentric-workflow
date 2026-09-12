@@ -154,6 +154,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
       title={
         <span className="flex items-center gap-2">
           <span className="text-slate-400">{task?.taskId ?? "…"}</span>
+          {task?.enquiryId && <span className="text-brand-500">· {task.enquiryId}</span>}
           {task?.estimationId && <span className="text-indigo-500">· {task.estimationId}</span>}
           {task && <ApprovalStatusBadge status={task.approvalStatus} />}
         </span>

@@ -570,6 +570,7 @@ model Task {
   blockingLinks    TaskDependency[]    @relation("DependencySource")
   blockedByLinks   TaskDependency[]    @relation("DependencyTarget")
   estimationRecord EstimationRecord?
+  enquiryRecord    EnquiryRecord?
 
   @@index([boardId])
   @@index([stageId])
@@ -834,12 +835,38 @@ model LeaveAttachment {
 // Enquiry List — and never re-created if it's later Awarded again onward
 // into a Project.
 model EstimationRecord {
-  id               String   @id @default(uuid())
-  taskId           String   @unique
-  task             Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  estimationNumber Int      @unique @default(autoincrement())
-  estimationId     String   @unique // formatted EST-000001, generated from estimationNumber
-  createdAt        DateTime @default(now())
+  id           String   @id @default(uuid())
+  taskId       String   @unique
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  year         Int
+  sequence     Int
+  estimationId String   @unique // formatted QPTS-2026-0001, from year + sequence (resets each year)
+  createdAt    DateTime @default(now())
+}
+
+// Same idea as EstimationRecord, for tasks on the Enquiry List board —
+// created the first time a task lands there (only ever direct creation,
+// since Enquiry List has no upstream stage of its own).
+model EnquiryRecord {
+  id        String   @id @default(uuid())
+  taskId    String   @unique
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  year      Int
+  sequence  Int
+  enquiryId String   @unique // formatted QPTS-ENQ-2026-0001, from year + sequence (resets each year)
+  createdAt DateTime @default(now())
+}
+
+// Backs every year-scoped id (Project, Estimation, Enquiry) — a single
+// upsert-with-increment row per (key, year), so the visible sequence number
+// resets to 1 at the start of each calendar year instead of growing forever.
+model YearlySequence {
+  id    String @id @default(uuid())
+  key   String
+  year  Int
+  value Int    @default(0)
+
+  @@unique([key, year])
 }
 
 // ---------------------------------------------------------------------------
