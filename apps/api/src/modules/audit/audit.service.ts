@@ -17,7 +17,7 @@ export interface AuditFilters {
 
 /**
  * Section 34 / Business Rule 15: Admin sees all Workflow activity; a
- * Project role sees board-scoped activity only for boards they're permitted to
+ * Proj.Manager sees board-scoped activity only for boards they're permitted to
  * view. No route anywhere calls update/delete on AuditLog — it is
  * genuinely append-only end to end.
  */

@@ -5,7 +5,7 @@ import { formatDuration } from "../hooks/useWorkTimer";
 import { Badge, Avatar, Select, Skeleton, EmptyState, ErrorState } from "../components/ui/primitives";
 import clsx from "clsx";
 
-/** Time-log report for Project, HR, Accounts, System Admin and Super
+/** Time-log report for Proj.Manager, HR, Accounts, System Admin and Super
  * Admin (VIEW_TIME_LOGS) — per-employee Today / This Week / This Month
  * totals, scoped server-side exactly like Team Workload (own team, or
  * everyone for HR/Accounts/Admin tiers). */

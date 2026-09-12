@@ -88,34 +88,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.VIEW_TIME_LOGS]: "NONE",
     [PermissionKey.MANAGE_TICKETS]: "NONE",
   },
-  // Creates/configures boards, assigns and approves tasks for their team.
-  [RoleCode.PROJECT_MANAGER]: {
-    [PermissionKey.LOGIN]: "ALL",
-    [PermissionKey.VIEW_WORKFLOW]: "TEAM",
-    [PermissionKey.CREATE_BOARD]: "ALL",
-    [PermissionKey.EDIT_BOARD]: "OWN",
-    [PermissionKey.ARCHIVE_DELETE_BOARD]: "OWN",
-    [PermissionKey.CONFIGURE_STAGES]: "OWN",
-    [PermissionKey.MANAGE_BOARD_MEMBERS]: "OWN",
-    [PermissionKey.CREATE_TASK]: "ALL",
-    [PermissionKey.EDIT_TASK]: "OWN",
-    [PermissionKey.DELETE_TASK]: "OWN",
-    [PermissionKey.ASSIGN_TASK]: "ALL",
-    [PermissionKey.MOVE_TASK]: "ALL",
-    [PermissionKey.MANAGE_TASK_COLLAB]: "ALL",
-    [PermissionKey.VIEW_TEAM_WORKLOAD]: "TEAM",
-    [PermissionKey.APPROVE_TASK]: "OWN",
-    [PermissionKey.CRM_ERP_LINKING]: "OWN",
-    [PermissionKey.EXPORT]: "TEAM",
-    [PermissionKey.VIEW_AUDIT_TRAIL]: "OWN",
-    [PermissionKey.MANAGE_ROLES]: "NONE",
-    [PermissionKey.MANAGE_USERS]: "NONE",
-    [PermissionKey.VIEW_TIME_LOGS]: "TEAM",
-    [PermissionKey.MANAGE_TICKETS]: "NONE",
-  },
-  // People-ops: same Workflow project/task authority as Project
-  // (create/edit boards, create/assign/move tasks), plus HR's own broader
-  // org-wide workload/time visibility (kept at ALL, not downgraded to TEAM).
+  // People-ops: same board-creating/team-managing Workflow authority as
+  // Proj.Manager (create/edit boards, create/assign/move tasks), plus HR's
+  // own broader org-wide workload/time visibility (kept at ALL, not
+  // downgraded to TEAM).
   [RoleCode.HR]: {
     [PermissionKey.LOGIN]: "ALL",
     [PermissionKey.VIEW_WORKFLOW]: "TEAM",
@@ -138,7 +114,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.VIEW_TIME_LOGS]: "ALL",
     [PermissionKey.MANAGE_TICKETS]: "NONE",
   },
-  // Finance: same operational Workflow authority as HR/Project
+  // Finance: same operational Workflow authority as HR/Proj.Manager
   // (create/edit boards, create/assign/move tasks) so their menus and
   // features work the same as every other operational role, plus org-wide
   // visibility (VIEW_WORKFLOW/VIEW_TEAM_WORKLOAD at ALL, not TEAM) since
@@ -251,34 +227,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
   [RoleCode.STAFF]: {
     [PermissionKey.LOGIN]: "ALL",
   },
-  // Bridges Project's board/task authority with Sales' CRM linking —
-  // coordinates project delivery for deals the sales side has brought in.
-  [RoleCode.PROJECT_SALES_COORDINATOR]: {
-    [PermissionKey.LOGIN]: "ALL",
-    [PermissionKey.VIEW_WORKFLOW]: "TEAM",
-    [PermissionKey.CREATE_BOARD]: "ALL",
-    [PermissionKey.EDIT_BOARD]: "OWN",
-    [PermissionKey.ARCHIVE_DELETE_BOARD]: "OWN",
-    [PermissionKey.CONFIGURE_STAGES]: "OWN",
-    [PermissionKey.MANAGE_BOARD_MEMBERS]: "OWN",
-    [PermissionKey.CREATE_TASK]: "ALL",
-    [PermissionKey.EDIT_TASK]: "OWN",
-    [PermissionKey.DELETE_TASK]: "OWN",
-    [PermissionKey.ASSIGN_TASK]: "ALL",
-    [PermissionKey.MOVE_TASK]: "ALL",
-    [PermissionKey.MANAGE_TASK_COLLAB]: "ALL",
-    [PermissionKey.VIEW_TEAM_WORKLOAD]: "TEAM",
-    [PermissionKey.APPROVE_TASK]: "OWN",
-    [PermissionKey.CRM_ERP_LINKING]: "ALL",
-    [PermissionKey.EXPORT]: "TEAM",
-    [PermissionKey.VIEW_AUDIT_TRAIL]: "OWN",
-    [PermissionKey.MANAGE_ROLES]: "NONE",
-    [PermissionKey.MANAGE_USERS]: "NONE",
-    [PermissionKey.VIEW_TIME_LOGS]: "TEAM",
-    [PermissionKey.MANAGE_TICKETS]: "NONE",
-  },
   // Heads the Estimation team — same board-creating/team-managing authority
-  // as Project's Manager tier.
+  // as Proj.Manager.
   [RoleCode.ESTIMATION_MANAGER]: {
     [PermissionKey.LOGIN]: "ALL",
     [PermissionKey.VIEW_WORKFLOW]: "TEAM",
@@ -355,9 +305,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.VIEW_TIME_LOGS]: "NONE",
     [PermissionKey.MANAGE_TICKETS]: "NONE",
   },
-  // Heads a project delivery team — same board-creating/team-managing
-  // authority as the existing Project role; kept as a distinct role code so
-  // it can be permissioned independently.
+  // Heads a project delivery team: board-creating/team-managing authority.
   [RoleCode.PROJ_MANAGER]: {
     [PermissionKey.LOGIN]: "ALL",
     [PermissionKey.VIEW_WORKFLOW]: "TEAM",

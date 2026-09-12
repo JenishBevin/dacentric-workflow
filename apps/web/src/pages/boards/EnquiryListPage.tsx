@@ -39,7 +39,7 @@ export default function EnquiryListPage() {
         <EmptyState
           icon={<Inbox className="h-8 w-8" />}
           title="Enquiry List isn't set up yet"
-          description="Ask a Project or Administrator to open Enquiry List once — it only needs to happen the first time."
+          description="Ask a Manager or Administrator to open Enquiry List once — it only needs to happen the first time."
         />
       </div>
     );

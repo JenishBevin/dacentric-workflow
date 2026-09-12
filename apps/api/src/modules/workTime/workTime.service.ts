@@ -174,7 +174,7 @@ export async function getSummary(userId: string, range: "week" | "month") {
 }
 
 /**
- * Time-log report for Project, HR, Accounts, System Admin and Super
+ * Time-log report for Proj.Manager, HR, Accounts, System Admin and Super
  * Admin (VIEW_TIME_LOGS) — per-employee totals for the range, scoped exactly
  * like Team Workload: TEAM sees employees on a team you manage or a board
  * you own, ALL sees everyone, NONE (Estimation, Sales, Procurement,
