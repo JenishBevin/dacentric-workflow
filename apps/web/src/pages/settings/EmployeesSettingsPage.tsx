@@ -23,7 +23,7 @@ interface EmployeeRow {
   jobTitle: string | null;
   isActive: boolean;
   department: { id: string; name: string } | null;
-  team: { id: string; name: string } | null;
+  teams: Array<{ id: string; name: string }>;
   user: { id: string; name: string; status: string } | null;
 }
 
@@ -83,7 +83,9 @@ export default function EmployeesSettingsPage() {
                   </td>
                   <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{e.employeeCode}</td>
                   <td className="px-4 py-2.5 text-slate-600">{e.jobTitle ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{[e.department?.name, e.team?.name].filter(Boolean).join(" / ") || "—"}</td>
+                  <td className="px-4 py-2.5 text-slate-600">
+                    {[e.department?.name, e.teams.map((t) => t.name).join(", ")].filter(Boolean).join(" / ") || "—"}
+                  </td>
                   <td className="px-4 py-2.5">
                     {e.user ? <Badge tone="green">{e.user.name}</Badge> : <span className="text-xs text-slate-400">Not linked</span>}
                   </td>
@@ -119,13 +121,13 @@ export default function EmployeesSettingsPage() {
 function DepartmentTeamPicker({
   departmentId,
   setDepartmentId,
-  teamId,
-  setTeamId,
+  teamIds,
+  setTeamIds,
 }: {
   departmentId: string | null;
   setDepartmentId: (id: string | null) => void;
-  teamId: string | null;
-  setTeamId: (id: string | null) => void;
+  teamIds: string[];
+  setTeamIds: (ids: string[]) => void;
 }) {
   const { data: departments } = useDepartments();
   const { data: teams } = useTeams(departmentId ?? undefined);
@@ -147,9 +149,13 @@ function DepartmentTeamPicker({
   async function addTeam() {
     if (!newTeam.trim()) return;
     const team = await createTeam.mutateAsync({ name: newTeam.trim(), departmentId });
-    setTeamId(team.id);
+    setTeamIds([...teamIds, team.id]);
     setNewTeam("");
     setShowNewTeam(false);
+  }
+
+  function toggleTeam(id: string) {
+    setTeamIds(teamIds.includes(id) ? teamIds.filter((t) => t !== id) : [...teamIds, id]);
   }
 
   return (
@@ -161,7 +167,7 @@ function DepartmentTeamPicker({
             value={departmentId ?? ""}
             onChange={(e) => {
               setDepartmentId(e.target.value || null);
-              setTeamId(null);
+              setTeamIds([]);
             }}
           >
             <option value="">None</option>
@@ -185,18 +191,27 @@ function DepartmentTeamPicker({
         )}
       </div>
       <div>
-        <Label>Team</Label>
-        <div className="flex gap-2">
-          <Select value={teamId ?? ""} onChange={(e) => setTeamId(e.target.value || null)}>
-            <option value="">None</option>
-            {teams?.map((t: any) => (
-              <option key={t.id} value={t.id}>
+        <Label>Teams</Label>
+        <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-lg border border-slate-200 p-2.5">
+          {teams && teams.length > 0 ? (
+            teams.map((t: any) => (
+              <label key={t.id} className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={teamIds.includes(t.id)}
+                  onChange={() => toggleTeam(t.id)}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus-visible:focus-ring"
+                />
                 {t.name}
-              </option>
-            ))}
-          </Select>
+              </label>
+            ))
+          ) : (
+            <p className="px-0.5 py-0.5 text-xs text-slate-400">No teams yet.</p>
+          )}
+        </div>
+        <div className="mt-2">
           <Button type="button" variant="outline" size="sm" onClick={() => setShowNewTeam((v) => !v)}>
-            + New
+            + New team
           </Button>
         </div>
         {showNewTeam && (
@@ -207,7 +222,7 @@ function DepartmentTeamPicker({
             </Button>
           </div>
         )}
-        <p className="mt-1 text-xs text-slate-400">A team can optionally belong to the selected department.</p>
+        <p className="mt-1 text-xs text-slate-400">An employee can belong to multiple teams. A team can optionally belong to the selected department.</p>
       </div>
     </>
   );
@@ -225,7 +240,7 @@ const NewEmployeeDrawer: React.FC<{
   const [employeeCode, setEmployeeCode] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
-  const [teamId, setTeamId] = useState<string | null>(null);
+  const [teamIds, setTeamIds] = useState<string[]>([]);
 
   function reset() {
     setFullName("");
@@ -233,7 +248,7 @@ const NewEmployeeDrawer: React.FC<{
     setEmployeeCode("");
     setJobTitle("");
     setDepartmentId(null);
-    setTeamId(null);
+    setTeamIds([]);
   }
 
   async function submit() {
@@ -248,7 +263,7 @@ const NewEmployeeDrawer: React.FC<{
         employeeCode: employeeCode.trim() || undefined,
         jobTitle: jobTitle.trim() || undefined,
         departmentId,
-        teamId,
+        teamIds,
       };
       await onCreate.mutateAsync(payload);
       onSuccess();
@@ -293,7 +308,7 @@ const NewEmployeeDrawer: React.FC<{
           <Label>Job Title</Label>
           <Input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
         </div>
-        <DepartmentTeamPicker departmentId={departmentId} setDepartmentId={setDepartmentId} teamId={teamId} setTeamId={setTeamId} />
+        <DepartmentTeamPicker departmentId={departmentId} setDepartmentId={setDepartmentId} teamIds={teamIds} setTeamIds={setTeamIds} />
       </div>
     </Drawer>
   );
@@ -309,12 +324,12 @@ const EditEmployeeDrawer: React.FC<{
   const [fullName, setFullName] = useState(employee.fullName);
   const [jobTitle, setJobTitle] = useState(employee.jobTitle ?? "");
   const [departmentId, setDepartmentId] = useState<string | null>(employee.department?.id ?? null);
-  const [teamId, setTeamId] = useState<string | null>(employee.team?.id ?? null);
+  const [teamIds, setTeamIds] = useState<string[]>(employee.teams.map((t) => t.id));
   const [isActive, setIsActive] = useState(employee.isActive);
 
   async function submit() {
     try {
-      await onUpdate.mutateAsync({ employeeId: employee.id, fullName: fullName.trim(), jobTitle: jobTitle.trim() || null, departmentId, teamId, isActive });
+      await onUpdate.mutateAsync({ employeeId: employee.id, fullName: fullName.trim(), jobTitle: jobTitle.trim() || null, departmentId, teamIds, isActive });
       onSuccess();
       onClose();
     } catch (err) {
@@ -348,7 +363,7 @@ const EditEmployeeDrawer: React.FC<{
           <Label>Job Title</Label>
           <Input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
         </div>
-        <DepartmentTeamPicker departmentId={departmentId} setDepartmentId={setDepartmentId} teamId={teamId} setTeamId={setTeamId} />
+        <DepartmentTeamPicker departmentId={departmentId} setDepartmentId={setDepartmentId} teamIds={teamIds} setTeamIds={setTeamIds} />
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600 focus-visible:focus-ring" />
           Active

@@ -189,7 +189,7 @@ export async function getReport(actor: AuthedUser, range: "week" | "month") {
       ...(scopedIds === "ALL" ? {} : { id: { in: scopedIds } }),
       user: { isNot: null },
     },
-    include: { user: true, department: true, team: true },
+    include: { user: true, department: true, teams: true },
   });
 
   const rows = await Promise.all(
@@ -202,7 +202,7 @@ export async function getReport(actor: AuthedUser, range: "week" | "month") {
           userId: emp.user!.id,
           name: emp.fullName,
           department: emp.department?.name ?? null,
-          team: emp.team?.name ?? null,
+          team: emp.teams.map((t) => t.name).join(", ") || null,
           todaySeconds: today.todaySeconds,
           isRunning: today.isRunning,
           rangeSeconds: summary.totalSeconds,

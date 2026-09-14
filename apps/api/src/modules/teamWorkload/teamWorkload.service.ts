@@ -33,7 +33,7 @@ export async function resolveScopedEmployeeIds(actor: AuthedUser, permission: Pe
         ).map((m) => m.userId)
       : [];
     const teamEmployees = await prisma.employee.findMany({
-      where: { OR: [{ teamId: { in: managedTeams.map((t) => t.id) } }, { user: { id: { in: boardMemberUserIds } } }] },
+      where: { OR: [{ teams: { some: { id: { in: managedTeams.map((t) => t.id) } } } }, { user: { id: { in: boardMemberUserIds } } }] },
       select: { id: true },
     });
     const ids = new Set(teamEmployees.map((e) => e.id));
@@ -53,10 +53,10 @@ export async function getTeamWorkload(actor: AuthedUser, filters: WorkloadFilter
       isActive: true,
       ...(scopedIds === "ALL" ? {} : { id: { in: scopedIds } }),
       ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
-      ...(filters.teamId ? { teamId: filters.teamId } : {}),
+      ...(filters.teamId ? { teams: { some: { id: filters.teamId } } } : {}),
       user: { isNot: null },
     },
-    include: { user: true, department: true, team: true },
+    include: { user: true, department: true, teams: true },
   });
 
   const now = new Date();
@@ -88,7 +88,7 @@ export async function getTeamWorkload(actor: AuthedUser, filters: WorkloadFilter
         userId: emp.user.id,
         name: emp.fullName,
         department: emp.department?.name ?? null,
-        team: emp.team?.name ?? null,
+        team: emp.teams.map((t) => t.name).join(", ") || null,
         openTasks,
         overdue,
         dueThisWeek,

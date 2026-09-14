@@ -225,7 +225,7 @@ export interface CreateEmployeeInput {
   employeeCode?: string;
   jobTitle?: string;
   departmentId?: string | null;
-  teamId?: string | null;
+  teamIds?: string[];
 }
 
 async function nextEmployeeCode(): Promise<string> {
@@ -250,7 +250,7 @@ export async function listAllEmployees(filters: { search?: string } = {}) {
           ],
         }
       : undefined,
-    include: { department: true, team: true, user: { select: { id: true, name: true, status: true } } },
+    include: { department: true, teams: true, user: { select: { id: true, name: true, status: true } } },
     orderBy: { fullName: "asc" },
   });
 }
@@ -271,9 +271,9 @@ export async function createEmployee(input: CreateEmployeeInput, actor: AuthedUs
       workEmail: input.workEmail.toLowerCase(),
       jobTitle: input.jobTitle || null,
       departmentId: input.departmentId || null,
-      teamId: input.teamId || null,
+      teams: input.teamIds?.length ? { connect: input.teamIds.map((id) => ({ id })) } : undefined,
     },
-    include: { department: true, team: true },
+    include: { department: true, teams: true },
   });
 
   await writeAudit({ actor, action: AuditAction.CREATE, entityType: "Employee", entityId: employee.id, afterValue: { fullName: employee.fullName, workEmail: employee.workEmail } });
@@ -282,16 +282,20 @@ export async function createEmployee(input: CreateEmployeeInput, actor: AuthedUs
 
 export async function updateEmployee(
   employeeId: string,
-  input: { fullName?: string; jobTitle?: string | null; departmentId?: string | null; teamId?: string | null; isActive?: boolean },
+  input: { fullName?: string; jobTitle?: string | null; departmentId?: string | null; teamIds?: string[]; isActive?: boolean },
   actor: AuthedUser
 ) {
   const existing = await prisma.employee.findUnique({ where: { id: employeeId } });
   if (!existing) throw Errors.notFound("Employee");
 
+  const { teamIds, ...rest } = input;
   const employee = await prisma.employee.update({
     where: { id: employeeId },
-    data: input,
-    include: { department: true, team: true },
+    data: {
+      ...rest,
+      ...(teamIds !== undefined ? { teams: { set: teamIds.map((id) => ({ id })) } } : {}),
+    },
+    include: { department: true, teams: true },
   });
 
   await writeAudit({ actor, action: AuditAction.EDIT, entityType: "Employee", entityId: employeeId, beforeValue: existing, afterValue: input });

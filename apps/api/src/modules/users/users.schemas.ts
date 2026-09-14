@@ -42,14 +42,14 @@ export const createEmployeeSchema = z.object({
   employeeCode: z.string().trim().min(1).max(50).optional(),
   jobTitle: z.string().trim().max(200).optional(),
   departmentId: z.string().uuid().optional().nullable(),
-  teamId: z.string().uuid().optional().nullable(),
+  teamIds: z.array(z.string().uuid()).optional(),
 });
 
 export const updateEmployeeSchema = z.object({
   fullName: z.string().trim().min(1).max(200).optional(),
   jobTitle: z.string().trim().max(200).optional().nullable(),
   departmentId: z.string().uuid().optional().nullable(),
-  teamId: z.string().uuid().optional().nullable(),
+  teamIds: z.array(z.string().uuid()).optional(),
   isActive: z.boolean().optional(),
 });
 

@@ -46,7 +46,7 @@ usersRouter.get(
             ]
           : undefined,
       },
-      include: { user: true, department: true, team: true },
+      include: { user: true, department: true, teams: true },
       take: 50,
       orderBy: { fullName: "asc" },
     });
@@ -59,7 +59,7 @@ usersRouter.get(
         email: e.workEmail,
         jobTitle: e.jobTitle,
         department: e.department?.name ?? null,
-        team: e.team?.name ?? null,
+        team: e.teams.map((t) => t.name).join(", ") || null,
       }))
     );
   })

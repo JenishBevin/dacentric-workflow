@@ -117,8 +117,7 @@ model Employee {
   jobTitle     String?
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
-  teamId       String?
-  team         Team?     @relation("TeamMembers", fields: [teamId], references: [id])
+  teams        Team[]    @relation("TeamMembers")
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -130,7 +129,6 @@ model Employee {
   expenseClaims ExpenseClaim[] @relation("ClaimEmployee")
 
   @@index([departmentId])
-  @@index([teamId])
 }
 
 /// The single platform account. One login serves CRM/ERP/HRMS/Workflow.
