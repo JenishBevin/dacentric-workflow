@@ -221,6 +221,25 @@ export function useDownloadAttachmentUrl(taskId: string, attachmentId: string) {
   return `${api.defaults.baseURL}/tasks/${taskId}/attachments/${attachmentId}/download`;
 }
 
+export interface ImportEnquiriesResult {
+  created: number;
+  skipped: Array<{ row: number; reason: string }>;
+}
+
+/** Local development only — the backend rejects this in production regardless of who calls it. */
+export function useImportEnquiries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return (await api.post<{ data: ImportEnquiriesResult }>("/tasks/import-enquiries", form, { headers: { "Content-Type": "multipart/form-data" } }))
+        .data.data;
+    },
+    onSuccess: () => invalidateTaskEverywhere(qc),
+  });
+}
+
 export function useWatcherMutations(taskId: string) {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: ["task", taskId] });

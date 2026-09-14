@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, List, LayoutGrid } from "lucide-react";
+import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload } from "lucide-react";
 import { useBoardDetail, useReorderStages, useSetBoardCompleted } from "../../api/boards";
-import { useBoardTasks, useDuplicateTask, useDeleteTask } from "../../api/tasks";
+import { useBoardTasks, useDuplicateTask, useDeleteTask, useImportEnquiries } from "../../api/tasks";
 import { downloadExport } from "../../api/misc";
 import { KanbanToolbar } from "../../components/kanban/KanbanToolbar";
 import { KanbanBoard } from "../../components/kanban/KanbanBoard";
@@ -77,6 +77,25 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   const duplicateTask = useDuplicateTask();
   const deleteTask = useDeleteTask();
   const setBoardCompleted = useSetBoardCompleted();
+  const importEnquiries = useImportEnquiries();
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImportEnquiriesFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const result = await importEnquiries.mutateAsync(file);
+      push({
+        variant: "success",
+        title: `Imported ${result.created} enquir${result.created === 1 ? "y" : "ies"}.`,
+        description: result.skipped.length ? `${result.skipped.length} row(s) skipped — see console for details.` : undefined,
+      });
+      if (result.skipped.length) console.warn("Enquiry import — skipped rows:", result.skipped);
+    } catch (err) {
+      push({ variant: "error", title: "Import failed", description: extractApiError(err).message });
+    }
+  }
 
   const settingsTab = searchParams.get("settings") as "general" | "stages" | "members" | "templates" | null;
   const openTaskId = searchParams.get("task");
@@ -215,6 +234,14 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
                 <LayoutGrid className="h-3.5 w-3.5" /> Kanban
               </button>
             </div>
+          )}
+          {canCreateTask && !board.isArchived && board.name === "Enquiry List" && import.meta.env.DEV && (
+            <>
+              <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportEnquiriesFile} />
+              <Button variant="outline" onClick={() => importFileInputRef.current?.click()} loading={importEnquiries.isPending}>
+                <Upload className="h-4 w-4" /> Import from Excel
+              </Button>
+            </>
           )}
           {canCreateTask && !board.isArchived && (
             <Button onClick={() => { setRecurringPrefill(null); setNewTaskStageId(stages[0]?.id ?? null); }} disabled={stages.length === 0}>

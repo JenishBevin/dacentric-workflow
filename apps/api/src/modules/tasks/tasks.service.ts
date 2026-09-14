@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import { prisma } from "../../lib/prisma";
 import { Errors } from "../../common/errors";
 import { writeAudit } from "../../common/audit";
@@ -6,10 +7,10 @@ import { sanitizeDescription } from "../../common/richtext";
 import { loadTaskWithAccess, assertCanEditTask, assertCanDeleteTask } from "./task-access";
 import { AuthedUser } from "../../middleware/authenticate";
 import { computeDueDateStatus } from "./task-formatting";
-import { formatTaskId, formatProjectId, formatEstimationId, formatEnquiryId, AuditAction, TaskApprovalStatus, TaskType, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
+import { formatTaskId, formatProjectId, formatEstimationId, formatEnquiryId, AuditAction, TaskApprovalStatus, TaskType, TaskPriority, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
 import { getPermissionScope, scopeAtLeast } from "../../common/permissions";
 import { createRecurringSeries, attachTemplateAndScheduleFirst } from "../recurrence/recurrence.service";
-import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME } from "../boards/boards.service";
+import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard } from "../boards/boards.service";
 import { nextYearlySequence } from "../../common/sequence";
 
 export interface CreateTaskInput {
@@ -731,6 +732,133 @@ export async function duplicateTask(taskId: string, actor: AuthedUser) {
     },
     actor
   );
+}
+
+// --- Excel import for Enquiry List (local dev only — see tasks.routes.ts) ---
+
+const ENQUIRY_IMPORT_COLUMN_ALIASES: Record<string, string[]> = {
+  title: ["title", "enquiry title", "subject", "enquiry"],
+  description: ["description", "details", "notes"],
+  customerId: ["customer id"],
+  customerName: ["customer name", "customer", "company"],
+  service: ["service", "service type"],
+  priority: ["priority"],
+  assigneeEmail: ["assignee email", "assignee", "assigned to"],
+  startDate: ["start date"],
+  dueDate: ["due date", "deadline"],
+};
+
+export interface ImportEnquiriesResult {
+  created: number;
+  skipped: Array<{ row: number; reason: string }>;
+}
+
+function parseExcelDate(value: string): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export async function importEnquiriesFromExcel(buffer: Buffer, actor: AuthedUser): Promise<ImportEnquiriesResult> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as any);
+  const sheet = workbook.worksheets[0];
+  if (!sheet) throw Errors.badRequest("The uploaded file has no worksheet.");
+
+  const headerCells = sheet.getRow(1).values as unknown[];
+  const columnIndex: Record<string, number> = {};
+  headerCells.forEach((cell, idx) => {
+    if (typeof cell === "string" && cell.trim()) columnIndex[cell.trim().toLowerCase()] = idx;
+  });
+
+  const resolveColumn = (field: string): number | undefined => {
+    for (const alias of ENQUIRY_IMPORT_COLUMN_ALIASES[field]) {
+      const idx = columnIndex[alias];
+      if (idx !== undefined) return idx;
+    }
+    return undefined;
+  };
+  const fieldColumns = Object.fromEntries(Object.keys(ENQUIRY_IMPORT_COLUMN_ALIASES).map((f) => [f, resolveColumn(f)])) as Record<
+    string,
+    number | undefined
+  >;
+
+  if (!fieldColumns.title) {
+    throw Errors.badRequest('The file must have a "Title" column (row 1).');
+  }
+
+  const board = await getOrCreateEnquiryBoard(actor);
+  const services = await prisma.service.findMany();
+
+  const result: ImportEnquiriesResult = { created: 0, skipped: [] };
+
+  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
+    const row = sheet.getRow(rowNumber);
+    const cellText = (colIdx?: number) => (colIdx ? String(row.getCell(colIdx).value ?? "").trim() : "");
+
+    const isBlankRow = Object.values(fieldColumns).every((idx) => !cellText(idx));
+    if (isBlankRow) continue;
+
+    const title = cellText(fieldColumns.title);
+    if (!title) {
+      result.skipped.push({ row: rowNumber, reason: "Missing Title" });
+      continue;
+    }
+
+    try {
+      const priorityRaw = cellText(fieldColumns.priority).toUpperCase();
+      const priority = (Object.values(TaskPriority) as string[]).includes(priorityRaw) ? priorityRaw : TaskPriority.MEDIUM;
+
+      let customerId: string | null = null;
+      const customerIdCell = cellText(fieldColumns.customerId);
+      const customerNameCell = cellText(fieldColumns.customerName);
+      if (customerIdCell) {
+        const match = await prisma.customer.findFirst({ where: { customerId: { equals: customerIdCell, mode: "insensitive" } } });
+        customerId = match?.id ?? null;
+      } else if (customerNameCell) {
+        const match = await prisma.customer.findFirst({ where: { name: { contains: customerNameCell, mode: "insensitive" } } });
+        customerId = match?.id ?? null;
+      }
+
+      const serviceNameCell = cellText(fieldColumns.service);
+      const service = serviceNameCell ? services.find((s) => s.name.toLowerCase() === serviceNameCell.toLowerCase()) : undefined;
+
+      const assigneeEmailCell = cellText(fieldColumns.assigneeEmail);
+      let assigneeUserId = actor.id;
+      if (assigneeEmailCell) {
+        const match = await prisma.user.findFirst({ where: { workEmail: { equals: assigneeEmailCell, mode: "insensitive" }, status: "ACTIVE" } });
+        if (match) assigneeUserId = match.id;
+      }
+
+      await createTask(
+        {
+          boardId: board.id,
+          title,
+          description: cellText(fieldColumns.description) || undefined,
+          priority,
+          customerId,
+          serviceId: service?.id,
+          assigneeUserIds: [assigneeUserId],
+          startDate: parseExcelDate(cellText(fieldColumns.startDate)),
+          dueDate: parseExcelDate(cellText(fieldColumns.dueDate)),
+        },
+        actor
+      );
+      result.created++;
+    } catch (err: any) {
+      result.skipped.push({ row: rowNumber, reason: err?.message ?? "Unknown error" });
+    }
+  }
+
+  await writeAudit({
+    actor,
+    action: AuditAction.CREATE,
+    entityType: "Task",
+    boardId: board.id,
+    afterValue: { source: "excel-import", created: result.created, skipped: result.skipped.length },
+  });
+
+  return result;
 }
 
 export { addDependencyInternal, serializeTask, assertActiveWorkflowUsers };
