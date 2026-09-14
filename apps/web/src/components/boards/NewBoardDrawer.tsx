@@ -9,6 +9,8 @@ import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
 import { X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { CustomerPicker } from "../customers/CustomerPicker";
+import { CustomerRef } from "../../lib/types";
 
 interface MemberRow {
   userId: string;
@@ -49,6 +51,7 @@ export const NewBoardDrawer: React.FC<NewBoardDrawerProps> = ({ open, onClose, s
   const { data: records } = useLinkedRecordSearch(recordQuery);
   const [memberQuery, setMemberQuery] = useState("");
   const { data: employees } = useEmployeeDirectory(memberQuery);
+  const [customer, setCustomer] = useState<CustomerRef | null>(null);
   const [dirty, setDirty] = useState(false);
 
   const {
@@ -66,7 +69,10 @@ export const NewBoardDrawer: React.FC<NewBoardDrawerProps> = ({ open, onClose, s
   // between uses — e.g. the "Awarded" action on a task opens this with the
   // task's title and service already filled in.
   useEffect(() => {
-    if (open) reset({ boardType: "STANDALONE", name: initialName ?? "", serviceId: initialServiceId ?? "" });
+    if (open) {
+      reset({ boardType: "STANDALONE", name: initialName ?? "", serviceId: initialServiceId ?? "" });
+      setCustomer(null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -74,6 +80,7 @@ export const NewBoardDrawer: React.FC<NewBoardDrawerProps> = ({ open, onClose, s
     if (dirty && !window.confirm("Discard unsaved changes to this project?")) return;
     reset();
     setMembers(user ? [{ userId: user.id, name: user.name, role: "OWNER" }] : []);
+    setCustomer(null);
     setDirty(false);
     onClose();
   };
@@ -92,10 +99,12 @@ export const NewBoardDrawer: React.FC<NewBoardDrawerProps> = ({ open, onClose, s
         linkedRecordType: values.boardType === "LINKED" ? values.linkedRecordType : undefined,
         templateId: values.templateId || undefined,
         serviceId: serviceId ?? values.serviceId ?? undefined,
+        customerId: customer?.id,
         members: members.map((m) => ({ userId: m.userId, role: m.role })),
       });
       push({ variant: "success", title: "Project created." });
       reset();
+      setCustomer(null);
       setDirty(false);
       onClose();
       onCreated?.(board);
@@ -146,6 +155,11 @@ export const NewBoardDrawer: React.FC<NewBoardDrawerProps> = ({ open, onClose, s
               </Select>
             </div>
           )}
+          <div>
+            <Label>Customer</Label>
+            <CustomerPicker value={customer} onChange={setCustomer} placeholder="Search Customer Master by name or ID…" />
+            <p className="mt-1 text-[11px] text-slate-400">Pulls from CRM — if this customer already exists, pick them instead of retyping their details.</p>
+          </div>
         </section>
 
         <section className="space-y-3">

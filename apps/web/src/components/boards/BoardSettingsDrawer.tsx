@@ -16,10 +16,10 @@ import {
   useDeleteBoard,
 } from "../../api/boards";
 import { useEmployeeDirectory } from "../../api/misc";
-import { useCustomerSearch } from "../../api/customers";
+import { CustomerPicker } from "../customers/CustomerPicker";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/apiClient";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -55,8 +55,6 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
   const { data: employees } = useEmployeeDirectory(memberQuery);
   const [newStageName, setNewStageName] = useState("");
   const [templateName, setTemplateName] = useState("");
-  const [customerQuery, setCustomerQuery] = useState("");
-  const { data: customerMatches } = useCustomerSearch(customerQuery);
 
   const stages = [...(board.stages ?? [])].sort((a: any, b: any) => a.position - b.position);
 
@@ -117,46 +115,15 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
           )}
 
           <div className="rounded-lg border border-slate-200 p-3 text-sm">
-            <p className="font-medium text-slate-700">Customer</p>
-            {board.customer ? (
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <Link to={`/workflow/customers/${board.customer.id}`} className="text-brand-700 hover:underline">
-                  {board.customer.name} <span className="text-slate-400">· {board.customer.customerId}</span>
-                </Link>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    await updateBoard.mutateAsync({ customerId: null });
-                    push({ variant: "success", title: "Customer unlinked." });
-                  }}
-                >
-                  Unlink
-                </Button>
-              </div>
-            ) : (
-              <div className="relative mt-1.5">
-                <Input placeholder="Search customers by name or ID…" value={customerQuery} onChange={(e) => setCustomerQuery(e.target.value)} />
-                {customerQuery && (customerMatches?.length ?? 0) > 0 && (
-                  <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                    {customerMatches!.map((c) => (
-                      <button
-                        key={c.id}
-                        className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-slate-50"
-                        onClick={async () => {
-                          await updateBoard.mutateAsync({ customerId: c.id });
-                          setCustomerQuery("");
-                          push({ variant: "success", title: "Customer linked." });
-                        }}
-                      >
-                        <span>{c.name}</span>
-                        <span className="text-xs text-slate-400">{c.customerId}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <p className="mb-1.5 font-medium text-slate-700">Customer</p>
+            <CustomerPicker
+              value={board.customer}
+              linkToDetail
+              onChange={async (c) => {
+                await updateBoard.mutateAsync({ customerId: c?.id ?? null });
+                push({ variant: "success", title: c ? "Customer linked." : "Customer unlinked." });
+              }}
+            />
           </div>
 
           <div className="rounded-lg border border-red-200 bg-red-50/50 p-4">

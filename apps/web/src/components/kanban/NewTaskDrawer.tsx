@@ -4,12 +4,13 @@ import { Drawer } from "../ui/Drawer";
 import { Button, Input, Label, Select, Badge } from "../ui/primitives";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import { PeoplePicker } from "../tasks/PeoplePicker";
+import { CustomerPicker } from "../customers/CustomerPicker";
 import { useCreateTask } from "../../api/tasks";
 import { useServices } from "../../api/boards";
 import { useTags, useLinkedRecordSearch } from "../../api/misc";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
-import { Board, BoardStage } from "../../lib/types";
+import { Board, BoardStage, CustomerRef } from "../../lib/types";
 import { X, Plus } from "lucide-react";
 
 interface TaskPrefill {
@@ -72,6 +73,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
   const [recordQuery, setRecordQuery] = useState("");
   const [linkedRecord, setLinkedRecord] = useState<{ id: string; type: string; name: string } | null>(null);
   const { data: records } = useLinkedRecordSearch(recordQuery);
+  const [customer, setCustomer] = useState<CustomerRef | null>(null);
   const [dirty, setDirty] = useState(false);
 
   const {
@@ -107,6 +109,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
     setTagIds([]);
     setLinkedRecord(null);
     setRecordQuery("");
+    setCustomer(null);
     setDescription("");
     setDirty(false);
   }
@@ -158,6 +161,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
         boardId: board.id,
         stageId: values.stageId,
         serviceId: values.serviceId || undefined,
+        customerId: customer?.id,
         title: values.title,
         description: description || undefined,
         priority: values.priority,
@@ -253,6 +257,16 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
               ))}
             </Select>
             <p className="mt-1 text-[11px] text-slate-400">Which service this enquiry is about — used when it's Awarded to start the project.</p>
+          </section>
+        )}
+
+        {isEnquiryBoard && (
+          <section>
+            <Label>Customer</Label>
+            <CustomerPicker value={customer} onChange={setCustomer} placeholder="Search Customer Master by name or ID…" />
+            <p className="mt-1 text-[11px] text-slate-400">
+              Pulls from CRM — if this customer already exists, pick them instead of retyping their details. Carries forward automatically if this is Awarded to a Project.
+            </p>
           </section>
         )}
 
