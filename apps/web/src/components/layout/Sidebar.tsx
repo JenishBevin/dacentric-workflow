@@ -21,6 +21,7 @@ import {
   Activity,
   Archive,
   Building2,
+  Package,
   X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -57,12 +58,12 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
   // (enforced in AppLayout.tsx, not just hidden here), so every other nav
   // item is force-hidden rather than left to permission scopes.
   const isStaff = user?.roles.includes("STAFF") ?? false;
+  const hasModule = (m: "CRM" | "ERP" | "HRMS" | "WORKFLOW") => user?.moduleAccess.includes(m) ?? false;
 
   const workflowItems: NavItem[] = [
     { to: "/workflow/enquiries", label: "Enquiry List", icon: Inbox, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
     { to: "/workflow/estimation", label: "Estimation", icon: Calculator, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
     { to: "/workflow/boards", label: "Projects", icon: Trello, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
-    { to: "/workflow/customers", label: "Customers", icon: Building2, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
     { to: "/workflow/my-tasks", label: "My Tasks", icon: ListChecks, visible: !isStaff, badge: myTaskCount || undefined },
     { to: "/workflow/team", label: "Team Workload", icon: Users2, visible: !isStaff && can(user, "VIEW_TEAM_WORKLOAD") },
     { to: "/workflow/history", label: "Project/Task History", icon: Archive, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
@@ -75,12 +76,31 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
     { to: "/tickets", label: "Support Tickets", icon: TicketIcon, visible: !isStaff, badge: isTicketManager ? openTickets?.length || undefined : undefined },
   ];
 
+  // Module-gated top-level sections, parallel to Workflow — visible only to
+  // users an admin has granted that module (Settings -> Users -> edit ->
+  // Module Access). Customers is genuinely CRM functionality, so it moves
+  // here and is now additionally gated on CRM access — this narrows who
+  // sees it versus before (anyone with VIEW_WORKFLOW could). Employees
+  // moves to HRMS too, but keeps its original MANAGE_USERS gate unchanged,
+  // so nobody who could see it before loses access. "Request" (leave/claims)
+  // deliberately stays under Workflow rather than moving to HRMS — it's a
+  // universal employee entitlement, not an HRMS-admin feature, and most
+  // users don't have HRMS access.
+  const crmItems: NavItem[] = [
+    { to: "/workflow/customers", label: "Customers", icon: Building2, visible: !isStaff && hasModule("CRM") && can(user, "VIEW_WORKFLOW") },
+  ];
+
+  const hrmsItems: NavItem[] = [
+    { to: "/settings/employees", label: "Employees", icon: Contact, visible: !isStaff && hasModule("HRMS") && can(user, "MANAGE_USERS", "ALL") },
+  ];
+
+  const erpItems: NavItem[] = [{ to: "/erp", label: "ERP", icon: Package, visible: !isStaff && hasModule("ERP") }];
+
   const settingsItems: NavItem[] = [
     // My Profile is allowed for Staff too (see STAFF_ALLOWED_PATHS in
     // AppLayout.tsx); Notifications stays out of reach for them.
     { to: "/settings/profile", label: "My Profile", icon: UserCircle, visible: true },
     { to: "/settings/users", label: "Users", icon: UserCog, visible: !isStaff && can(user, "MANAGE_USERS", "ALL") },
-    { to: "/settings/employees", label: "Employees", icon: Contact, visible: !isStaff && can(user, "MANAGE_USERS", "ALL") },
     { to: "/settings/roles", label: "Roles & Permissions", icon: Shield, visible: !isStaff && can(user, "MANAGE_ROLES", "ALL") },
     { to: "/settings/tags", label: "Tags", icon: Tags, visible: !isStaff },
     { to: "/settings/notifications", label: "Notifications", icon: Bell, visible: !isStaff },
@@ -105,6 +125,9 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
       {!isStaff && <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} visible badge={undefined} onNavigate={onCloseMobile} />}
 
       <NavSection title="Workflow" items={workflowItems} onNavigate={onCloseMobile} />
+      <NavSection title="CRM" items={crmItems} onNavigate={onCloseMobile} />
+      <NavSection title="HRMS" items={hrmsItems} onNavigate={onCloseMobile} />
+      <NavSection title="ERP" items={erpItems} onNavigate={onCloseMobile} />
       <NavSection title="Settings" items={settingsItems} onNavigate={onCloseMobile} />
     </nav>
   );

@@ -22,6 +22,7 @@ const RecentActivityPage = lazy(() => import("./pages/RecentActivityPage"));
 const HistoryPage = lazy(() => import("./pages/HistoryPage"));
 const CustomersListPage = lazy(() => import("./pages/customers/CustomersListPage"));
 const CustomerDetailPage = lazy(() => import("./pages/customers/CustomerDetailPage"));
+const ErpHomePage = lazy(() => import("./pages/erp/ErpHomePage"));
 const MyProfilePage = lazy(() => import("./pages/settings/MyProfilePage"));
 const UsersSettingsPage = lazy(() => import("./pages/settings/UsersSettingsPage"));
 const EmployeesSettingsPage = lazy(() => import("./pages/settings/EmployeesSettingsPage"));
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="/workflow/history" element={<HistoryPage />} />
           <Route path="/workflow/customers" element={<CustomersListPage />} />
           <Route path="/workflow/customers/:customerId" element={<CustomerDetailPage />} />
+          <Route path="/erp" element={<ErpHomePage />} />
           <Route path="/hrms/leave" element={<RequestPage />} />
           <Route path="/tickets" element={<TicketsPage />} />
           <Route path="/settings/profile" element={<MyProfilePage />} />
