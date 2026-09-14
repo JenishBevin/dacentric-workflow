@@ -28,6 +28,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { can } from "../../lib/permissions";
 import { useMyTasks, useHrmsLeaveRequests } from "../../api/misc";
+import qplusIcon from "../../assets/qplus-icon.png";
 import { useAllTickets } from "../../api/tickets";
 
 interface NavItem {
@@ -118,14 +119,18 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
 
   const content = (
     <nav className="flex h-full flex-col gap-6 overflow-y-auto px-3 py-5">
-      <div className="flex items-center justify-between px-2">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-purple-600 text-sm font-bold text-white shadow-sm">
-            D
-          </div>
-          <span className="text-sm font-semibold tracking-tight text-white">DaCentric</span>
+      <div className="relative flex items-center justify-center px-2 py-1">
+        <div className="flex items-center justify-center gap-2 py-2" style={{ width: "75%" }}>
+          <img src={qplusIcon} alt="" className="h-12 w-12 shrink-0 object-contain" />
+          <span className="whitespace-nowrap text-2xl tracking-wide text-white" style={{ fontFamily: "'Baloo 2', sans-serif", fontWeight: 700 }}>
+            QPlus
+          </span>
         </div>
-        <button className="rounded-md p-1 text-slate-400 hover:bg-white/10 lg:hidden" onClick={onCloseMobile} aria-label="Close menu">
+        <button
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-white/10 lg:hidden"
+          onClick={onCloseMobile}
+          aria-label="Close menu"
+        >
           <X className="h-5 w-5" />
         </button>
       </div>
