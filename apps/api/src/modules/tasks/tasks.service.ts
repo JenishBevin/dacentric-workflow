@@ -734,7 +734,7 @@ export async function duplicateTask(taskId: string, actor: AuthedUser) {
   );
 }
 
-// --- Excel import for Enquiry List (local dev only — see tasks.routes.ts) ---
+// --- Excel import for Enquiry List ---
 
 const ENQUIRY_IMPORT_COLUMN_ALIASES: Record<string, string[]> = {
   title: ["title", "enquiry title", "subject", "enquiry"],

@@ -235,7 +235,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
               </button>
             </div>
           )}
-          {canCreateTask && !board.isArchived && board.name === "Enquiry List" && import.meta.env.DEV && (
+          {canCreateTask && !board.isArchived && board.name === "Enquiry List" && (
             <>
               <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportEnquiriesFile} />
               <Button variant="outline" onClick={() => importFileInputRef.current?.click()} loading={importEnquiries.isPending}>

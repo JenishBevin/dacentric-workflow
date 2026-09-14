@@ -320,7 +320,7 @@ export async function deleteDocument(customerId: string, documentId: string, act
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "CustomerDocument", entityId: documentId, beforeValue: { fileName: document.fileName } });
 }
 
-// --- Excel import (local dev only — see customers.routes.ts) ---
+// --- Excel import ---
 
 const IMPORT_COLUMN_ALIASES: Record<string, string[]> = {
   name: ["customer name", "company", "company / customer name", "name"],

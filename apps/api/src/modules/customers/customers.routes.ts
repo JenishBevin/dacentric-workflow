@@ -5,7 +5,6 @@ import { validate } from "../../common/validate";
 import { authenticate } from "../../middleware/authenticate";
 import { requirePermission } from "../../middleware/authorize";
 import { Errors } from "../../common/errors";
-import { env } from "../../lib/env";
 import * as customersService from "./customers.service";
 import { createCustomerSchema, updateCustomerSchema, createContactSchema, updateContactSchema } from "./customers.schemas";
 import { PermissionKey } from "@dacentric/types";
@@ -38,14 +37,12 @@ customersRouter.post(
   asyncHandler(async (req, res) => created(res, await customersService.createCustomer((req as any).validatedBody, req.user!)))
 );
 
-// Local development only — see env.allowCustomerImport. Must come before
-// "/:id" so Express doesn't capture "import" as an id.
+// Must come before "/:id" so Express doesn't capture "import" as an id.
 customersRouter.post(
   "/import",
   requirePermission(PermissionKey.CRM_ERP_LINKING, "OWN"),
   upload.single("file"),
   asyncHandler(async (req, res) => {
-    if (!env.allowCustomerImport) throw Errors.forbidden("Customer import is only available in local development.");
     if (!req.file) throw Errors.badRequest("No file was uploaded.");
     return ok(res, await customersService.importCustomersFromExcel(req.file.buffer, req.user!));
   })

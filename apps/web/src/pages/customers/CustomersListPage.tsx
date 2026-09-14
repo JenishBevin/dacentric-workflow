@@ -52,7 +52,7 @@ export default function CustomersListPage() {
           <p className="text-sm text-slate-500">Every customer's permanent record — profile, contacts, enquiries, projects, and documents in one place.</p>
         </div>
         <div className="flex gap-2">
-          {canManage && import.meta.env.DEV && (
+          {canManage && (
             <>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
               <Button variant="outline" onClick={() => fileInputRef.current?.click()} loading={importCustomers.isPending}>

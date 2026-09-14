@@ -226,7 +226,6 @@ export interface ImportEnquiriesResult {
   skipped: Array<{ row: number; reason: string }>;
 }
 
-/** Local development only — the backend rejects this in production regardless of who calls it. */
 export function useImportEnquiries() {
   const qc = useQueryClient();
   return useMutation({

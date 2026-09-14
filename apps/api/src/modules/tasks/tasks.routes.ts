@@ -30,7 +30,6 @@ import { z } from "zod";
 import { prisma } from "../../lib/prisma";
 import { PermissionKey } from "@dacentric/types";
 import { Errors } from "../../common/errors";
-import { env } from "../../lib/env";
 
 export const tasksRouter = Router();
 tasksRouter.use(authenticate);
@@ -60,14 +59,12 @@ tasksRouter.post(
   asyncHandler(async (req, res) => created(res, await tasksService.createTask((req as any).validatedBody, req.user!)))
 );
 
-// Local development only — see env.allowEnquiryImport. Must come before
-// "/:taskId" so Express doesn't capture "import-enquiries" as a taskId.
+// Must come before "/:taskId" so Express doesn't capture "import-enquiries" as a taskId.
 tasksRouter.post(
   "/import-enquiries",
   requirePermission(PermissionKey.CREATE_TASK, "OWN"),
   upload.single("file"),
   asyncHandler(async (req, res) => {
-    if (!env.allowEnquiryImport) throw Errors.forbidden("Enquiry import is only available in local development.");
     if (!req.file) throw Errors.badRequest("No file was uploaded.");
     return ok(res, await tasksService.importEnquiriesFromExcel(req.file.buffer, req.user!));
   })
