@@ -28,7 +28,7 @@ const ROLE_LABELS: Record<string, string> = {
   MANAGEMENT: "Management",
   HR: "HR",
   ACCOUNTS: "Accounts",
-  ESTIMATION: "Estimation",
+  ESTIMATION: "Admin and Finance",
   SALES: "Sales",
   PROCUREMENT: "Procurement",
   STAFF: "Staff",

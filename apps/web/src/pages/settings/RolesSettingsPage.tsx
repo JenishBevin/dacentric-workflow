@@ -37,7 +37,7 @@ const ROLE_LABELS: Record<RoleCode, string> = {
   MANAGEMENT: "Management",
   HR: "HR",
   ACCOUNTS: "Accounts",
-  ESTIMATION: "Estimation",
+  ESTIMATION: "Admin and Finance",
   SALES: "Sales",
   PROCUREMENT: "Procurement",
   STAFF: "Staff",
