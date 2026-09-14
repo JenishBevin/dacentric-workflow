@@ -14,10 +14,24 @@ import {
 } from "./users.schemas";
 import * as usersService from "./users.service";
 import { prisma } from "../../lib/prisma";
-import { PermissionKey } from "@dacentric/types";
+import { PermissionKey, ModuleCode } from "@dacentric/types";
+import { Errors } from "../../common/errors";
 
 export const usersRouter = Router();
 usersRouter.use(authenticate);
+
+// Viewing the Employee directory only needs the HRMS module grant (like ERP's
+// own module-only gate); creating/editing/deactivating an employee still
+// requires Manage Users: All (see the routes below), since that permission
+// also controls logins, not just this read-only listing.
+function requireModuleAccess(module: ModuleCode) {
+  return (req: any, _res: any, next: any) => {
+    if (!req.user?.moduleAccess.includes(module)) {
+      return next(Errors.forbidden(`You need ${module} module access to do that.`));
+    }
+    next();
+  };
+}
 
 usersRouter.get(
   "/",
@@ -98,7 +112,7 @@ usersRouter.get(
 // external HRMS in this build to sync them in from (Section 31). ---
 usersRouter.get(
   "/employees/all",
-  requirePermission(PermissionKey.MANAGE_USERS, "ALL"),
+  requireModuleAccess(ModuleCode.HRMS),
   asyncHandler(async (req, res) => {
     const search = req.query.search as string | undefined;
     return ok(res, await usersService.listAllEmployees({ search }));

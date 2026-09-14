@@ -76,17 +76,19 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
   // Module Access). Customers is genuinely CRM functionality, so it moves
   // here and is now additionally gated on CRM access — this narrows who
   // sees it versus before (anyone with VIEW_WORKFLOW could). Employees
-  // moves to HRMS too, but keeps its original MANAGE_USERS gate unchanged,
-  // so nobody who could see it before loses access. "Request" (leave/claims)
-  // lives in the Tools section below rather than moving to HRMS — it's a
-  // universal employee entitlement, not an HRMS-admin feature, and most
-  // users don't have HRMS access.
+  // moves to HRMS too — viewing the directory only needs the HRMS grant
+  // (matching ERP's module-only gate); creating/editing/deactivating an
+  // employee is still restricted to Manage Users: All, enforced both on the
+  // page itself (EmployeesSettingsPage hides those controls) and by the API.
+  // "Request" (leave/claims) lives in the Tools section below rather than
+  // moving to HRMS — it's a universal employee entitlement, not an
+  // HRMS-admin feature, and most users don't have HRMS access.
   const crmItems: NavItem[] = [
     { to: "/workflow/customers", label: "Customers", icon: Building2, visible: !isStaff && hasModule("CRM") && can(user, "VIEW_WORKFLOW") },
   ];
 
   const hrmsItems: NavItem[] = [
-    { to: "/settings/employees", label: "Employees", icon: Contact, visible: !isStaff && hasModule("HRMS") && can(user, "MANAGE_USERS", "ALL") },
+    { to: "/settings/employees", label: "Employees", icon: Contact, visible: !isStaff && hasModule("HRMS") },
   ];
 
   const erpItems: NavItem[] = [{ to: "/erp", label: "ERP", icon: Package, visible: !isStaff && hasModule("ERP") }];

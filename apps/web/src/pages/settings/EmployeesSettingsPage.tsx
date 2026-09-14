@@ -14,6 +14,8 @@ import { Button, Input, Label, Select, Badge, Skeleton, ErrorState, EmptyState }
 import { Drawer } from "../../components/ui/Drawer";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
+import { useAuth } from "../../context/AuthContext";
+import { can } from "../../lib/permissions";
 
 interface EmployeeRow {
   id: string;
@@ -31,6 +33,8 @@ interface EmployeeRow {
  * records from, so — unlike everywhere else in the app, which only ever
  * reads them — this is the one screen that creates and edits them directly. */
 export default function EmployeesSettingsPage() {
+  const { user } = useAuth();
+  const canManage = can(user, "MANAGE_USERS", "ALL");
   const { push } = useToast();
   const [search, setSearch] = useState("");
   const { data: employees, isLoading, isError, refetch } = useAllEmployees(search);
@@ -45,11 +49,17 @@ export default function EmployeesSettingsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">Employees</h1>
-          <p className="text-sm text-slate-500">HR records — job title, department, team. Link one to a login from Settings → Users.</p>
+          <p className="text-sm text-slate-500">
+            {canManage
+              ? "HR records — job title, department, team. Link one to a login from Settings → Users."
+              : "HR directory — job title, department, team."}
+          </p>
         </div>
-        <Button onClick={() => setNewOpen(true)}>
-          <Plus className="h-4 w-4" /> New Employee
-        </Button>
+        {canManage && (
+          <Button onClick={() => setNewOpen(true)}>
+            <Plus className="h-4 w-4" /> New Employee
+          </Button>
+        )}
       </div>
 
       <Input placeholder="Search by name, email or employee code…" value={search} onChange={(e) => setSearch(e.target.value)} className="sm:max-w-xs" />
@@ -57,7 +67,11 @@ export default function EmployeesSettingsPage() {
       {isLoading && <Skeleton className="h-64 w-full" />}
       {isError && <ErrorState message="Could not load employees." onRetry={() => refetch()} />}
       {employees && employees.length === 0 && (
-        <EmptyState icon={<Users className="h-8 w-8" />} title="No employees yet." description="Create one to start linking logins to HR records." />
+        <EmptyState
+          icon={<Users className="h-8 w-8" />}
+          title="No employees yet."
+          description={canManage ? "Create one to start linking logins to HR records." : "No HR records to show yet."}
+        />
       )}
 
       {employees && employees.length > 0 && (
@@ -71,7 +85,7 @@ export default function EmployeesSettingsPage() {
                 <th className="px-4 py-2.5">Department / Team</th>
                 <th className="px-4 py-2.5">Linked Login</th>
                 <th className="px-4 py-2.5">Status</th>
-                <th className="px-4 py-2.5 text-right">Actions</th>
+                {canManage && <th className="px-4 py-2.5 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -92,11 +106,13 @@ export default function EmployeesSettingsPage() {
                   <td className="px-4 py-2.5">
                     <Badge tone={e.isActive ? "green" : "slate"}>{e.isActive ? "Active" : "Inactive"}</Badge>
                   </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => setEditEmployee(e)}>
-                      Edit
-                    </Button>
-                  </td>
+                  {canManage && (
+                    <td className="px-4 py-2.5 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => setEditEmployee(e)}>
+                        Edit
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
