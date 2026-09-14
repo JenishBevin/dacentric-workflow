@@ -10,6 +10,7 @@ export const createBoardSchema = z
     linkedRecordId: z.string().uuid().optional(),
     templateId: z.string().uuid().optional(),
     serviceId: z.string().uuid().optional(),
+    customerId: z.string().uuid().optional().nullable(),
     members: z
       .array(
         z.object({
@@ -33,6 +34,7 @@ export const updateBoardSchema = z.object({
   description: z.string().max(2000).optional().nullable(),
   linkedRecordType: z.nativeEnum(LinkedRecordType).optional().nullable(),
   linkedRecordId: z.string().uuid().optional().nullable(),
+  customerId: z.string().uuid().optional().nullable(),
   version: z.number().int().optional(),
 });
 

@@ -23,6 +23,7 @@ export interface CreateBoardInput {
   linkedRecordId?: string;
   templateId?: string;
   serviceId?: string;
+  customerId?: string | null;
   members: Array<{ userId: string; role: string }>;
 }
 
@@ -66,6 +67,7 @@ export async function listBoards(
       stages: { orderBy: { position: "asc" } },
       members: { include: { user: true } },
       linkedRecord: true,
+      customer: { select: { id: true, customerId: true, name: true } },
       _count: { select: { tasks: true } },
     },
     orderBy: { updatedAt: "desc" },
@@ -92,6 +94,8 @@ export async function listBoards(
     description: b.description,
     boardType: b.boardType,
     linkedRecord: b.linkedRecord,
+    customerId: b.customerId,
+    customer: (b as any).customer ?? null,
     isArchived: b.isArchived,
     isHighlighted: b.isHighlighted,
     stageCount: b.stages.length,
@@ -125,6 +129,7 @@ export async function getBoardDetail(boardId: string, user: AuthedUser) {
       stages: { orderBy: { position: "asc" } },
       members: { include: { user: true } },
       linkedRecord: true,
+      customer: { select: { id: true, customerId: true, name: true } },
       tags: { include: { tag: true } },
     },
   });
@@ -167,6 +172,7 @@ export async function createBoard(input: CreateBoardInput, actor: AuthedUser) {
         linkedRecordId: input.boardType === BoardType.LINKED ? input.linkedRecordId : null,
         templateId: input.templateId,
         serviceId: input.serviceId ?? null,
+        customerId: input.customerId ?? null,
         createdById: actor.id,
         stages: {
           create: stageDefs.map((s, idx) => ({
@@ -329,7 +335,7 @@ export async function listServices() {
 
 export async function updateBoard(
   boardId: string,
-  input: { name?: string; description?: string | null; linkedRecordType?: string | null; linkedRecordId?: string | null; version?: number },
+  input: { name?: string; description?: string | null; linkedRecordType?: string | null; linkedRecordId?: string | null; customerId?: string | null; version?: number },
   actor: AuthedUser
 ) {
   const role = await assertBoardVisible(boardId, actor);
@@ -348,6 +354,7 @@ export async function updateBoard(
       linkedRecordType: input.linkedRecordType === null ? null : (input.linkedRecordType as any),
       linkedRecordId: input.linkedRecordId === null ? null : input.linkedRecordId,
       boardType: input.linkedRecordId === null ? BoardType.STANDALONE : undefined,
+      customerId: input.customerId === undefined ? undefined : input.customerId,
       isHighlighted: false,
       version: { increment: 1 },
     },

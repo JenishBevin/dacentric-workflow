@@ -22,6 +22,7 @@ import {
   Archive,
   ChevronDown,
   DollarSign,
+  Building2,
   X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -75,6 +76,7 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
 
   const workflowItems: NavItem[] = [
     ...(SHOW_SALES_DROPDOWN ? [] : salesItems),
+    { to: "/workflow/customers", label: "Customers", icon: Building2, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
     { to: "/workflow/my-tasks", label: "My Tasks", icon: ListChecks, visible: !isStaff, badge: myTaskCount || undefined },
     { to: "/workflow/team", label: "Team Workload", icon: Users2, visible: !isStaff && can(user, "VIEW_TEAM_WORKLOAD") },
     { to: "/workflow/history", label: "Project/Task History", icon: Archive, visible: !isStaff && can(user, "VIEW_WORKFLOW") },

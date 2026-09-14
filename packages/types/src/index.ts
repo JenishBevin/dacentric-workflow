@@ -95,6 +95,12 @@ export enum LinkedRecordType {
   INVOICE = "INVOICE",
 }
 
+export enum CustomerStatus {
+  ACTIVE = "ACTIVE",
+  INACTIVE = "INACTIVE",
+  PROSPECT = "PROSPECT",
+}
+
 // ---------------------------------------------------------------------------
 // Tasks
 // ---------------------------------------------------------------------------
@@ -212,6 +218,15 @@ export function formatEstimationId(year: number, sequence: number): string {
 
 export function formatEnquiryId(year: number, sequence: number): string {
   return formatQptsId("ENQ", year, sequence);
+}
+
+// Customer IDs are permanent — unlike the QPTS ids above, they never reset
+// per year, since a customer relationship outlives any single year.
+export const CUSTOMER_ID_PREFIX = "CUS-";
+export const CUSTOMER_ID_PAD_LENGTH = 6;
+
+export function formatCustomerId(sequence: number): string {
+  return `${CUSTOMER_ID_PREFIX}${String(sequence).padStart(CUSTOMER_ID_PAD_LENGTH, "0")}`;
 }
 
 // ---------------------------------------------------------------------------

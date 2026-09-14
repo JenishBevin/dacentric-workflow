@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Drawer } from "../ui/Drawer";
 import {
   Button,
@@ -275,7 +275,12 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
           </section>
 
           {/* Workflow */}
-          <section className={clsx("grid gap-3", task.service ? "grid-cols-3" : "grid-cols-2")}>
+          <section
+            className={clsx(
+              "grid gap-3",
+              ["grid-cols-2", "grid-cols-3", "grid-cols-4"][(task.service ? 1 : 0) + (task.customer ? 1 : 0)]
+            )}
+          >
             <div>
               <Label>Project</Label>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{task.board?.name}</p>
@@ -284,6 +289,17 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
               <div>
                 <Label>Service</Label>
                 <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{task.service.name}</p>
+              </div>
+            )}
+            {task.customer && (
+              <div>
+                <Label>Customer</Label>
+                <Link
+                  to={`/workflow/customers/${task.customer.id}`}
+                  className="block truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-brand-700 hover:bg-slate-100"
+                >
+                  {task.customer.name} <span className="text-slate-400">· {task.customer.customerId}</span>
+                </Link>
               </div>
             )}
             <div>

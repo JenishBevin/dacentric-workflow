@@ -16,6 +16,7 @@ export interface CreateTaskInput {
   boardId: string;
   stageId?: string;
   serviceId?: string;
+  customerId?: string | null;
   title: string;
   description?: string;
   priority: string;
@@ -62,6 +63,13 @@ async function ensureEnquiryRecord(tx: any, taskId: string) {
   return tx.enquiryRecord.create({ data: { taskId, year, sequence, enquiryId: formatEnquiryId(year, sequence) } });
 }
 
+// Append-only stage-change log backing a project's/enquiry's full journey
+// (Enquiry -> Estimation -> Won -> Implementation -> ..., whatever stage
+// names that board actually uses) — see TaskStatusHistory in schema.prisma.
+async function recordStatusHistory(taskId: string, stageName: string, actor: AuthedUser, comment?: string) {
+  await prisma.taskStatusHistory.create({ data: { taskId, stageName, comment, updatedById: actor.id } });
+}
+
 async function assertActiveWorkflowUsers(userIds: string[]) {
   const users = await prisma.user.findMany({ where: { id: { in: userIds } } });
   if (users.length !== userIds.length) throw Errors.badRequest("One or more selected people could not be found.");
@@ -98,6 +106,7 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
         boardId: input.boardId,
         stageId: stage.id,
         serviceId: input.serviceId ?? null,
+        customerId: input.customerId ?? null,
         title: input.title,
         description: sanitizeDescription(input.description),
         priority: input.priority as any,
@@ -132,6 +141,8 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
     }
     return updatedTask;
   });
+
+  await recordStatusHistory(task.id, stage.name, actor);
 
   if (input.dependencies?.length) {
     for (const dep of input.dependencies) {
@@ -207,6 +218,8 @@ function serializeTask(task: any) {
     stage: task.stage ? { id: task.stage.id, name: task.stage.name, color: task.stage.color, isTerminal: task.stage.isTerminal } : undefined,
     serviceId: task.serviceId,
     service: task.service ? { id: task.service.id, name: task.service.name } : undefined,
+    customerId: task.customerId ?? null,
+    customer: task.customer ? { id: task.customer.id, customerId: task.customer.customerId, name: task.customer.name } : null,
     priority: task.priority,
     startDate: task.startDate,
     dueDate: task.dueDate,
@@ -257,6 +270,7 @@ const TASK_DETAIL_INCLUDE = {
   board: true,
   stage: true,
   service: true,
+  customer: { select: { id: true, customerId: true, name: true } },
   createdBy: true,
   assignees: { include: { user: true } },
   watchers: { include: { user: true } },
@@ -273,6 +287,18 @@ export async function getTaskDetail(taskId: string, actor: AuthedUser) {
   await loadTaskWithAccess(taskId, actor);
   const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId }, include: TASK_DETAIL_INCLUDE as any });
   return serializeTask(task);
+}
+
+// The audit trail behind "Project status should have a proper history" —
+// every stage this task has ever passed through, oldest first.
+export async function getTaskStatusHistory(taskId: string, actor: AuthedUser) {
+  await loadTaskWithAccess(taskId, actor);
+  const rows = await prisma.taskStatusHistory.findMany({
+    where: { taskId },
+    include: { updatedBy: { select: { name: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map((r) => ({ id: r.id, stageName: r.stageName, comment: r.comment, updatedByName: r.updatedBy.name, createdAt: r.createdAt }));
 }
 
 export async function listBoardTasks(
@@ -317,7 +343,7 @@ export async function updateTask(taskId: string, input: Record<string, any>, act
   const data: any = { version: { increment: 1 }, isHighlighted: false };
   const changedFields: string[] = [];
 
-  for (const key of ["title", "priority", "startDate", "dueDate", "estimatedEffortHours", "dependencyEnforced"]) {
+  for (const key of ["title", "priority", "startDate", "dueDate", "estimatedEffortHours", "dependencyEnforced", "customerId"]) {
     if (input[key] !== undefined) {
       data[key] = input[key];
       changedFields.push(key);
@@ -462,6 +488,8 @@ export async function moveTask(taskId: string, targetStageId: string, actor: Aut
 
     await prisma.taskApproval.create({ data: { taskId, approverId: ctx.task.approverUserId } });
 
+    await recordStatusHistory(taskId, pendingApprovalStage ? pendingApprovalStage.name : "Pending Approval", actor);
+
     await writeAudit({
       actor,
       action: AuditAction.MOVE,
@@ -511,6 +539,8 @@ export async function moveTask(taskId: string, targetStageId: string, actor: Aut
     beforeValue: ctx.task.stageId,
     afterValue: targetStageId,
   });
+
+  await recordStatusHistory(taskId, targetStage.name, actor);
 
   const watcherIds = (updated.watchers ?? []).map((w: any) => w.userId);
   const assigneeIds = (updated.assignees ?? []).map((a: any) => a.userId);
@@ -570,6 +600,8 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
       metadata: { awarded: true, fromBoardId: sourceBoard.id, toBoardId: estimationBoard.id, toStageId: firstStage.id, estimationId: estimationRecord.estimationId },
     });
 
+    await recordStatusHistory(taskId, firstStage.name, actor, "Awarded to Estimation");
+
     return { kind: "moved-to-estimation" as const, id: estimationBoard.id, name: estimationBoard.name };
   }
 
@@ -582,6 +614,7 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
         name: ctx.task.title,
         boardType: BoardType.STANDALONE,
         serviceId: (ctx.task as any).serviceId ?? null,
+        customerId: (ctx.task as any).customerId ?? null,
         isHighlighted: true,
         createdById: actor.id,
         stages: {
@@ -628,6 +661,8 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
     boardId: newBoard.id,
     metadata: { awarded: true, fromBoardId: ctx.task.boardId, toBoardId: newBoard.id, toStageId: firstStageId },
   });
+
+  await recordStatusHistory(taskId, newBoard.stages[0].name, actor, "Awarded to Project");
 
   return { kind: "project-created" as const, id: newBoard.id, name: newBoard.name };
 }

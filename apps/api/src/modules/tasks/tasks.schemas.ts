@@ -8,6 +8,7 @@ export const createTaskSchema = z
     boardId: z.string().uuid("Board is required."),
     stageId: z.string().uuid().optional(),
     serviceId: z.string().uuid().optional(),
+    customerId: z.string().uuid().optional().nullable(),
     title: z.string().min(1, "Title is required.").max(150, "Title cannot exceed 150 characters."),
     description: z.string().max(20000).optional(),
     priority: z.nativeEnum(TaskPriority).default(TaskPriority.MEDIUM),
@@ -55,6 +56,7 @@ export const updateTaskSchema = z
     requiresApproval: z.boolean().optional(),
     approverUserId: z.string().uuid().optional().nullable(),
     dependencyEnforced: z.boolean().optional(),
+    customerId: z.string().uuid().optional().nullable(),
     version: z.number().int().optional(),
   })
   .refine((v) => !v.startDate || !v.dueDate || v.dueDate >= v.startDate, {

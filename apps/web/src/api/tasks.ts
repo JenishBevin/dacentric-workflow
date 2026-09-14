@@ -27,6 +27,14 @@ export function useTaskActivity(taskId: string | undefined) {
   });
 }
 
+export function useTaskStatusHistory(taskId: string | undefined) {
+  return useQuery({
+    queryKey: ["task-status-history", taskId],
+    queryFn: async () => (await api.get(`/tasks/${taskId}/status-history`)).data.data,
+    enabled: !!taskId,
+  });
+}
+
 export function useTaskComments(taskId: string | undefined) {
   return useQuery({
     queryKey: ["task-comments", taskId],

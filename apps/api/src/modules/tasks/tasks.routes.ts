@@ -85,6 +85,11 @@ tasksRouter.get(
   asyncHandler(async (req, res) => ok(res, await tasksService.getTaskDetail(req.params.taskId, req.user!)))
 );
 
+tasksRouter.get(
+  "/:taskId/status-history",
+  asyncHandler(async (req, res) => ok(res, await tasksService.getTaskStatusHistory(req.params.taskId, req.user!)))
+);
+
 tasksRouter.patch(
   "/:taskId",
   validate(updateTaskSchema),

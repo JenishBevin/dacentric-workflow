@@ -81,6 +81,110 @@ export interface CurrentUser {
   hasAvatar: boolean;
 }
 
+export type CustomerStatus = "ACTIVE" | "INACTIVE" | "PROSPECT";
+
+export interface CustomerRef {
+  id: string;
+  customerId: string;
+  name: string;
+}
+
+export interface CustomerSummary extends CustomerRef {
+  status: CustomerStatus;
+  industry?: string | null;
+  country?: string | null;
+  mainContactName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  accountManager?: { id: string; name: string } | null;
+  createdAt: string;
+  enquiryCount: number;
+  projectCount: number;
+}
+
+export interface CustomerContact {
+  id: string;
+  customerId: string;
+  name: string;
+  designation?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  isPrimary: boolean;
+  createdAt: string;
+}
+
+export interface CustomerDocument {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  uploadedBy: { name: string };
+  createdAt: string;
+}
+
+export interface CustomerDetail extends CustomerSummary {
+  customerType?: string | null;
+  website?: string | null;
+  city?: string | null;
+  address?: string | null;
+  designation?: string | null;
+  alternateContact?: string | null;
+  rating?: string | null;
+  notes?: string | null;
+  createdBy: { id: string; name: string };
+  contacts: CustomerContact[];
+  documents: CustomerDocument[];
+  enquiries: {
+    total: number;
+    won: number;
+    lost: number;
+    open: number;
+    items: Array<{
+      id: string;
+      taskId: string;
+      title: string;
+      isCompleted: boolean;
+      board: { id: string; name: string };
+      stage: { name: string; isTerminal: boolean };
+      enquiryRecord: { enquiryId: string } | null;
+      estimationRecord: { estimationId: string } | null;
+      createdAt: string;
+    }>;
+  };
+  projects: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    items: Array<{
+      id: string;
+      boardId: string;
+      name: string;
+      isCompleted: boolean;
+      isArchived: boolean;
+      createdAt: string;
+      updatedAt: string;
+      _count: { tasks: number };
+    }>;
+  };
+  recentActivity: Array<{
+    id: string;
+    actorName: string;
+    action: string;
+    entityType: string;
+    field?: string | null;
+    metadata?: unknown;
+    createdAt: string;
+  }>;
+}
+
+export interface TaskStatusHistoryEntry {
+  id: string;
+  stageName: string;
+  comment?: string | null;
+  updatedByName: string;
+  createdAt: string;
+}
+
 export interface Board {
   id: string;
   boardId: string;
@@ -88,6 +192,8 @@ export interface Board {
   description?: string | null;
   boardType: BoardType;
   linkedRecord?: { id: string; recordType: LinkedRecordType; name: string; externalRef: string } | null;
+  customerId?: string | null;
+  customer?: CustomerRef | null;
   isArchived: boolean;
   isHighlighted: boolean;
   stageCount: number;
@@ -118,6 +224,8 @@ export interface TaskSummary {
   stage?: { id: string; name: string; color: string; isTerminal: boolean };
   serviceId?: string | null;
   service?: { id: string; name: string };
+  customerId?: string | null;
+  customer?: CustomerRef | null;
   priority: TaskPriority;
   startDate: string | null;
   dueDate: string | null;
