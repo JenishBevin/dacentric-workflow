@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import { prisma } from "../../lib/prisma";
 import { Errors } from "../../common/errors";
 import { writeAudit } from "../../common/audit";
@@ -317,4 +318,114 @@ export async function deleteDocument(customerId: string, documentId: string, act
   await getStorageAdapter().remove(document.storageKey);
   await prisma.customerDocument.delete({ where: { id: documentId } });
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "CustomerDocument", entityId: documentId, beforeValue: { fileName: document.fileName } });
+}
+
+// --- Excel import (local dev only — see customers.routes.ts) ---
+
+const IMPORT_COLUMN_ALIASES: Record<string, string[]> = {
+  name: ["customer name", "company", "company / customer name", "name"],
+  customerType: ["customer type"],
+  industry: ["industry"],
+  website: ["website"],
+  country: ["country"],
+  city: ["city"],
+  address: ["address"],
+  mainContactName: ["main contact person", "main contact name", "main contact"],
+  designation: ["designation"],
+  email: ["email"],
+  phone: ["phone"],
+  alternateContact: ["alternate contact"],
+  status: ["status", "customer status"],
+  rating: ["rating", "priority", "customer rating / priority"],
+  notes: ["notes"],
+};
+
+export interface ImportCustomersResult {
+  created: number;
+  skipped: Array<{ row: number; reason: string }>;
+}
+
+/** Reads an uploaded .xlsx (first sheet, header row first) and creates one
+ * Customer per data row via the same createCustomer() path the UI uses —
+ * matching header text to a fixed set of Customer Profile field aliases, in
+ * any column order. Only "Customer Name" is required; every other column is
+ * optional and simply left blank if missing or empty. */
+export async function importCustomersFromExcel(buffer: Buffer, actor: AuthedUser): Promise<ImportCustomersResult> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as any);
+  const sheet = workbook.worksheets[0];
+  if (!sheet) throw Errors.badRequest("The uploaded file has no worksheet.");
+
+  const headerCells = sheet.getRow(1).values as unknown[];
+  const columnIndex: Record<string, number> = {};
+  headerCells.forEach((cell, idx) => {
+    if (typeof cell === "string" && cell.trim()) columnIndex[cell.trim().toLowerCase()] = idx;
+  });
+
+  const resolveColumn = (field: string): number | undefined => {
+    for (const alias of IMPORT_COLUMN_ALIASES[field]) {
+      const idx = columnIndex[alias];
+      if (idx !== undefined) return idx;
+    }
+    return undefined;
+  };
+  const fieldColumns = Object.fromEntries(Object.keys(IMPORT_COLUMN_ALIASES).map((f) => [f, resolveColumn(f)])) as Record<string, number | undefined>;
+
+  if (!fieldColumns.name) {
+    throw Errors.badRequest('The file must have a "Customer Name" column (row 1).');
+  }
+
+  const result: ImportCustomersResult = { created: 0, skipped: [] };
+
+  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
+    const row = sheet.getRow(rowNumber);
+    const cellText = (colIdx?: number) => (colIdx ? String(row.getCell(colIdx).value ?? "").trim() : "");
+
+    const isBlankRow = Object.values(fieldColumns).every((idx) => !cellText(idx));
+    if (isBlankRow) continue;
+
+    const name = cellText(fieldColumns.name);
+    if (!name) {
+      result.skipped.push({ row: rowNumber, reason: "Missing Customer Name" });
+      continue;
+    }
+
+    const statusRaw = cellText(fieldColumns.status).toUpperCase();
+    const status = (Object.values(CustomerStatus) as string[]).includes(statusRaw) ? (statusRaw as CustomerStatus) : CustomerStatus.PROSPECT;
+
+    try {
+      await createCustomer(
+        {
+          name,
+          customerType: cellText(fieldColumns.customerType) || undefined,
+          industry: cellText(fieldColumns.industry) || undefined,
+          website: cellText(fieldColumns.website) || undefined,
+          country: cellText(fieldColumns.country) || undefined,
+          city: cellText(fieldColumns.city) || undefined,
+          address: cellText(fieldColumns.address) || undefined,
+          mainContactName: cellText(fieldColumns.mainContactName) || undefined,
+          designation: cellText(fieldColumns.designation) || undefined,
+          email: cellText(fieldColumns.email) || undefined,
+          phone: cellText(fieldColumns.phone) || undefined,
+          alternateContact: cellText(fieldColumns.alternateContact) || undefined,
+          status,
+          rating: cellText(fieldColumns.rating) || undefined,
+          notes: cellText(fieldColumns.notes) || undefined,
+        },
+        actor
+      );
+      result.created++;
+    } catch (err: any) {
+      result.skipped.push({ row: rowNumber, reason: err?.message ?? "Unknown error" });
+    }
+  }
+
+  await writeAudit({
+    actor,
+    action: AuditAction.CREATE,
+    entityType: "Customer",
+    afterValue: { source: "excel-import", created: result.created, skipped: result.skipped.length },
+  });
+
+  return result;
 }

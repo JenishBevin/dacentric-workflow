@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Building2 } from "lucide-react";
-import { useCustomers, useCreateCustomer } from "../../api/customers";
+import { Plus, Building2, Upload } from "lucide-react";
+import { useCustomers, useCreateCustomer, useImportCustomers } from "../../api/customers";
 import { Button, Input, Select, Badge, Skeleton, ErrorState, EmptyState } from "../../components/ui/primitives";
 import { Drawer } from "../../components/ui/Drawer";
 import { useToast } from "../../context/ToastContext";
@@ -18,11 +18,31 @@ const STATUS_TONE: Record<CustomerStatus, "green" | "slate" | "amber"> = {
 
 export default function CustomersListPage() {
   const { user } = useAuth();
+  const { push } = useToast();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const { data: customers, isLoading, isError, refetch } = useCustomers({ search: search || undefined, status: status || undefined });
   const [newOpen, setNewOpen] = useState(false);
   const canManage = can(user, "CRM_ERP_LINKING", "OWN");
+  const importCustomers = useImportCustomers();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const result = await importCustomers.mutateAsync(file);
+      push({
+        variant: result.skipped.length ? "success" : "success",
+        title: `Imported ${result.created} customer${result.created === 1 ? "" : "s"}.`,
+        description: result.skipped.length ? `${result.skipped.length} row(s) skipped — see console for details.` : undefined,
+      });
+      if (result.skipped.length) console.warn("Customer import — skipped rows:", result.skipped);
+    } catch (err) {
+      push({ variant: "error", title: "Import failed", description: extractApiError(err).message });
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -31,11 +51,21 @@ export default function CustomersListPage() {
           <h1 className="text-lg font-semibold text-slate-900">Customers</h1>
           <p className="text-sm text-slate-500">Every customer's permanent record — profile, contacts, enquiries, projects, and documents in one place.</p>
         </div>
-        {canManage && (
-          <Button onClick={() => setNewOpen(true)}>
-            <Plus className="h-4 w-4" /> New Customer
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canManage && import.meta.env.DEV && (
+            <>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} loading={importCustomers.isPending}>
+                <Upload className="h-4 w-4" /> Import from Excel
+              </Button>
+            </>
+          )}
+          {canManage && (
+            <Button onClick={() => setNewOpen(true)}>
+              <Plus className="h-4 w-4" /> New Customer
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">

@@ -63,4 +63,10 @@ export const env = {
   },
 
   recurrenceCron: process.env.RECURRENCE_CRON ?? "*/15 * * * *",
+
+  // Explicit opt-in rather than `!isProd` — Railway's own NODE_ENV isn't
+  // actually set to "production" today, so that alone wouldn't reliably keep
+  // a local-only feature off the deployed environment. Never set this var
+  // anywhere but a local .env.
+  allowCustomerImport: process.env.ALLOW_CUSTOMER_IMPORT === "true",
 };

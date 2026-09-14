@@ -102,3 +102,22 @@ export function useDeleteCustomerDocument(customerId: string) {
 export function useDownloadCustomerDocumentUrl(customerId: string, documentId: string) {
   return `${api.defaults.baseURL}/customers/${customerId}/documents/${documentId}/download`;
 }
+
+export interface ImportCustomersResult {
+  created: number;
+  skipped: Array<{ row: number; reason: string }>;
+}
+
+/** Local development only — the backend rejects this in production regardless of who calls it. */
+export function useImportCustomers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return (await api.post<{ data: ImportCustomersResult }>("/customers/import", form, { headers: { "Content-Type": "multipart/form-data" } })).data
+        .data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
+  });
+}
