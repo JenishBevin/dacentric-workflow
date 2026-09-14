@@ -1,5 +1,5 @@
 import React from "react";
-import qplusIcon from "../../assets/qplus-icon.png";
+import qplusIcon from "../../assets/qplus-icon-dark.png";
 
 export const AuthLayout: React.FC<{ title: string; subtitle?: string; children: React.ReactNode }> = ({ title, subtitle, children }) => (
   <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
