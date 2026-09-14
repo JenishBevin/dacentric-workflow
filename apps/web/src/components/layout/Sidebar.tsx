@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import clsx from "clsx";
 import {
   LayoutDashboard,
@@ -22,6 +22,7 @@ import {
   Archive,
   Building2,
   Package,
+  ChevronDown,
   X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -131,10 +132,12 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
 
       {!isStaff && <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} visible badge={undefined} onNavigate={onCloseMobile} />}
 
-      <NavSection title="Workflow" items={workflowItems} onNavigate={onCloseMobile} />
-      <NavSection title="CRM" items={crmItems} onNavigate={onCloseMobile} />
-      <NavSection title="HRMS" items={hrmsItems} onNavigate={onCloseMobile} />
-      <NavSection title="ERP" items={erpItems} onNavigate={onCloseMobile} />
+      <div className="flex flex-col gap-1">
+        <ModuleGroup title="Workflow" items={workflowItems} onNavigate={onCloseMobile} />
+        <ModuleGroup title="CRM" items={crmItems} onNavigate={onCloseMobile} />
+        <ModuleGroup title="HRMS" items={hrmsItems} onNavigate={onCloseMobile} />
+        <ModuleGroup title="ERP" items={erpItems} onNavigate={onCloseMobile} />
+      </div>
       <NavSection title="Tools" items={toolsItems} onNavigate={onCloseMobile} />
       <NavSection title="Settings" items={settingsItems} onNavigate={onCloseMobile} />
     </nav>
@@ -164,6 +167,43 @@ const NavSection: React.FC<NavSectionProps> = ({ title, items, onNavigate }) => 
           <SidebarLink key={item.to} {...item} onNavigate={onNavigate} />
         ))}
       </div>
+    </div>
+  );
+};
+
+// Collapsible, highlighted module header — used for the four top-level
+// modules (Workflow/CRM/HRMS/ERP) so they read as a module switcher rather
+// than a plain section label. Expanded by default, and forced visibly
+// "current" (via containsActive) whenever the active route is one of its
+// own children, even while collapsed.
+const ModuleGroup: React.FC<{ title: string; items: NavItem[]; onNavigate?: () => void }> = ({ title, items, onNavigate }) => {
+  const visible = items.filter((i) => i.visible);
+  const location = useLocation();
+  const containsActive = visible.some((i) => location.pathname.startsWith(i.to));
+  const [open, setOpen] = React.useState(true);
+
+  if (!visible.length) return null;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={clsx(
+          "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors",
+          containsActive ? "bg-brand-600/15 text-brand-300" : "text-slate-400 hover:bg-white/5 hover:text-white"
+        )}
+      >
+        <span className="flex-1 text-left">{title}</span>
+        <ChevronDown className={clsx("h-3.5 w-3.5 shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="mt-1 flex flex-col gap-0.5">
+          {visible.map((item) => (
+            <SidebarLink key={item.to} {...item} onNavigate={onNavigate} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
