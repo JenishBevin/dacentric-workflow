@@ -1,4 +1,6 @@
 import React from "react";
+import { Link } from "react-router-dom";
+import { Building2 } from "lucide-react";
 import { Badge } from "../ui/primitives";
 import { PriorityBadge, DueDateBadge, ChecklistProgress } from "../workflow/badges";
 import { BoardStage, TaskSummary } from "../../lib/types";
@@ -32,9 +34,12 @@ export const TaskListView: React.FC<{
             </p>
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
               {items.map((task, idx) => (
-                <button
+                <div
                   key={task.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onOpenTask(task)}
+                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpenTask(task)}
                   className={clsx(
                     "flex w-full flex-wrap items-center gap-3 px-3 py-2.5 text-left sm:flex-nowrap",
                     idx !== 0 && "border-t border-slate-100",
@@ -51,6 +56,15 @@ export const TaskListView: React.FC<{
                         New
                       </span>
                     )}
+                    {task.customer && (
+                      <Link
+                        to={`/workflow/customers/${task.customer.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="ml-2 inline-flex items-center gap-1 text-xs text-brand-600 hover:underline"
+                      >
+                        <Building2 className="h-3 w-3" /> {task.customer.name}
+                      </Link>
+                    )}
                   </span>
                   {task.assignees.length > 0 && (
                     <Badge tone="slate">
@@ -61,7 +75,7 @@ export const TaskListView: React.FC<{
                   <PriorityBadge priority={task.priority} />
                   <ChecklistProgress done={task.checklistProgress.done} total={task.checklistProgress.total} />
                   <DueDateBadge dueDate={task.dueDate} status={task.dueDateStatus} />
-                </button>
+                </div>
               ))}
             </div>
           </div>

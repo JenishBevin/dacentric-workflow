@@ -1,7 +1,8 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Paperclip, MessageSquare, Link2, MoreVertical, GripVertical } from "lucide-react";
+import { Paperclip, MessageSquare, Link2, Building2, MoreVertical, GripVertical } from "lucide-react";
 import clsx from "clsx";
 import { TaskSummary } from "../../lib/types";
 import { PriorityBadge, DueDateBadge, ApprovalStatusBadge, ChecklistProgress } from "../workflow/badges";
@@ -125,6 +126,16 @@ export const TaskCard: React.FC<Props> = ({ task, onOpen, onMenuAction, dragDisa
         <div className="mt-1.5 flex items-center gap-1 truncate text-xs text-slate-400">
           <Link2 className="h-3 w-3 shrink-0" /> {task.linkedRecord.name}
         </div>
+      )}
+
+      {task.customer && (
+        <Link
+          to={`/workflow/customers/${task.customer.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-1.5 flex items-center gap-1 truncate text-xs text-brand-600 hover:underline"
+        >
+          <Building2 className="h-3 w-3 shrink-0" /> {task.customer.name}
+        </Link>
       )}
 
       <div className="mt-2.5 flex items-center justify-between">
