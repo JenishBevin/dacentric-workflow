@@ -877,7 +877,7 @@ export async function restoreTask(taskId: string, actor: AuthedUser) {
 
   if (!targetStage) {
     targetStage = await prisma.boardStage.findFirst({
-      where: { boardId: ctx.task.boardId, isTerminal: false, name: { not: { equals: "Lost", mode: "insensitive" } } },
+      where: { boardId: ctx.task.boardId, isTerminal: false, NOT: { name: { equals: "Lost", mode: "insensitive" } } },
       orderBy: { position: "asc" },
     });
   }
