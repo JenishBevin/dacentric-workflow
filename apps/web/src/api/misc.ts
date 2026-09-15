@@ -74,7 +74,7 @@ export function useCreateEmployee() {
 export function useUpdateEmployee() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ employeeId, ...payload }: { employeeId: string; fullName?: string; jobTitle?: string | null; departmentId?: string | null; teamIds?: string[]; isActive?: boolean }) =>
+    mutationFn: async ({ employeeId, ...payload }: { employeeId: string; fullName?: string; employeeCode?: string; jobTitle?: string | null; departmentId?: string | null; teamIds?: string[]; isActive?: boolean }) =>
       (await api.patch(`/users/employees/${employeeId}`, payload)).data.data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["all-employees"] });

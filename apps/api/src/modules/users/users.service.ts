@@ -282,11 +282,23 @@ export async function createEmployee(input: CreateEmployeeInput, actor: AuthedUs
 
 export async function updateEmployee(
   employeeId: string,
-  input: { fullName?: string; jobTitle?: string | null; departmentId?: string | null; teamIds?: string[]; isActive?: boolean },
+  input: { fullName?: string; employeeCode?: string; jobTitle?: string | null; departmentId?: string | null; teamIds?: string[]; isActive?: boolean },
   actor: AuthedUser
 ) {
   const existing = await prisma.employee.findUnique({ where: { id: employeeId } });
   if (!existing) throw Errors.notFound("Employee");
+
+  // Changing an existing employee's ID/code is Super Admin only — every
+  // Task/Board/AuditLog reference is by employeeId (uuid), not this code, so
+  // relabeling it can't break anything downstream, but it's still the kind
+  // of identifier change reserved for the top tier, same as a user's email.
+  if (input.employeeCode !== undefined && input.employeeCode !== existing.employeeCode) {
+    if (!actor.roles.includes(RoleCode.SUPER_ADMIN)) {
+      throw Errors.forbidden("Only a Super Admin can change an employee's ID.");
+    }
+    const codeTaken = await prisma.employee.findUnique({ where: { employeeCode: input.employeeCode } });
+    if (codeTaken) throw Errors.conflict("That employee code is already in use.");
+  }
 
   const { teamIds, ...rest } = input;
   const employee = await prisma.employee.update({

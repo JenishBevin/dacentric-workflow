@@ -15,7 +15,7 @@ import { Drawer } from "../../components/ui/Drawer";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
 import { useAuth } from "../../context/AuthContext";
-import { can } from "../../lib/permissions";
+import { can, isSuperAdmin } from "../../lib/permissions";
 
 interface EmployeeRow {
   id: string;
@@ -337,15 +337,30 @@ const EditEmployeeDrawer: React.FC<{
   onError: (message: string) => void;
   onSuccess: () => void;
 }> = ({ employee, onClose, onUpdate, onError, onSuccess }) => {
+  const { user } = useAuth();
+  const canEditCode = isSuperAdmin(user);
   const [fullName, setFullName] = useState(employee.fullName);
+  const [employeeCode, setEmployeeCode] = useState(employee.employeeCode);
   const [jobTitle, setJobTitle] = useState(employee.jobTitle ?? "");
   const [departmentId, setDepartmentId] = useState<string | null>(employee.department?.id ?? null);
   const [teamIds, setTeamIds] = useState<string[]>(employee.teams.map((t) => t.id));
   const [isActive, setIsActive] = useState(employee.isActive);
 
   async function submit() {
+    if (canEditCode && !employeeCode.trim()) {
+      onError("Employee ID is required.");
+      return;
+    }
     try {
-      await onUpdate.mutateAsync({ employeeId: employee.id, fullName: fullName.trim(), jobTitle: jobTitle.trim() || null, departmentId, teamIds, isActive });
+      await onUpdate.mutateAsync({
+        employeeId: employee.id,
+        fullName: fullName.trim(),
+        ...(canEditCode ? { employeeCode: employeeCode.trim() } : {}),
+        jobTitle: jobTitle.trim() || null,
+        departmentId,
+        teamIds,
+        isActive,
+      });
       onSuccess();
       onClose();
     } catch (err) {
@@ -374,6 +389,17 @@ const EditEmployeeDrawer: React.FC<{
         <div>
           <Label required>Full Name</Label>
           <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        </div>
+        <div>
+          <Label required={canEditCode}>Employee ID</Label>
+          {canEditCode ? (
+            <Input value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value)} />
+          ) : (
+            <>
+              <Input value={employeeCode} disabled />
+              <p className="mt-1 text-xs text-slate-400">Only a Super Admin can change an employee's ID.</p>
+            </>
+          )}
         </div>
         <div>
           <Label>Job Title</Label>
