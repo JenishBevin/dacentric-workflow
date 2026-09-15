@@ -425,6 +425,14 @@ export function isSystemLevelAdmin(roles: RoleCode[]): boolean {
   return roles.includes(RoleCode.SYSTEM_ADMIN) || roles.includes(RoleCode.SUPER_ADMIN);
 }
 
+/** Full-database backup/restore is deliberately narrower than the general
+ * "system admin" override above — it bypasses the whole app's data, not
+ * just its access rules, so it stays hardcoded to Super Admin regardless of
+ * how Roles & Permissions gets configured from Settings. */
+export function isSuperAdmin(roles: RoleCode[]): boolean {
+  return roles.includes(RoleCode.SUPER_ADMIN);
+}
+
 const SCOPE_RANK: Record<PermissionScope, number> = { NONE: 0, OWN: 1, TEAM: 2, ALL: 3 };
 
 export function scopeAtLeast(scope: PermissionScope, required: PermissionScope): boolean {

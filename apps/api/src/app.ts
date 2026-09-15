@@ -29,6 +29,7 @@ import { chatRouter } from "./modules/chat/chat.routes";
 import { historyRouter } from "./modules/history/history.routes";
 import { claimsRouter } from "./modules/claims/claims.routes";
 import { customersRouter } from "./modules/customers/customers.routes";
+import { backupRouter } from "./modules/backup/backup.routes";
 
 export function createApp() {
   const app = express();
@@ -73,6 +74,7 @@ export function createApp() {
   app.use("/api/history", historyRouter);
   app.use("/api/claims", claimsRouter);
   app.use("/api/customers", customersRouter);
+  app.use("/api/backup", backupRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

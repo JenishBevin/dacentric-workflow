@@ -188,6 +188,8 @@ export enum AuditAction {
   LOCK = "LOCK",
   ACTIVATE = "ACTIVATE",
   DEACTIVATE = "DEACTIVATE",
+  EXPORT = "EXPORT",
+  IMPORT = "IMPORT",
 }
 
 export const TASK_ID_PREFIX = "WF-";

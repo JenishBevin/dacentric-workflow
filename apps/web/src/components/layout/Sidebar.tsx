@@ -24,11 +24,12 @@ import {
   Package,
   Landmark,
   Truck,
+  DatabaseBackup,
   ChevronDown,
   X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { can } from "../../lib/permissions";
+import { can, isSuperAdmin } from "../../lib/permissions";
 import { useMyTasks, useHrmsLeaveRequests } from "../../api/misc";
 import qplusIcon from "../../assets/qplus-icon.png";
 import { useAllTickets } from "../../api/tickets";
@@ -121,6 +122,10 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
     { to: "/settings/users", label: "Users", icon: UserCog, visible: !isStaff && can(user, "MANAGE_USERS", "ALL") },
     { to: "/settings/roles", label: "Roles & Permissions", icon: Shield, visible: !isStaff && can(user, "MANAGE_ROLES", "ALL") },
     { to: "/settings/notifications", label: "Notifications", icon: Bell, visible: !isStaff },
+    // Hardcoded to the Super Admin role itself, not a configurable
+    // permission — bypasses the app's own access rules, so it can't be
+    // handed out via Roles & Permissions like everything else here.
+    { to: "/settings/backup", label: "Backup & Restore", icon: DatabaseBackup, visible: isSuperAdmin(user) },
   ];
 
   const content = (

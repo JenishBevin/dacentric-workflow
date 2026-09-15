@@ -32,6 +32,7 @@ const RolesSettingsPage = lazy(() => import("./pages/settings/RolesSettingsPage"
 const TagsSettingsPage = lazy(() => import("./pages/settings/TagsSettingsPage"));
 const NotificationSettingsPage = lazy(() => import("./pages/settings/NotificationSettingsPage"));
 const AuditTrailPage = lazy(() => import("./pages/settings/AuditTrailPage"));
+const BackupSettingsPage = lazy(() => import("./pages/settings/BackupSettingsPage"));
 const RequestPage = lazy(() => import("./pages/RequestPage"));
 const TicketsPage = lazy(() => import("./pages/TicketsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
@@ -96,6 +97,7 @@ export default function App() {
           <Route path="/settings/tags" element={<TagsSettingsPage />} />
           <Route path="/settings/notifications" element={<NotificationSettingsPage />} />
           <Route path="/settings/audit" element={<AuditTrailPage />} />
+          <Route path="/settings/backup" element={<BackupSettingsPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

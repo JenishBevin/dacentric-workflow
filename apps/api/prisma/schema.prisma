@@ -874,6 +874,8 @@ enum AuditAction {
   LOCK
   ACTIVATE
   DEACTIVATE
+  EXPORT
+  IMPORT
 }
 
 model AuditLog {
