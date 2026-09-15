@@ -80,7 +80,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.MANAGE_TASK_COLLAB]: "NONE",
     [PermissionKey.VIEW_TEAM_WORKLOAD]: "ALL",
     [PermissionKey.APPROVE_TASK]: "ALL",
-    [PermissionKey.CRM_ERP_LINKING]: "NONE",
+    // Can create/import Customer Master records now that every role has
+    // been granted the CRM module — module access alone was letting them
+    // view Customers with no way to add to it.
+    [PermissionKey.CRM_ERP_LINKING]: "OWN",
     [PermissionKey.EXPORT]: "ALL",
     [PermissionKey.VIEW_AUDIT_TRAIL]: "ALL",
     [PermissionKey.MANAGE_ROLES]: "NONE",
@@ -324,7 +327,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.MANAGE_TASK_COLLAB]: "ALL",
     [PermissionKey.VIEW_TEAM_WORKLOAD]: "TEAM",
     [PermissionKey.APPROVE_TASK]: "OWN",
-    [PermissionKey.CRM_ERP_LINKING]: "NONE",
+    // Can create/import Customer Master records now that every role has
+    // been granted the CRM module — module access alone was letting them
+    // view Customers with no way to add to it.
+    [PermissionKey.CRM_ERP_LINKING]: "OWN",
     [PermissionKey.EXPORT]: "TEAM",
     [PermissionKey.VIEW_AUDIT_TRAIL]: "OWN",
     [PermissionKey.MANAGE_ROLES]: "NONE",
