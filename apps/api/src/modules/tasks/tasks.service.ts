@@ -549,6 +549,14 @@ export async function moveTask(
     await assertDependenciesCleared(taskId);
   }
 
+  // Entering "Lost" or a terminal (Completed) stage from a normal one
+  // remembers where the task came from, so restoreTask() can send it back.
+  // Moving between two historical states (rare) keeps whatever was already
+  // captured; moving to any ordinary stage clears it — it's no longer needed.
+  const enteringHistorical = targetStage.isTerminal || targetStage.name.toLowerCase() === "lost";
+  const wasAlreadyHistorical = ctx.task.isCompleted || ctx.task.stage?.name?.toLowerCase() === "lost";
+  const restoreStageId = enteringHistorical ? (wasAlreadyHistorical ? ctx.task.restoreStageId : ctx.task.stageId) : null;
+
   const updated = await prisma.task.update({
     where: { id: taskId },
     data: {
@@ -557,6 +565,7 @@ export async function moveTask(
       completedAt: targetStage.isTerminal ? new Date() : null,
       approvalStatus: targetStage.isTerminal ? TaskApprovalStatus.APPROVED : ctx.task.approvalStatus,
       isHighlighted: false,
+      restoreStageId,
       version: { increment: 1 },
     },
     include: TASK_DETAIL_INCLUDE as any,
@@ -847,6 +856,71 @@ export async function decideLost(taskId: string, approve: boolean, actor: Authed
   });
 
   return result;
+}
+
+/** Undoes a Lost or Completed task from Project/Task History — sends it back
+ *  to whichever stage it was on right before that happened (restoreStageId,
+ *  captured by moveTask/approveTask), on the same board. Falls back to the
+ *  board's first ordinary stage if that stage no longer exists. */
+export async function restoreTask(taskId: string, actor: AuthedUser) {
+  const ctx = await loadTaskWithAccess(taskId, actor);
+  assertCanEditTask(ctx);
+
+  const isLost = ctx.task.stage?.name?.toLowerCase() === "lost";
+  if (!isLost && !ctx.task.isCompleted) {
+    throw Errors.badRequest("This task is not currently Lost or Completed.");
+  }
+
+  let targetStage = ctx.task.restoreStageId
+    ? await prisma.boardStage.findFirst({ where: { id: ctx.task.restoreStageId, boardId: ctx.task.boardId } })
+    : null;
+
+  if (!targetStage) {
+    targetStage = await prisma.boardStage.findFirst({
+      where: { boardId: ctx.task.boardId, isTerminal: false, name: { not: { equals: "Lost", mode: "insensitive" } } },
+      orderBy: { position: "asc" },
+    });
+  }
+  if (!targetStage) throw Errors.badRequest("This board has no earlier stage to restore this task to.");
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      stageId: targetStage.id,
+      isCompleted: false,
+      completedAt: null,
+      approvalStatus: TaskApprovalStatus.NONE,
+      lostApprovalStatus: TaskApprovalStatus.NONE,
+      lostReason: null,
+      restoreStageId: null,
+      version: { increment: 1 },
+    },
+    include: TASK_DETAIL_INCLUDE as any,
+  });
+
+  await writeAudit({
+    actor,
+    action: AuditAction.MOVE,
+    entityType: "Task",
+    entityId: taskId,
+    boardId: ctx.task.boardId,
+    field: "stage",
+    beforeValue: ctx.task.stage?.name ?? ctx.task.stageId,
+    afterValue: `restored: ${targetStage.name}`,
+  });
+
+  await recordStatusHistory(taskId, targetStage.name, actor, isLost ? "Restored from Lost" : "Restored from Completed");
+
+  const watcherIds = (updated.watchers ?? []).map((w: any) => w.userId);
+  const assigneeIds = (updated.assignees ?? []).map((a: any) => a.userId);
+  await notifyMany([...assigneeIds, ...watcherIds], {
+    event: NotificationEvent.TASK_ACTIVITY,
+    title: `${updated.taskId} was restored to ${targetStage.name}`,
+    taskId,
+    boardId: ctx.task.boardId,
+  });
+
+  return serializeTask(updated);
 }
 
 async function assertDependenciesCleared(taskId: string) {

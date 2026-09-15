@@ -664,6 +664,11 @@ model Task {
   lostApprovalStatus TaskApprovalStatus @default(NONE)
   lostReason         String?            // why the requester believes this enquiry is Lost — shown to the approver
 
+  // The stage this task was on right before it entered "Lost" or a terminal
+  // (Completed) stage — lets restoreTask() send it back where it came from.
+  // Cleared once restored, or once the task is moved to a normal stage.
+  restoreStageId   String?
+
   dependencyEnforced Boolean           @default(true)
 
   isCompleted      Boolean             @default(false)

@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { format, startOfDay, endOfDay, startOfWeek, startOfMonth } from "date-fns";
-import { Download, Archive, Trello, Inbox, ChevronRight } from "lucide-react";
+import { Download, Archive, Trello, Inbox, ChevronRight, RotateCcw } from "lucide-react";
 import { useHistory } from "../api/history";
+import { useRestoreTask } from "../api/tasks";
+import { useSetBoardCompleted } from "../api/boards";
 import { downloadExport } from "../api/misc";
 import { Select, Button, Skeleton, ErrorState, EmptyState, Badge, Label } from "../components/ui/primitives";
 import { useToast } from "../context/ToastContext";
@@ -59,6 +61,28 @@ export default function HistoryPage() {
 
   const { data, isLoading, isError, refetch } = useHistory(filters);
   const rows = data ?? [];
+
+  const restoreTask = useRestoreTask();
+  const setBoardCompleted = useSetBoardCompleted();
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  async function handleRestore(r: any, e: React.MouseEvent) {
+    e.stopPropagation();
+    setRestoringId(r.id);
+    try {
+      if (r.kind === "PROJECT") {
+        await setBoardCompleted.mutateAsync({ boardId: r.id, completed: false });
+        push({ variant: "success", title: "Project restored.", description: `${r.name} is active again.` });
+      } else {
+        await restoreTask.mutateAsync(r.id);
+        push({ variant: "success", title: "Restored.", description: `${r.name} is back where it came from.` });
+      }
+    } catch (err) {
+      push({ variant: "error", title: "Could not restore", description: extractApiError(err).message });
+    } finally {
+      setRestoringId(null);
+    }
+  }
 
   function selectPreset(next: DatePreset) {
     setPreset((p) => (p === next ? null : next));
@@ -205,8 +229,16 @@ export default function HistoryPage() {
                     <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status] ?? r.status}</Badge>
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-500">{format(new Date(r.eventDate), "d MMM yyyy")}</td>
-                  <td className="px-4 py-2.5 text-slate-300">
-                    <ChevronRight className="h-4 w-4" />
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center justify-end gap-2">
+                      {(r.status === "COMPLETED" || r.status === "LOST") && (
+                        <Button variant="outline" size="sm" loading={restoringId === r.id} onClick={(e) => handleRestore(r, e)}>
+                          <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
+                          Restore to {r.kind === "PROJECT" ? "Project" : r.board === "Estimation" ? "Estimation" : "Enquiry"}
+                        </Button>
+                      )}
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                    </div>
                   </td>
                 </tr>
               ))}

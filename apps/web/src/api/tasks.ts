@@ -135,6 +135,19 @@ export function useMarkTaskLost() {
   });
 }
 
+/** Undoes a Lost or Completed enquiry from Project/Task History — sends it
+ * back to whichever stage it was on beforehand, on the same board. */
+export function useRestoreTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (taskId: string) => (await api.post<{ data: TaskSummary }>(`/tasks/${taskId}/restore`)).data.data,
+    onSuccess: (task) => {
+      invalidateTaskEverywhere(qc, task.id, task.boardId);
+      qc.invalidateQueries({ queryKey: ["history"] });
+    },
+  });
+}
+
 /** Management's decision on a pending Lost request (Enquiry List only —
  * see requestLostApproval on the backend). Approving lands the task on the
  * board's Lost stage, same as useMarkTaskLost. */

@@ -170,6 +170,14 @@ tasksRouter.post(
   asyncHandler(async (req, res) => ok(res, await tasksService.decideLost(req.params.taskId, false, req.user!, (req as any).validatedBody.reason)))
 );
 
+// Undoes a Lost or Completed enquiry from Project/Task History, sending it
+// back to whichever stage it was on beforehand.
+tasksRouter.post(
+  "/:taskId/restore",
+  requirePermission(PermissionKey.MOVE_TASK, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await tasksService.restoreTask(req.params.taskId, req.user!)))
+);
+
 tasksRouter.patch(
   "/:taskId/quick-edit",
   validate(quickEditSchema),

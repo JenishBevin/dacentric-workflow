@@ -26,6 +26,9 @@ export async function approveTask(taskId: string, actor: AuthedUser) {
 
   const pendingApproval = await prisma.taskApproval.findFirst({ where: { taskId, decision: null }, orderBy: { requestedAt: "desc" } });
 
+  // previousStageId already holds the stage this task sat on before it
+  // entered "Pending Approval" (set by moveTask's approval gate) — carry
+  // that forward as the restore target, not "Pending Approval" itself.
   const [updatedTask] = await prisma.$transaction([
     prisma.task.update({
       where: { id: taskId },
@@ -34,6 +37,7 @@ export async function approveTask(taskId: string, actor: AuthedUser) {
         isCompleted: true,
         completedAt: new Date(),
         approvalStatus: TaskApprovalStatus.APPROVED,
+        restoreStageId: ctx.task.previousStageId ?? ctx.task.stageId,
         version: { increment: 1 },
       },
     }),

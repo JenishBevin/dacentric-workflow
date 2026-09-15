@@ -340,7 +340,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         title="Mark project as completed"
         message={
           <>
-            <strong>&ldquo;{board.name}&rdquo;</strong> will move to Project/Task History and no longer show up in your active Projects list. You can&apos;t undo this from here.
+            <strong>&ldquo;{board.name}&rdquo;</strong> will move to Project/Task History and no longer show up in your active Projects list. You can restore it from there afterward.
           </>
         }
         confirmLabel="Mark as Completed"
