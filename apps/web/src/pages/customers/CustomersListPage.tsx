@@ -134,18 +134,22 @@ const NewCustomerDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ o
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState("");
   const [country, setCountry] = useState("");
+  const [website, setWebsite] = useState("");
   const [mainContactName, setMainContactName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [alternateContact, setAlternateContact] = useState("");
   const [status, setStatus] = useState<CustomerStatus>("PROSPECT");
 
   function reset() {
     setName("");
     setIndustry("");
     setCountry("");
+    setWebsite("");
     setMainContactName("");
     setEmail("");
     setPhone("");
+    setAlternateContact("");
     setStatus("PROSPECT");
   }
 
@@ -155,7 +159,7 @@ const NewCustomerDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ o
       return;
     }
     try {
-      await createCustomer.mutateAsync({ name: name.trim(), industry, country, mainContactName, email, phone, status });
+      await createCustomer.mutateAsync({ name: name.trim(), industry, country, website, mainContactName, email, phone, alternateContact, status });
       push({ variant: "success", title: "Customer created." });
       reset();
       onClose();
@@ -208,6 +212,10 @@ const NewCustomerDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ o
           </div>
         </div>
         <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Website</label>
+          <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://example.com" />
+        </div>
+        <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Main Contact Person</label>
           <Input value={mainContactName} onChange={(e) => setMainContactName(e.target.value)} />
         </div>
@@ -220,6 +228,10 @@ const NewCustomerDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ o
             <label className="mb-1 block text-sm font-medium text-slate-700">Phone</label>
             <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Alternate Number</label>
+          <Input value={alternateContact} onChange={(e) => setAlternateContact(e.target.value)} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
