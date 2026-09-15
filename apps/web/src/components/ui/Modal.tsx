@@ -21,13 +21,22 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, description,
   // straight to its final state instead of animating in.
   const [entered, setEntered] = useState(false);
 
+  // Callers almost always pass onClose as a fresh inline arrow function, so
+  // it's a new reference on every render — kept out of the effect's deps via
+  // a ref rather than depending on it directly, otherwise a parent re-render
+  // triggered by typing into a field inside this modal would re-run the
+  // effect below and re-focus the dialog container on every keystroke,
+  // stealing focus straight back out of whatever the user just clicked into.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!open) {
       setEntered(false);
       return;
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     }
     document.addEventListener("keydown", onKey);
     ref.current?.focus();
@@ -36,7 +45,7 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, description,
       document.removeEventListener("keydown", onKey);
       cancelAnimationFrame(raf);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
