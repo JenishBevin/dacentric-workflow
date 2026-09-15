@@ -28,7 +28,7 @@ import { useToast } from "../../context/ToastContext";
 import { can, isAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, Award, ThumbsDown } from "lucide-react";
+import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, Award, BadgeCheck, ThumbsDown } from "lucide-react";
 import { format } from "date-fns";
 import clsx from "clsx";
 
@@ -174,7 +174,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                       try {
                         const result = await awardTask.mutateAsync(task.id);
                         if (result.kind === "moved-to-estimation") {
-                          push({ variant: "success", title: "Awarded — moved to Estimation.", description: result.name });
+                          push({ variant: "success", title: "Qualified — moved to Estimation.", description: result.name });
                           onClose();
                           navigate(`/workflow/estimation`);
                         } else {
@@ -183,11 +183,23 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                           navigate(`/workflow/boards/${result.id}`);
                         }
                       } catch (err) {
-                        push({ variant: "error", title: "Could not award", description: extractApiError(err).message });
+                        push({
+                          variant: "error",
+                          title: task.board?.name === "Enquiry List" ? "Could not qualify" : "Could not award",
+                          description: extractApiError(err).message,
+                        });
                       }
                     }}
                   >
-                    <Award className="h-3.5 w-3.5 text-emerald-600" /> Awarded
+                    {task.board?.name === "Enquiry List" ? (
+                      <>
+                        <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Qualified
+                      </>
+                    ) : (
+                      <>
+                        <Award className="h-3.5 w-3.5 text-emerald-600" /> Awarded
+                      </>
+                    )}
                   </Button>
                   <Button
                     variant="outline"

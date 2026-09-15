@@ -601,7 +601,7 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
       metadata: { awarded: true, fromBoardId: sourceBoard.id, toBoardId: estimationBoard.id, toStageId: firstStage.id, estimationId: estimationRecord.estimationId },
     });
 
-    await recordStatusHistory(taskId, firstStage.name, actor, "Awarded to Estimation");
+    await recordStatusHistory(taskId, firstStage.name, actor, "Qualified to Estimation");
 
     return { kind: "moved-to-estimation" as const, id: estimationBoard.id, name: estimationBoard.name };
   }
