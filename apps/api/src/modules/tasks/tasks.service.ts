@@ -71,6 +71,22 @@ async function recordStatusHistory(taskId: string, stageName: string, actor: Aut
   await prisma.taskStatusHistory.create({ data: { taskId, stageName, comment, updatedById: actor.id } });
 }
 
+// The Activity Log should read like a sentence a human wrote, not a diff of
+// database ids — resolve the handful of task fields that store a raw
+// customer/user id into that record's display name before it's audited.
+async function resolveTaskAuditValue(field: string, value: unknown): Promise<unknown> {
+  if (value == null || typeof value !== "string") return value;
+  if (field === "customerId") {
+    const customer = await prisma.customer.findUnique({ where: { id: value }, select: { name: true, customerId: true } });
+    return customer ? `${customer.name} (${customer.customerId})` : value;
+  }
+  if (field === "approverUserId") {
+    const user = await prisma.user.findUnique({ where: { id: value }, select: { name: true } });
+    return user?.name ?? value;
+  }
+  return value;
+}
+
 async function assertActiveWorkflowUsers(userIds: string[]) {
   const users = await prisma.user.findMany({ where: { id: { in: userIds } } });
   if (users.length !== userIds.length) throw Errors.badRequest("One or more selected people could not be found.");
@@ -373,8 +389,8 @@ export async function updateTask(taskId: string, input: Record<string, any>, act
       entityId: taskId,
       boardId: ctx.task.boardId,
       field,
-      beforeValue: (before as any)[field],
-      afterValue: (updated as any)[field],
+      beforeValue: await resolveTaskAuditValue(field, (before as any)[field]),
+      afterValue: await resolveTaskAuditValue(field, (updated as any)[field]),
     });
   }
 
@@ -404,6 +420,9 @@ export async function setAssignees(taskId: string, assigneeUserIds: string[], ac
     prisma.task.update({ where: { id: taskId }, data: { version: { increment: 1 }, isHighlighted: false } }),
   ]);
 
+  const namedUsers = await prisma.user.findMany({ where: { id: { in: [...new Set([...before, ...assigneeUserIds])] } }, select: { id: true, name: true } });
+  const nameOf = (id: string) => namedUsers.find((u) => u.id === id)?.name ?? id;
+
   await writeAudit({
     actor,
     action: AuditAction.ASSIGN,
@@ -411,8 +430,8 @@ export async function setAssignees(taskId: string, assigneeUserIds: string[], ac
     entityId: taskId,
     boardId: ctx.task.boardId,
     field: "assignees",
-    beforeValue: before,
-    afterValue: assigneeUserIds,
+    beforeValue: before.map(nameOf),
+    afterValue: assigneeUserIds.map(nameOf),
   });
 
   const added = assigneeUserIds.filter((id) => !before.includes(id));
@@ -537,8 +556,8 @@ export async function moveTask(taskId: string, targetStageId: string, actor: Aut
     entityId: taskId,
     boardId: ctx.task.boardId,
     field: "stage",
-    beforeValue: ctx.task.stageId,
-    afterValue: targetStageId,
+    beforeValue: ctx.task.stage?.name ?? ctx.task.stageId,
+    afterValue: targetStage.name,
   });
 
   await recordStatusHistory(taskId, targetStage.name, actor);

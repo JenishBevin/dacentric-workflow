@@ -14,12 +14,33 @@ const ACTION_LABEL: Record<string, string> = {
   REJECT: "rejected",
 };
 
+const FIELD_LABEL: Record<string, string> = {
+  customerId: "customer",
+  approverUserId: "approver",
+  assignees: "assignees",
+  stage: "stage",
+  priority: "priority",
+  dueDate: "due date",
+  startDate: "start date",
+  estimatedEffortHours: "estimated effort",
+  dependencyEnforced: "dependency enforcement",
+  requiresApproval: "approval requirement",
+  approvalStatus: "approval status",
+  description: "description",
+  title: "title",
+};
+
+function formatValue(value: unknown): string {
+  if (value == null) return "—";
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "none";
+  return String(value);
+}
+
 function describe(entry: AuditLogItem): string {
   const verb = ACTION_LABEL[entry.action] ?? entry.action.toLowerCase();
   if (entry.field) {
-    const before = entry.beforeValue != null ? String(entry.beforeValue) : "—";
-    const after = entry.afterValue != null ? String(entry.afterValue) : "—";
-    return `${verb} ${entry.field}: ${before} → ${after}`;
+    const label = FIELD_LABEL[entry.field] ?? entry.field;
+    return `${verb} ${label}: ${formatValue(entry.beforeValue)} → ${formatValue(entry.afterValue)}`;
   }
   return verb;
 }
