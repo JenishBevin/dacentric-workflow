@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Flag } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Flag, ThumbsDown } from "lucide-react";
 import { useDashboard, useDashboardTaskList, useTeamWorkload } from "../../api/misc";
 import { useBoards } from "../../api/boards";
 import { Card, Skeleton, ErrorState, Avatar, AvatarGroup, Badge } from "../../components/ui/primitives";
@@ -220,6 +220,22 @@ export default function DashboardManagementPage() {
               className="flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25"
             >
               <ShieldCheck className="h-4 w-4" /> Review Approvals
+            </button>
+          </div>
+
+          {/* Review Lost Projects — Enquiry List "Lost" requests waiting on sign-off */}
+          <div className="flex flex-col gap-4 rounded-xl bg-gradient-to-br from-red-500 to-rose-700 p-5 text-white sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-base font-semibold">Review Lost Projects</p>
+              <p className="text-sm text-white/80">
+                {data.pendingLost > 0 ? `${data.pendingLost} enquiry(ies) requesting to be marked Lost.` : "Nothing waiting on your review right now."}
+              </p>
+            </div>
+            <button
+              onClick={() => setOpenStat("PENDING_LOST")}
+              className="flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25"
+            >
+              <ThumbsDown className="h-4 w-4" /> Review Lost Projects
             </button>
           </div>
 

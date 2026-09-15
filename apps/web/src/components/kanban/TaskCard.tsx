@@ -120,6 +120,7 @@ export const TaskCard: React.FC<Props> = ({ task, onOpen, onMenuAction, dragDisa
           </Badge>
         ))}
         <ApprovalStatusBadge status={task.approvalStatus} />
+        {task.lostApprovalStatus === "PENDING_APPROVAL" && <Badge tone="amber">Pending Lost approval</Badge>}
       </div>
 
       {task.linkedRecord && (

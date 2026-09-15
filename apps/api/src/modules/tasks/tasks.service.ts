@@ -8,7 +8,7 @@ import { loadTaskWithAccess, assertCanEditTask, assertCanDeleteTask } from "./ta
 import { AuthedUser } from "../../middleware/authenticate";
 import { computeDueDateStatus } from "./task-formatting";
 import { formatTaskId, formatProjectId, formatEstimationId, formatEnquiryId, AuditAction, TaskApprovalStatus, TaskType, TaskPriority, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
-import { getPermissionScope, scopeAtLeast } from "../../common/permissions";
+import { getPermissionScope, scopeAtLeast, isSystemLevelAdmin } from "../../common/permissions";
 import { createRecurringSeries, attachTemplateAndScheduleFirst } from "../recurrence/recurrence.service";
 import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard } from "../boards/boards.service";
 import { nextYearlySequence } from "../../common/sequence";
@@ -256,6 +256,8 @@ function serializeTask(task: any) {
     requiresApproval: task.requiresApproval,
     approverUserId: task.approverUserId,
     approvalStatus: task.approvalStatus,
+    lostApprovalStatus: task.lostApprovalStatus,
+    lostReason: task.lostReason,
     dependencyEnforced: task.dependencyEnforced,
     assignees: (task.assignees ?? []).map((a: any) => ({ userId: a.userId, name: a.user?.name, isPrimary: a.isPrimary })),
     watchers: (task.watchers ?? []).map((w: any) => ({ userId: w.userId, name: w.user?.name })),
@@ -690,7 +692,10 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
 /** The "Lost" action on an enquiry — moves it to its board's "Lost" stage
  *  (via the same moveTask() every drag-and-drop move uses, so WIP limits,
  *  approval gates, and notifications all still apply), so it shows up in
- *  Project/Task History as Lost instead of ever becoming a Project. */
+ *  Project/Task History as Lost instead of ever becoming a Project.
+ *
+ *  Called directly for every board except Enquiry List — see
+ *  requestLostApproval() below for the gated path. */
 export async function markTaskLost(taskId: string, actor: AuthedUser) {
   const ctx = await loadTaskWithAccess(taskId, actor);
   const lostStage = await prisma.boardStage.findFirst({
@@ -698,6 +703,135 @@ export async function markTaskLost(taskId: string, actor: AuthedUser) {
   });
   if (!lostStage) throw Errors.badRequest('This board has no "Lost" stage.');
   return moveTask(taskId, lostStage.id, actor);
+}
+
+// Anyone holding Approve Task: All (Management, by default — configurable
+// from Settings -> Roles & Permissions) rather than a single named approver,
+// since a Lost enquiry needs sign-off from management broadly, not one
+// designated person chosen per task.
+async function findLostApproverIds(): Promise<string[]> {
+  const rolePermissions = await prisma.rolePermission.findMany({
+    where: { permission: PermissionKey.APPROVE_TASK, scope: "ALL" },
+    select: { roleId: true },
+  });
+  if (!rolePermissions.length) return [];
+  const users = await prisma.user.findMany({
+    where: { status: "ACTIVE", roles: { some: { roleId: { in: rolePermissions.map((r) => r.roleId) } } } },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
+}
+
+/** The "Lost" action on an Enquiry List task — instead of moving it
+ *  immediately, this flags it as awaiting Management's sign-off; the task
+ *  only actually lands on the "Lost" stage once decideLost() approves it.
+ *  Every other board's Lost button still calls markTaskLost() directly. */
+export async function requestLostApproval(taskId: string, reason: string | undefined, actor: AuthedUser) {
+  const ctx = await loadTaskWithAccess(taskId, actor);
+  assertCanEditTask(ctx);
+
+  if (ctx.task.board?.name !== "Enquiry List") {
+    return markTaskLost(taskId, actor);
+  }
+
+  if (ctx.task.lostApprovalStatus === TaskApprovalStatus.PENDING_APPROVAL) {
+    throw Errors.conflict("A Lost approval request is already pending for this task.");
+  }
+  if (!reason?.trim()) {
+    throw Errors.badRequest("A reason is required to request this enquiry be marked Lost.");
+  }
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: { lostApprovalStatus: TaskApprovalStatus.PENDING_APPROVAL, lostReason: reason.trim(), version: { increment: 1 } },
+    include: TASK_DETAIL_INCLUDE as any,
+  });
+
+  await writeAudit({
+    actor,
+    action: AuditAction.MOVE,
+    entityType: "Task",
+    entityId: taskId,
+    boardId: ctx.task.boardId,
+    field: "lostApprovalStatus",
+    afterValue: `requested: ${reason.trim()} — pending Management approval`,
+  });
+
+  const approverIds = await findLostApproverIds();
+  await notifyMany(approverIds, {
+    event: NotificationEvent.APPROVAL_REQUESTED,
+    title: `${ctx.task.taskId} requests approval to mark Lost`,
+    taskId,
+    boardId: ctx.task.boardId,
+  });
+
+  return serializeTask(updated);
+}
+
+/** Management's decision on a pending Lost request — approving moves the
+ *  task to the Lost stage (via markTaskLost, so it shows up in Project/Task
+ *  History exactly like any other Lost enquiry); rejecting just clears the
+ *  pending flag and leaves the task where it was. */
+export async function decideLost(taskId: string, approve: boolean, actor: AuthedUser, reason?: string) {
+  const ctx = await loadTaskWithAccess(taskId, actor);
+
+  const canDecide = isSystemLevelAdmin(actor.roles) || scopeAtLeast(getPermissionScope(actor.permissions, PermissionKey.APPROVE_TASK), "ALL");
+  if (!canDecide) throw Errors.forbidden("Only Management or an Administrator can approve or reject a Lost request.");
+
+  if (ctx.task.lostApprovalStatus !== TaskApprovalStatus.PENDING_APPROVAL) {
+    throw Errors.badRequest("This task has no pending Lost approval request.");
+  }
+
+  const assigneeIds = ctx.task.assignees.map((a) => a.userId);
+
+  if (!approve) {
+    const updated = await prisma.task.update({
+      where: { id: taskId },
+      data: { lostApprovalStatus: TaskApprovalStatus.NONE, lostReason: null, version: { increment: 1 } },
+      include: TASK_DETAIL_INCLUDE as any,
+    });
+
+    await writeAudit({
+      actor,
+      action: AuditAction.REJECT,
+      entityType: "Task",
+      entityId: taskId,
+      boardId: ctx.task.boardId,
+      field: "lostApprovalStatus",
+      afterValue: reason ? `rejected: ${reason}` : "rejected",
+    });
+
+    await notifyMany(assigneeIds, {
+      event: NotificationEvent.APPROVAL_REJECTED,
+      title: `${ctx.task.taskId}'s Lost request was rejected${reason ? `: ${reason}` : ""}`,
+      taskId,
+      boardId: ctx.task.boardId,
+    });
+
+    return serializeTask(updated);
+  }
+
+  await prisma.task.update({ where: { id: taskId }, data: { lostApprovalStatus: TaskApprovalStatus.APPROVED } });
+  const result = await markTaskLost(taskId, actor);
+
+  await writeAudit({
+    actor,
+    action: AuditAction.APPROVE,
+    entityType: "Task",
+    entityId: taskId,
+    boardId: ctx.task.boardId,
+    field: "lostApprovalStatus",
+    afterValue: "approved",
+  });
+
+  await notifyMany(assigneeIds, {
+    event: NotificationEvent.APPROVAL_APPROVED,
+    title: `${ctx.task.taskId}'s Lost request was approved`,
+    taskId,
+    boardId: ctx.task.boardId,
+  });
+
+  return result;
 }
 
 async function assertDependenciesCleared(taskId: string) {

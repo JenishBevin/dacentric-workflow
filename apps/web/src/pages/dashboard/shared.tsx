@@ -112,7 +112,7 @@ export function DonutCenter({ total }: { total: number }) {
   );
 }
 
-export type StatKind = "TOTAL_OPEN" | "OVERDUE" | "DUE_TODAY" | "DUE_THIS_WEEK" | "COMPLETED_THIS_MONTH" | "PENDING_APPROVAL";
+export type StatKind = "TOTAL_OPEN" | "OVERDUE" | "DUE_TODAY" | "DUE_THIS_WEEK" | "COMPLETED_THIS_MONTH" | "PENDING_APPROVAL" | "PENDING_LOST";
 
 const STAT_MODAL_TITLES: Record<StatKind, { title: string; empty: string }> = {
   TOTAL_OPEN: { title: "Total Open Tasks", empty: "No open tasks." },
@@ -121,6 +121,7 @@ const STAT_MODAL_TITLES: Record<StatKind, { title: string; empty: string }> = {
   DUE_THIS_WEEK: { title: "Due This Week", empty: "Nothing due this week." },
   COMPLETED_THIS_MONTH: { title: "Completed This Month", empty: "Nothing completed yet this month." },
   PENDING_APPROVAL: { title: "Pending Approvals", empty: "Nothing waiting on approval." },
+  PENDING_LOST: { title: "Review Lost Projects", empty: "No Lost requests waiting on your review." },
 };
 
 /** Drill-down list for a clickable dashboard stat card — opens a task on click. */
@@ -156,6 +157,7 @@ export function StatDrillDownModal({ kind, onClose, onOpenTask }: { kind: StatKi
               <div className="min-w-0 flex-1">
                 <span className="mr-1.5 text-xs text-slate-400">{t.taskId}</span>
                 <span className="text-sm font-medium text-slate-800">{t.title}</span>
+                {kind === "PENDING_LOST" && t.lostReason && <p className="mt-0.5 truncate text-xs text-slate-500">"{t.lostReason}"</p>}
               </div>
               <Badge tone="slate">{t.boardName}</Badge>
               {t.assignees.length > 0 && <AvatarGroup names={t.assignees.map((a: any) => a.name)} max={3} />}

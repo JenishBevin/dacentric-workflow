@@ -122,12 +122,30 @@ export function useAwardTask() {
 export function useMarkTaskLost() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (taskId: string) => (await api.post(`/tasks/${taskId}/lost`)).data.data,
-    onSuccess: (task: any, taskId) => {
+    // reason is only actually required server-side for an Enquiry List task
+    // (it starts the approval request there); every other board ignores it
+    // and moves straight to Lost, same as before.
+    mutationFn: async ({ taskId, reason }: { taskId: string; reason?: string }) =>
+      (await api.post(`/tasks/${taskId}/lost`, { reason })).data.data,
+    onSuccess: (task: any, { taskId }) => {
       invalidateTaskEverywhere(qc, taskId, task.boardId);
       qc.invalidateQueries({ queryKey: ["history"] });
     },
   });
+}
+
+/** Management's decision on a pending Lost request (Enquiry List only —
+ * see requestLostApproval on the backend). Approving lands the task on the
+ * board's Lost stage, same as useMarkTaskLost. */
+export function useLostApprovalMutations(taskId: string) {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    invalidateTaskEverywhere(qc, taskId);
+    qc.invalidateQueries({ queryKey: ["history"] });
+  };
+  const approve = useMutation({ mutationFn: async () => api.post(`/tasks/${taskId}/lost/approve`), onSuccess: invalidate });
+  const reject = useMutation({ mutationFn: async (reason: string) => api.post(`/tasks/${taskId}/lost/reject`, { reason }), onSuccess: invalidate });
+  return { approve, reject };
 }
 
 export function useQuickComplete() {

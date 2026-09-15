@@ -20,7 +20,7 @@ import { AttachmentsSection } from "./AttachmentsSection";
 import { DependenciesSection } from "./DependenciesSection";
 import { ActivitySection } from "./ActivitySection";
 import { PriorityBadge, ApprovalStatusBadge } from "../workflow/badges";
-import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask, useAwardTask, useMarkTaskLost } from "../../api/tasks";
+import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask, useAwardTask, useMarkTaskLost, useLostApprovalMutations } from "../../api/tasks";
 import { useBoardDetail } from "../../api/boards";
 import { useTags, useCreateTag } from "../../api/misc";
 import { useAuth } from "../../context/AuthContext";
@@ -56,6 +56,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const watcherMutations = useWatcherMutations(taskId ?? "");
   const setTags = useSetTaskTags(taskId ?? "");
   const { approve, reject } = useApprovalMutations(taskId ?? "");
+  const lostApproval = useLostApprovalMutations(taskId ?? "");
   const duplicateTask = useDuplicateTask();
   const deleteTask = useDeleteTask();
   const awardTask = useAwardTask();
@@ -69,6 +70,10 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const [wipConfirm, setWipConfirm] = useState<{ stageId: string; message: string } | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [lostRejectOpen, setLostRejectOpen] = useState(false);
+  const [lostRejectReason, setLostRejectReason] = useState("");
+  const [lostRequestOpen, setLostRequestOpen] = useState(false);
+  const [lostRequestReason, setLostRequestReason] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -166,57 +171,94 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
             <div className="flex gap-2">
               {(task.board?.name === "Enquiry List" || task.board?.name === "Estimation") && task.stage?.name?.toLowerCase() !== "lost" && (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={awardTask.isPending}
-                    onClick={async () => {
-                      try {
-                        const result = await awardTask.mutateAsync(task.id);
-                        if (result.kind === "moved-to-estimation") {
-                          push({ variant: "success", title: "Qualified — moved to Estimation.", description: result.name });
-                          onClose();
-                          navigate(`/workflow/estimation`);
-                        } else {
-                          push({ variant: "success", title: "Awarded — project created.", description: result.name });
-                          onClose();
-                          navigate(`/workflow/boards/${result.id}`);
-                        }
-                      } catch (err) {
-                        push({
-                          variant: "error",
-                          title: task.board?.name === "Enquiry List" ? "Could not qualify" : "Could not award",
-                          description: extractApiError(err).message,
-                        });
-                      }
-                    }}
-                  >
-                    {task.board?.name === "Enquiry List" ? (
+                  {task.board?.name === "Enquiry List" && task.lostApprovalStatus === "PENDING_APPROVAL" ? (
+                    can(user, "APPROVE_TASK", "ALL") || isAdmin(user) ? (
                       <>
-                        <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Qualified
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          loading={lostApproval.approve.isPending}
+                          onClick={async () => {
+                            try {
+                              await lostApproval.approve.mutateAsync();
+                              push({ variant: "success", title: "Lost request approved.", description: "Moved to Project/Task History." });
+                              onClose();
+                            } catch (err) {
+                              push({ variant: "error", title: "Could not approve", description: extractApiError(err).message });
+                            }
+                          }}
+                        >
+                          <ThumbsDown className="h-3.5 w-3.5 text-red-500" /> Approve Lost
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setLostRejectOpen(true)}>
+                          <XIcon className="h-3.5 w-3.5 text-slate-500" /> Reject
+                        </Button>
                       </>
                     ) : (
-                      <>
-                        <Award className="h-3.5 w-3.5 text-emerald-600" /> Awarded
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={markTaskLost.isPending}
-                    onClick={async () => {
-                      try {
-                        await markTaskLost.mutateAsync(task.id);
-                        push({ variant: "success", title: "Marked as Lost.", description: "Moved to Project/Task History." });
-                        onClose();
-                      } catch (err) {
-                        push({ variant: "error", title: "Could not mark as Lost", description: extractApiError(err).message });
-                      }
-                    }}
-                  >
-                    <ThumbsDown className="h-3.5 w-3.5 text-red-500" /> Lost
-                  </Button>
+                      <Badge tone="amber">Pending Lost approval</Badge>
+                    )
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        loading={awardTask.isPending}
+                        onClick={async () => {
+                          try {
+                            const result = await awardTask.mutateAsync(task.id);
+                            if (result.kind === "moved-to-estimation") {
+                              push({ variant: "success", title: "Qualified — moved to Estimation.", description: result.name });
+                              onClose();
+                              navigate(`/workflow/estimation`);
+                            } else {
+                              push({ variant: "success", title: "Awarded — project created.", description: result.name });
+                              onClose();
+                              navigate(`/workflow/boards/${result.id}`);
+                            }
+                          } catch (err) {
+                            push({
+                              variant: "error",
+                              title: task.board?.name === "Enquiry List" ? "Could not qualify" : "Could not award",
+                              description: extractApiError(err).message,
+                            });
+                          }
+                        }}
+                      >
+                        {task.board?.name === "Enquiry List" ? (
+                          <>
+                            <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Qualified
+                          </>
+                        ) : (
+                          <>
+                            <Award className="h-3.5 w-3.5 text-emerald-600" /> Awarded
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        loading={markTaskLost.isPending}
+                        onClick={async () => {
+                          // Enquiry List needs a reason up front — it's what
+                          // Management reviews when deciding. Every other
+                          // board still moves straight to Lost.
+                          if (task.board?.name === "Enquiry List") {
+                            setLostRequestOpen(true);
+                            return;
+                          }
+                          try {
+                            await markTaskLost.mutateAsync({ taskId: task.id });
+                            push({ variant: "success", title: "Marked as Lost.", description: "Moved to Project/Task History." });
+                            onClose();
+                          } catch (err) {
+                            push({ variant: "error", title: "Could not mark as Lost", description: extractApiError(err).message });
+                          }
+                        }}
+                      >
+                        <ThumbsDown className="h-3.5 w-3.5 text-red-500" /> Lost
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
               <Button
@@ -577,6 +619,90 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
             }}
           >
             Reject task
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={lostRejectOpen}
+        onClose={() => setLostRejectOpen(false)}
+        title="Reject Lost request"
+        description="A reason is required and will be shared with the assignees."
+      >
+        <textarea
+          rows={3}
+          value={lostRejectReason}
+          onChange={(e) => setLostRejectReason(e.target.value)}
+          placeholder="Explain why this shouldn't be marked Lost…"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-visible:focus-ring"
+        />
+        <div className="mt-3 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setLostRejectOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            disabled={!lostRejectReason.trim()}
+            loading={lostApproval.reject.isPending}
+            onClick={async () => {
+              try {
+                await lostApproval.reject.mutateAsync(lostRejectReason.trim());
+                push({ variant: "success", title: "Lost request rejected." });
+                setLostRejectOpen(false);
+                setLostRejectReason("");
+              } catch (err) {
+                push({ variant: "error", title: "Could not reject", description: extractApiError(err).message });
+              }
+            }}
+          >
+            Reject request
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={lostRequestOpen}
+        onClose={() => {
+          setLostRequestOpen(false);
+          setLostRequestReason("");
+        }}
+        title="Mark as Lost"
+        description="A reason is required — this goes to Management for approval before the enquiry actually moves to Lost."
+      >
+        <textarea
+          rows={3}
+          value={lostRequestReason}
+          onChange={(e) => setLostRequestReason(e.target.value)}
+          placeholder="Why is this enquiry Lost?"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-visible:focus-ring"
+        />
+        <div className="mt-3 flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setLostRequestOpen(false);
+              setLostRequestReason("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            disabled={!lostRequestReason.trim()}
+            loading={markTaskLost.isPending}
+            onClick={async () => {
+              if (!task) return;
+              try {
+                await markTaskLost.mutateAsync({ taskId: task.id, reason: lostRequestReason.trim() });
+                push({ variant: "success", title: "Lost approval requested.", description: "Sent to Management for review." });
+                setLostRequestOpen(false);
+                setLostRequestReason("");
+              } catch (err) {
+                push({ variant: "error", title: "Could not request Lost", description: extractApiError(err).message });
+              }
+            }}
+          >
+            Submit request
           </Button>
         </div>
       </Modal>

@@ -657,6 +657,13 @@ model Task {
   approvalStatus   TaskApprovalStatus  @default(NONE)
   previousStageId  String?             // remembered so a rejection returns the task here
 
+  // Marking an Enquiry List task Lost needs sign-off from anyone holding
+  // Approve Task: All (Management, by default) rather than a single named
+  // approver — see requestLostApproval/decideLost in tasks.service.ts. The
+  // task only actually moves to the "Lost" stage once approved.
+  lostApprovalStatus TaskApprovalStatus @default(NONE)
+  lostReason         String?            // why the requester believes this enquiry is Lost — shown to the approver
+
   dependencyEnforced Boolean           @default(true)
 
   isCompleted      Boolean             @default(false)

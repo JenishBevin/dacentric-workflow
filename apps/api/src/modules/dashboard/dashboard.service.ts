@@ -16,7 +16,8 @@ export type DashboardStatKind =
   | "DUE_TODAY"
   | "DUE_THIS_WEEK"
   | "COMPLETED_THIS_MONTH"
-  | "PENDING_APPROVAL";
+  | "PENDING_APPROVAL"
+  | "PENDING_LOST";
 
 function dateWindows() {
   const now = new Date();
@@ -58,6 +59,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     priorityBreakdown,
     statusBreakdown,
     pendingApprovals,
+    pendingLost,
     recentActivity,
   ] = await Promise.all([
     prisma.task.count({ where: { ...baseWhere, isCompleted: false } }),
@@ -73,6 +75,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     prisma.task.groupBy({ by: ["priority"], where: { ...baseWhere, isCompleted: false }, _count: { _all: true } }),
     prisma.task.groupBy({ by: ["stageId"], where: { ...baseWhere }, _count: { _all: true } }),
     prisma.task.count({ where: { ...baseWhere, approvalStatus: "PENDING_APPROVAL" } }),
+    prisma.task.count({ where: { ...baseWhere, lostApprovalStatus: "PENDING_APPROVAL" } }),
     prisma.auditLog.findMany({ where: { boardId: { in: boardIds } }, orderBy: { createdAt: "desc" }, take: 15 }),
   ]);
 
@@ -98,6 +101,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     completedThisMonth,
     activeBoards,
     pendingApprovals,
+    pendingLost,
     priorityDistribution: priorityBreakdown.map((p) => ({ priority: p.priority, count: p._count._all })),
     statusDistribution,
     recentActivity,
@@ -130,6 +134,9 @@ export async function getDashboardTaskList(actor: AuthedUser, kind: DashboardSta
     case "PENDING_APPROVAL":
       where = { ...baseWhere, approvalStatus: "PENDING_APPROVAL" };
       break;
+    case "PENDING_LOST":
+      where = { ...baseWhere, lostApprovalStatus: "PENDING_APPROVAL" };
+      break;
   }
 
   const tasks = await prisma.task.findMany({
@@ -150,6 +157,8 @@ export async function getDashboardTaskList(actor: AuthedUser, kind: DashboardSta
     dueDateStatus: computeDueDateStatus(t.dueDate, t.isCompleted),
     isCompleted: t.isCompleted,
     approvalStatus: t.approvalStatus,
+    lostApprovalStatus: t.lostApprovalStatus,
+    lostReason: t.lostReason,
     assignees: t.assignees.map((a) => ({ userId: a.userId, name: a.user.name })),
   }));
 }

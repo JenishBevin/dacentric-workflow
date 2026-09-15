@@ -25,6 +25,7 @@ import {
   dependencySchema,
   watcherSchema,
   rejectApprovalSchema,
+  requestLostSchema,
 } from "./tasks.schemas";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma";
@@ -144,12 +145,29 @@ tasksRouter.post(
   asyncHandler(async (req, res) => ok(res, await tasksService.awardTask(req.params.taskId, req.user!)))
 );
 
-// Moves an enquiry to its board's "Lost" stage — the "Lost" action on an
-// enquiry, the counterpart to "Awarded".
+// The "Lost" action on an enquiry, the counterpart to "Qualified"/"Awarded".
+// On Enquiry List this only requests Management's sign-off (see the two
+// routes below); every other board still moves straight to "Lost".
 tasksRouter.post(
   "/:taskId/lost",
   requirePermission(PermissionKey.MOVE_TASK, "OWN"),
-  asyncHandler(async (req, res) => ok(res, await tasksService.markTaskLost(req.params.taskId, req.user!)))
+  validate(requestLostSchema),
+  asyncHandler(async (req, res) =>
+    ok(res, await tasksService.requestLostApproval(req.params.taskId, (req as any).validatedBody.reason, req.user!))
+  )
+);
+
+tasksRouter.post(
+  "/:taskId/lost/approve",
+  requirePermission(PermissionKey.APPROVE_TASK, "ALL"),
+  asyncHandler(async (req, res) => ok(res, await tasksService.decideLost(req.params.taskId, true, req.user!)))
+);
+
+tasksRouter.post(
+  "/:taskId/lost/reject",
+  requirePermission(PermissionKey.APPROVE_TASK, "ALL"),
+  validate(rejectApprovalSchema),
+  asyncHandler(async (req, res) => ok(res, await tasksService.decideLost(req.params.taskId, false, req.user!, (req as any).validatedBody.reason)))
 );
 
 tasksRouter.patch(

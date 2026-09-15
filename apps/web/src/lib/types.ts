@@ -245,6 +245,7 @@ export interface TaskSummary {
   requiresApproval: boolean;
   approverUserId?: string | null;
   approvalStatus: TaskApprovalStatus;
+  lostApprovalStatus: TaskApprovalStatus;
   dependencyEnforced: boolean;
   assignees: Array<{ userId: string; name: string; isPrimary: boolean }>;
   watchers: Array<{ userId: string; name: string }>;

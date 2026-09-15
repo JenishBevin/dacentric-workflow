@@ -7,7 +7,7 @@ import { getDashboard, getDashboardTaskList, DashboardStatKind } from "./dashboa
 export const dashboardRouter = Router();
 dashboardRouter.use(authenticate);
 
-const STAT_KINDS: DashboardStatKind[] = ["TOTAL_OPEN", "OVERDUE", "DUE_TODAY", "DUE_THIS_WEEK", "COMPLETED_THIS_MONTH", "PENDING_APPROVAL"];
+const STAT_KINDS: DashboardStatKind[] = ["TOTAL_OPEN", "OVERDUE", "DUE_TODAY", "DUE_THIS_WEEK", "COMPLETED_THIS_MONTH", "PENDING_APPROVAL", "PENDING_LOST"];
 
 dashboardRouter.get(
   "/",

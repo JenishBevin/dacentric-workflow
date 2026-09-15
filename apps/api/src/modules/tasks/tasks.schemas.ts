@@ -116,6 +116,12 @@ export const rejectApprovalSchema = z.object({
   reason: z.string().min(1, "A rejection reason is required."),
 });
 
+// Only actually required when the task is on Enquiry List (checked in
+// requestLostApproval itself) — every other board's Lost action ignores it.
+export const requestLostSchema = z.object({
+  reason: z.string().trim().min(1).optional(),
+});
+
 export const taskFilterSchema = z.object({
   boardId: z.string().uuid().optional(),
   assigneeUserId: z.string().uuid().optional(),
