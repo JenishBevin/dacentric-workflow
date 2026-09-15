@@ -338,24 +338,29 @@ const EditEmployeeDrawer: React.FC<{
   onSuccess: () => void;
 }> = ({ employee, onClose, onUpdate, onError, onSuccess }) => {
   const { user } = useAuth();
-  const canEditCode = isSuperAdmin(user);
+  const isSuper = isSuperAdmin(user);
   const [fullName, setFullName] = useState(employee.fullName);
   const [employeeCode, setEmployeeCode] = useState(employee.employeeCode);
+  const [workEmail, setWorkEmail] = useState(employee.workEmail);
   const [jobTitle, setJobTitle] = useState(employee.jobTitle ?? "");
   const [departmentId, setDepartmentId] = useState<string | null>(employee.department?.id ?? null);
   const [teamIds, setTeamIds] = useState<string[]>(employee.teams.map((t) => t.id));
   const [isActive, setIsActive] = useState(employee.isActive);
 
   async function submit() {
-    if (canEditCode && !employeeCode.trim()) {
+    if (isSuper && !employeeCode.trim()) {
       onError("Employee ID is required.");
+      return;
+    }
+    if (isSuper && !workEmail.trim()) {
+      onError("Work email is required.");
       return;
     }
     try {
       await onUpdate.mutateAsync({
         employeeId: employee.id,
         fullName: fullName.trim(),
-        ...(canEditCode ? { employeeCode: employeeCode.trim() } : {}),
+        ...(isSuper ? { employeeCode: employeeCode.trim(), workEmail: workEmail.trim() } : {}),
         jobTitle: jobTitle.trim() || null,
         departmentId,
         teamIds,
@@ -373,7 +378,7 @@ const EditEmployeeDrawer: React.FC<{
       open
       onClose={onClose}
       title={`Edit ${employee.fullName}`}
-      subtitle={employee.workEmail}
+      subtitle={isSuper ? undefined : employee.workEmail}
       footer={
         <>
           <Button variant="outline" onClick={onClose}>
@@ -391,8 +396,19 @@ const EditEmployeeDrawer: React.FC<{
           <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </div>
         <div>
-          <Label required={canEditCode}>Employee ID</Label>
-          {canEditCode ? (
+          <Label required={isSuper}>Work Email</Label>
+          {isSuper ? (
+            <Input type="email" value={workEmail} onChange={(e) => setWorkEmail(e.target.value)} />
+          ) : (
+            <>
+              <Input value={workEmail} disabled />
+              <p className="mt-1 text-xs text-slate-400">Only a Super Admin can change an employee's work email.</p>
+            </>
+          )}
+        </div>
+        <div>
+          <Label required={isSuper}>Employee ID</Label>
+          {isSuper ? (
             <Input value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value)} />
           ) : (
             <>

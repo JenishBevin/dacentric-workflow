@@ -47,9 +47,11 @@ export const createEmployeeSchema = z.object({
 
 export const updateEmployeeSchema = z.object({
   fullName: z.string().trim().min(1).max(200).optional(),
-  // Changing an existing employee's code is Super Admin only — enforced in
-  // users.service.ts#updateEmployee, not just by this schema.
+  // Changing an existing employee's code or work email is Super Admin
+  // only — enforced in users.service.ts#updateEmployee, not just by this
+  // schema, same tier as changing a User's sign-in email.
   employeeCode: z.string().trim().min(1).max(50).optional(),
+  workEmail: z.string().trim().email("Enter a valid work email.").optional(),
   jobTitle: z.string().trim().max(200).optional().nullable(),
   departmentId: z.string().uuid().optional().nullable(),
   teamIds: z.array(z.string().uuid()).optional(),
