@@ -15,6 +15,8 @@ const ServiceProjectsPage = lazy(() => import("./pages/boards/ServiceProjectsPag
 const BoardKanbanPage = lazy(() => import("./pages/boards/BoardKanbanPage"));
 const EnquiryListPage = lazy(() => import("./pages/boards/EnquiryListPage"));
 const EstimationPage = lazy(() => import("./pages/boards/EstimationPage"));
+const AccountsPage = lazy(() => import("./pages/boards/AccountsPage"));
+const ProcurementListPage = lazy(() => import("./pages/procurement/ProcurementListPage"));
 const MyTasksPage = lazy(() => import("./pages/MyTasksPage"));
 const TeamWorkloadPage = lazy(() => import("./pages/TeamWorkloadPage"));
 const TimeLogsPage = lazy(() => import("./pages/TimeLogsPage"));
@@ -71,6 +73,12 @@ export default function App() {
           <Route path="/workflow/boards/:boardId" element={<BoardKanbanPage />} />
           <Route path="/workflow/enquiries" element={<EnquiryListPage />} />
           <Route path="/workflow/estimation" element={<EstimationPage />} />
+          <Route path="/workflow/accounts" element={<AccountsPage />} />
+          <Route path="/workflow/procurement" element={<ProcurementListPage />} />
+          {/* Same BoardKanbanPage as /workflow/boards/:boardId, just under the
+              Procurement path so the sidebar highlights "Procurement" (NavLink
+              matches by prefix) instead of "Projects" while viewing it. */}
+          <Route path="/workflow/procurement/:boardId" element={<BoardKanbanPage />} />
           <Route path="/workflow/my-tasks" element={<MyTasksPage />} />
           <Route path="/workflow/team" element={<TeamWorkloadPage />} />
           <Route path="/workflow/time-logs" element={<TimeLogsPage />} />

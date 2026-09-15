@@ -170,6 +170,15 @@ tasksRouter.post(
   asyncHandler(async (req, res) => ok(res, await tasksService.decideLost(req.params.taskId, false, req.user!, (req as any).validatedBody.reason)))
 );
 
+// The "Reject" action on an Accounts-board task — Approve reuses the normal
+// /award endpoint (see awardTask's three-stage pipeline in tasks.service.ts).
+tasksRouter.post(
+  "/:taskId/accounts/reject",
+  requirePermission(PermissionKey.MOVE_TASK, "OWN"),
+  validate(rejectApprovalSchema),
+  asyncHandler(async (req, res) => ok(res, await tasksService.rejectAccountsTask(req.params.taskId, (req as any).validatedBody.reason, req.user!)))
+);
+
 // Undoes a Lost or Completed enquiry from Project/Task History, sending it
 // back to whichever stage it was on beforehand.
 tasksRouter.post(

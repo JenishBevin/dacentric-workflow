@@ -13,6 +13,7 @@ import {
   reorderStagesSchema,
   addMemberSchema,
   updateMemberRoleSchema,
+  updateProcurementSchema,
 } from "./boards.schemas";
 import { PermissionKey } from "@dacentric/types";
 
@@ -61,6 +62,22 @@ boardsRouter.get(
 
 // Same ordering requirement as "/enquiry-list" above.
 boardsRouter.get(
+  "/accounts",
+  requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await boardsService.getOrCreateAccountsBoard(req.user!)))
+);
+
+// Every board that has an attached ProcurementRecord — the "Procurement" nav.
+// Must come before "/:boardId" — otherwise Express would capture
+// "procurement" as a boardId path param and never reach this handler.
+boardsRouter.get(
+  "/procurement",
+  requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await boardsService.listProcurementBoards(req.user!, req.query.search as string | undefined)))
+);
+
+// Same ordering requirement as "/enquiry-list" above.
+boardsRouter.get(
   "/services",
   requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
   asyncHandler(async (_req, res) => ok(res, await boardsService.listServices()))
@@ -102,6 +119,20 @@ boardsRouter.post(
   "/:boardId/complete",
   validate(z.object({ completed: z.boolean() })),
   asyncHandler(async (req, res) => ok(res, await boardsService.setBoardCompleted(req.params.boardId, (req as any).validatedBody.completed, req.user!)))
+);
+
+// --- Procurement (see ProcurementRecord — attached once Accounts awards a task) ---
+boardsRouter.get(
+  "/:boardId/procurement",
+  asyncHandler(async (req, res) => ok(res, await boardsService.getProcurementRecord(req.params.boardId, req.user!)))
+);
+
+boardsRouter.patch(
+  "/:boardId/procurement",
+  validate(updateProcurementSchema),
+  asyncHandler(async (req, res) =>
+    ok(res, await boardsService.updateProcurementRecord(req.params.boardId, (req as any).validatedBody, req.user!))
+  )
 );
 
 boardsRouter.delete(

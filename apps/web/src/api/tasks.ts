@@ -99,15 +99,16 @@ export function useMoveTask() {
 }
 
 export interface AwardTaskResult {
-  kind: "moved-to-estimation" | "project-created";
+  kind: "moved-to-estimation" | "moved-to-accounts" | "project-created";
   id: string;
   name: string;
 }
 
-/** "Awarded" is two-stage: from Enquiry List it moves the task onto the
- * Estimation board (no project yet); from Estimation it creates a new
- * Project under the task's Service and moves the task onto it. The `kind`
- * on the result tells the caller which one just happened. */
+/** "Awarded" is a three-stage pipeline: from Enquiry List it moves the task
+ * onto Estimation; from Estimation it moves onto Accounts for sign-off; from
+ * Accounts it creates a new Project (and a ProcurementRecord alongside it)
+ * under the task's Service and moves the task onto it. The `kind` on the
+ * result tells the caller which one just happened. */
 export function useAwardTask() {
   const qc = useQueryClient();
   return useMutation({
@@ -116,6 +117,8 @@ export function useAwardTask() {
       invalidateTaskEverywhere(qc, taskId, result.id);
       qc.invalidateQueries({ queryKey: ["services"] });
       qc.invalidateQueries({ queryKey: ["estimation-board"] });
+      qc.invalidateQueries({ queryKey: ["accounts-board"] });
+      qc.invalidateQueries({ queryKey: ["procurement-boards"] });
     },
   });
 }
@@ -145,6 +148,17 @@ export function useRestoreTask() {
       invalidateTaskEverywhere(qc, task.id, task.boardId);
       qc.invalidateQueries({ queryKey: ["history"] });
     },
+  });
+}
+
+/** The "Reject" action on an Accounts-board task — Approve reuses
+ * useAwardTask() like every other board's Awarded button. */
+export function useRejectAccountsTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, reason }: { taskId: string; reason: string }) =>
+      (await api.post<{ data: TaskSummary }>(`/tasks/${taskId}/accounts/reject`, { reason })).data.data,
+    onSuccess: (task) => invalidateTaskEverywhere(qc, task.id, task.boardId),
   });
 }
 

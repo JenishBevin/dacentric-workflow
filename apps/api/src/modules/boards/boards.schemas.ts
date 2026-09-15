@@ -64,3 +64,27 @@ export const addMemberSchema = z.object({
 export const updateMemberRoleSchema = z.object({
   role: z.enum(["OWNER", "EDITOR", "VIEWER", "COMMENTER"]),
 });
+
+const isoDate = z.coerce.date();
+
+export const updateProcurementSchema = z.object({
+  vendorName: z.string().max(200).optional().nullable(),
+  vendorContact: z.string().max(200).optional().nullable(),
+  vendorAddress: z.string().max(500).optional().nullable(),
+  poNumber: z.string().max(100).optional().nullable(),
+  orderDate: isoDate.optional().nullable(),
+  lineItems: z
+    .array(
+      z.object({
+        description: z.string().min(1).max(300),
+        quantity: z.number().nonnegative(),
+        unitCost: z.number().nonnegative(),
+      })
+    )
+    .optional()
+    .nullable(),
+  expectedDeliveryDate: isoDate.optional().nullable(),
+  actualDeliveryDate: isoDate.optional().nullable(),
+  status: z.enum(["PENDING", "ORDERED", "DELIVERED", "CANCELLED"]).optional(),
+  notes: z.string().max(4000).optional().nullable(),
+});

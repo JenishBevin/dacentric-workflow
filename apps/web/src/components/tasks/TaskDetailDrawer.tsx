@@ -20,7 +20,7 @@ import { AttachmentsSection } from "./AttachmentsSection";
 import { DependenciesSection } from "./DependenciesSection";
 import { ActivitySection } from "./ActivitySection";
 import { PriorityBadge, ApprovalStatusBadge } from "../workflow/badges";
-import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask, useAwardTask, useMarkTaskLost, useLostApprovalMutations } from "../../api/tasks";
+import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask, useAwardTask, useMarkTaskLost, useLostApprovalMutations, useRejectAccountsTask } from "../../api/tasks";
 import { useBoardDetail } from "../../api/boards";
 import { useTags, useCreateTag } from "../../api/misc";
 import { useAuth } from "../../context/AuthContext";
@@ -61,6 +61,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const deleteTask = useDeleteTask();
   const awardTask = useAwardTask();
   const markTaskLost = useMarkTaskLost();
+  const rejectAccountsTask = useRejectAccountsTask();
   const { data: allTags } = useTags();
   const createTag = useCreateTag();
 
@@ -74,6 +75,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const [lostRejectReason, setLostRejectReason] = useState("");
   const [lostRequestOpen, setLostRequestOpen] = useState(false);
   const [lostRequestReason, setLostRequestReason] = useState("");
+  const [accountsRejectOpen, setAccountsRejectOpen] = useState(false);
+  const [accountsRejectReason, setAccountsRejectReason] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -169,7 +172,9 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         task && (
           <div className="flex w-full items-center justify-between">
             <div className="flex gap-2">
-              {(task.board?.name === "Enquiry List" || task.board?.name === "Estimation") && task.stage?.name?.toLowerCase() !== "lost" && (
+              {(task.board?.name === "Enquiry List" || task.board?.name === "Estimation" || task.board?.name === "Accounts") &&
+                task.stage?.name?.toLowerCase() !== "lost" &&
+                task.stage?.name?.toLowerCase() !== "rejected" && (
                 <>
                   {task.board?.name === "Enquiry List" && task.lostApprovalStatus === "PENDING_APPROVAL" ? (
                     can(user, "APPROVE_TASK", "ALL") || isAdmin(user) ? (
@@ -210,15 +215,20 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                               push({ variant: "success", title: "Qualified — moved to Estimation.", description: result.name });
                               onClose();
                               navigate(`/workflow/estimation`);
+                            } else if (result.kind === "moved-to-accounts") {
+                              push({ variant: "success", title: "Awarded — sent to Accounts.", description: result.name });
+                              onClose();
+                              navigate(`/workflow/accounts`);
                             } else {
-                              push({ variant: "success", title: "Awarded — project created.", description: result.name });
+                              push({ variant: "success", title: "Approved — project and procurement created.", description: result.name });
                               onClose();
                               navigate(`/workflow/boards/${result.id}`);
                             }
                           } catch (err) {
                             push({
                               variant: "error",
-                              title: task.board?.name === "Enquiry List" ? "Could not qualify" : "Could not award",
+                              title:
+                                task.board?.name === "Enquiry List" ? "Could not qualify" : task.board?.name === "Accounts" ? "Could not approve" : "Could not award",
                               description: extractApiError(err).message,
                             });
                           }
@@ -227,6 +237,10 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                         {task.board?.name === "Enquiry List" ? (
                           <>
                             <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Qualified
+                          </>
+                        ) : task.board?.name === "Accounts" ? (
+                          <>
+                            <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Approve
                           </>
                         ) : (
                           <>
@@ -240,10 +254,17 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                         loading={markTaskLost.isPending}
                         onClick={async () => {
                           // Enquiry List needs a reason up front — it's what
-                          // Management reviews when deciding. Every other
-                          // board still moves straight to Lost.
+                          // Management reviews when deciding. Accounts also
+                          // needs a reason, recorded directly (no approval
+                          // chain of its own — Accounts sign-off IS the
+                          // approval). Every other board moves straight to
+                          // Lost.
                           if (task.board?.name === "Enquiry List") {
                             setLostRequestOpen(true);
+                            return;
+                          }
+                          if (task.board?.name === "Accounts") {
+                            setAccountsRejectOpen(true);
                             return;
                           }
                           try {
@@ -255,7 +276,15 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                           }
                         }}
                       >
-                        <ThumbsDown className="h-3.5 w-3.5 text-red-500" /> Lost
+                        {task.board?.name === "Accounts" ? (
+                          <>
+                            <XIcon className="h-3.5 w-3.5 text-red-500" /> Reject
+                          </>
+                        ) : (
+                          <>
+                            <ThumbsDown className="h-3.5 w-3.5 text-red-500" /> Lost
+                          </>
+                        )}
                       </Button>
                     </>
                   )}
@@ -703,6 +732,54 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
             }}
           >
             Submit request
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={accountsRejectOpen}
+        onClose={() => {
+          setAccountsRejectOpen(false);
+          setAccountsRejectReason("");
+        }}
+        title="Reject this task"
+        description="A reason is required and will be recorded on the task's activity log."
+      >
+        <textarea
+          rows={3}
+          value={accountsRejectReason}
+          onChange={(e) => setAccountsRejectReason(e.target.value)}
+          placeholder="Why is Accounts rejecting this?"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-visible:focus-ring"
+        />
+        <div className="mt-3 flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setAccountsRejectOpen(false);
+              setAccountsRejectReason("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            disabled={!accountsRejectReason.trim()}
+            loading={rejectAccountsTask.isPending}
+            onClick={async () => {
+              if (!task) return;
+              try {
+                await rejectAccountsTask.mutateAsync({ taskId: task.id, reason: accountsRejectReason.trim() });
+                push({ variant: "success", title: "Task rejected." });
+                setAccountsRejectOpen(false);
+                setAccountsRejectReason("");
+                onClose();
+              } catch (err) {
+                push({ variant: "error", title: "Could not reject task", description: extractApiError(err).message });
+              }
+            }}
+          >
+            Reject task
           </Button>
         </div>
       </Modal>

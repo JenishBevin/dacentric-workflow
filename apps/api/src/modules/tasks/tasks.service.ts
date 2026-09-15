@@ -7,10 +7,10 @@ import { sanitizeDescription } from "../../common/richtext";
 import { loadTaskWithAccess, assertCanEditTask, assertCanDeleteTask } from "./task-access";
 import { AuthedUser } from "../../middleware/authenticate";
 import { computeDueDateStatus } from "./task-formatting";
-import { formatTaskId, formatProjectId, formatEstimationId, formatEnquiryId, AuditAction, TaskApprovalStatus, TaskType, TaskPriority, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
+import { formatTaskId, formatProjectId, formatEstimationId, formatEnquiryId, formatProcurementId, AuditAction, TaskApprovalStatus, TaskType, TaskPriority, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
 import { getPermissionScope, scopeAtLeast, isSystemLevelAdmin } from "../../common/permissions";
 import { createRecurringSeries, attachTemplateAndScheduleFirst } from "../recurrence/recurrence.service";
-import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard } from "../boards/boards.service";
+import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard, getOrCreateAccountsBoard, ACCOUNTS_BOARD_NAME } from "../boards/boards.service";
 import { nextYearlySequence } from "../../common/sequence";
 
 export interface CreateTaskInput {
@@ -597,16 +597,22 @@ export async function moveTask(
 }
 
 // ---------------------------------------------------------------------------
-// Awarded — a two-stage pipeline:
+// Awarded — a three-stage pipeline:
 //   1. An Enquiry List task Awarded lands on the (lazily-provisioned)
 //      Estimation board instead of becoming a Project directly — no board is
 //      created yet, the task just moves and gets highlighted there.
-//   2. An Estimation-board task Awarded is what actually spins up a real
-//      Project (under the task's chosen Service, if any) and moves the task
-//      onto it, landing in the new project's first stage, highlighted.
+//   2. An Estimation-board task Awarded (Qualified) moves onto the
+//      (lazily-provisioned) Accounts board for sign-off — still no Project
+//      yet.
+//   3. An Accounts-board task Awarded is what actually spins up a real
+//      Project (under the task's chosen Service, if any) AND a
+//      ProcurementRecord for it in the same transaction, moving the task
+//      onto the new Project's first stage, highlighted. From here on the
+//      same task/board is reachable from both Projects and Procurement,
+//      switched with the toggle on the Project board.
 // Every other write only ever moves a task between stages of the SAME
 // board — this is the one path that reassigns a task's boardId, and it does
-// so at either of the two hand-off points above.
+// so at each of the three hand-off points above.
 // ---------------------------------------------------------------------------
 
 export async function awardTask(taskId: string, actor: AuthedUser) {
@@ -618,7 +624,7 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
 
   const sourceBoard = await prisma.board.findUniqueOrThrow({ where: { id: ctx.task.boardId } });
 
-  if (sourceBoard.name !== ESTIMATION_BOARD_NAME) {
+  if (sourceBoard.name !== ESTIMATION_BOARD_NAME && sourceBoard.name !== ACCOUNTS_BOARD_NAME) {
     // Stage 1: move onto Estimation — no Project exists yet.
     const estimationStub = await getOrCreateEstimationBoard(actor);
     const estimationBoard = await prisma.board.findUniqueOrThrow({
@@ -647,7 +653,36 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
     return { kind: "moved-to-estimation" as const, id: estimationBoard.id, name: estimationBoard.name };
   }
 
-  // Stage 2: spin up the real Project.
+  if (sourceBoard.name === ESTIMATION_BOARD_NAME) {
+    // Stage 2: move onto Accounts for sign-off — no Project exists yet.
+    const accountsStub = await getOrCreateAccountsBoard(actor);
+    const accountsBoard = await prisma.board.findUniqueOrThrow({
+      where: { id: accountsStub.id },
+      include: { stages: { orderBy: { position: "asc" } } },
+    });
+    const firstStage = accountsBoard.stages[0];
+
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { boardId: accountsBoard.id, stageId: firstStage.id, isHighlighted: true, version: { increment: 1 } },
+    });
+
+    await writeAudit({
+      actor,
+      action: AuditAction.MOVE,
+      entityType: "Task",
+      entityId: taskId,
+      boardId: accountsBoard.id,
+      metadata: { awarded: true, fromBoardId: sourceBoard.id, toBoardId: accountsBoard.id, toStageId: firstStage.id },
+    });
+
+    await recordStatusHistory(taskId, firstStage.name, actor, "Qualified to Accounts");
+
+    return { kind: "moved-to-accounts" as const, id: accountsBoard.id, name: accountsBoard.name };
+  }
+
+  // Stage 3: Accounts awarded — spin up the real Project and its
+  // ProcurementRecord together, so the two are never out of sync.
   const { board: newBoard, firstStageId } = await prisma.$transaction(async (tx) => {
     const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
     const created = await tx.board.create({
@@ -682,6 +717,12 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
     await tx.task.update({
       where: { id: taskId },
       data: { boardId: board.id, stageId: board.stages[0].id, isHighlighted: true, version: { increment: 1 } },
+    });
+
+    const procurementYear = new Date().getFullYear();
+    const procurementSequence = await nextYearlySequence("PROCUREMENT", procurementYear, tx);
+    await tx.procurementRecord.create({
+      data: { boardId: board.id, year: procurementYear, sequence: procurementSequence, procurementId: formatProcurementId(procurementYear, procurementSequence) },
     });
 
     return { board, firstStageId: board.stages[0].id };
@@ -723,6 +764,35 @@ export async function markTaskLost(taskId: string, actor: AuthedUser, skipEditCh
   });
   if (!lostStage) throw Errors.badRequest('This board has no "Lost" stage.');
   return moveTask(taskId, lostStage.id, actor, false, undefined, skipEditCheck);
+}
+
+/** The "Reject" action on an Accounts-board task — Accounts sign-off is a
+ *  direct approve/reject, not a multi-person approval chain (Approve just
+ *  calls awardTask() like every other board's Awarded button), so this only
+ *  needs to move the task to Accounts' "Rejected" stage and record why. */
+export async function rejectAccountsTask(taskId: string, reason: string, actor: AuthedUser) {
+  const ctx = await loadTaskWithAccess(taskId, actor);
+  if (ctx.task.board?.name !== ACCOUNTS_BOARD_NAME) {
+    throw Errors.badRequest("This action is only available on the Accounts board.");
+  }
+  const rejectedStage = await prisma.boardStage.findFirst({
+    where: { boardId: ctx.task.boardId, name: { equals: "Rejected", mode: "insensitive" } },
+  });
+  if (!rejectedStage) throw Errors.badRequest('This board has no "Rejected" stage.');
+
+  const result = await moveTask(taskId, rejectedStage.id, actor);
+
+  await writeAudit({
+    actor,
+    action: AuditAction.REJECT,
+    entityType: "Task",
+    entityId: taskId,
+    boardId: ctx.task.boardId,
+    field: "accountsApproval",
+    afterValue: reason,
+  });
+
+  return result;
 }
 
 // Anyone holding Approve Task: All (Management, by default — configurable

@@ -119,6 +119,13 @@ export enum TaskApprovalStatus {
   REJECTED = "REJECTED",
 }
 
+export enum ProcurementStatus {
+  PENDING = "PENDING",
+  ORDERED = "ORDERED",
+  DELIVERED = "DELIVERED",
+  CANCELLED = "CANCELLED",
+}
+
 export enum TaskType {
   STANDARD = "STANDARD",
   RECURRING_INSTANCE = "RECURRING_INSTANCE",
@@ -218,6 +225,10 @@ export function formatEstimationId(year: number, sequence: number): string {
 
 export function formatEnquiryId(year: number, sequence: number): string {
   return formatQptsId("ENQ", year, sequence);
+}
+
+export function formatProcurementId(year: number, sequence: number): string {
+  return formatQptsId("PROC", year, sequence);
 }
 
 // Customer IDs are permanent — unlike the QPTS ids above, they never reset

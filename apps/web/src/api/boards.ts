@@ -45,6 +45,64 @@ export function useEstimationBoard() {
   });
 }
 
+/** Same lazy-provisioning pattern, for the Accounts board that sits between
+ * Estimation and Projects. */
+export function useAccountsBoard() {
+  return useQuery({
+    queryKey: ["accounts-board"],
+    queryFn: async () => (await api.get<{ data: { id: string; name: string } }>("/boards/accounts")).data.data,
+    retry: false,
+  });
+}
+
+export interface ProcurementRecord {
+  id: string;
+  boardId: string;
+  procurementId: string;
+  vendorName: string | null;
+  vendorContact: string | null;
+  vendorAddress: string | null;
+  poNumber: string | null;
+  orderDate: string | null;
+  lineItems: Array<{ description: string; quantity: number; unitCost: number }> | null;
+  expectedDeliveryDate: string | null;
+  actualDeliveryDate: string | null;
+  status: "PENDING" | "ORDERED" | "DELIVERED" | "CANCELLED";
+  notes: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+
+/** Every Project board that has been awarded from Accounts — the
+ * "Procurement" nav lists these. */
+export function useProcurementBoards(search?: string) {
+  return useQuery({
+    queryKey: ["procurement-boards", search],
+    queryFn: async () => (await api.get("/boards/procurement", { params: { search: search || undefined } })).data.data,
+  });
+}
+
+export function useProcurementRecord(boardId: string | undefined) {
+  return useQuery({
+    queryKey: ["procurement", boardId],
+    queryFn: async () => (await api.get<{ data: ProcurementRecord }>(`/boards/${boardId}/procurement`)).data.data,
+    enabled: !!boardId,
+    retry: false,
+  });
+}
+
+export function useUpdateProcurementRecord(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: Partial<ProcurementRecord>) => (await api.patch<{ data: ProcurementRecord }>(`/boards/${boardId}/procurement`, payload)).data.data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["procurement", boardId] });
+      qc.invalidateQueries({ queryKey: ["procurement-boards"] });
+      qc.invalidateQueries({ queryKey: ["board", boardId] });
+    },
+  });
+}
+
 export interface Service {
   id: string;
   name: string;

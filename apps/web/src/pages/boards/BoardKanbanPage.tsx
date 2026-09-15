@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload } from "lucide-react";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload, Trello, PackageSearch } from "lucide-react";
 import { useBoardDetail, useReorderStages, useSetBoardCompleted } from "../../api/boards";
 import { useBoardTasks, useDuplicateTask, useDeleteTask, useImportEnquiries } from "../../api/tasks";
 import { downloadExport } from "../../api/misc";
@@ -10,6 +10,7 @@ import { TaskListView } from "../../components/kanban/TaskListView";
 import { NewTaskDrawer } from "../../components/kanban/NewTaskDrawer";
 import { TaskDetailDrawer } from "../../components/tasks/TaskDetailDrawer";
 import { BoardSettingsDrawer } from "../../components/boards/BoardSettingsDrawer";
+import { ProcurementPanel } from "../../components/procurement/ProcurementPanel";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Button, Skeleton, ErrorState, Badge } from "../../components/ui/primitives";
 import { useToast } from "../../context/ToastContext";
@@ -51,6 +52,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   const { boardId: boardIdParam } = useParams<{ boardId: string }>();
   const boardId = boardIdProp ?? boardIdParam;
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { push } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -72,6 +74,20 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   // by whether this page was handed an explicit boardId prop), not on every
   // ordinary project board.
   const [view, setView] = useState<"kanban" | "list">("kanban");
+  // Project/Procurement toggle — only relevant once this board has a
+  // ProcurementRecord (awarded from Accounts). Driven by the URL path
+  // itself (not local state), so the sidebar highlight ("Projects" vs
+  // "Procurement", NavLink matches by prefix) always agrees with what's on
+  // screen: the Procurement list links here via /workflow/procurement/:id,
+  // everywhere else (Projects list, awardTask, etc.) via
+  // /workflow/boards/:id. It only changes when the toggle button itself is
+  // clicked — never as a side effect of just opening the page.
+  const panelView: "project" | "procurement" = boardIdProp ? "project" : location.pathname.startsWith("/workflow/procurement/") ? "procurement" : "project";
+  function setPanel(next: "project" | "procurement") {
+    if (next === panelView || !boardId) return;
+    const base = next === "procurement" ? "/workflow/procurement" : "/workflow/boards";
+    navigate({ pathname: `${base}/${boardId}`, search: searchParams.toString() ? `?${searchParams.toString()}` : "" }, { replace: true });
+  }
 
   const reorderStages = useReorderStages(boardId ?? "");
   const duplicateTask = useDuplicateTask();
@@ -205,7 +221,11 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {!boardIdProp && (
-            <button onClick={() => navigate("/workflow/boards")} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Back to projects">
+            <button
+              onClick={() => navigate(panelView === "procurement" ? "/workflow/procurement" : "/workflow/boards")}
+              className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              aria-label={panelView === "procurement" ? "Back to Procurement" : "Back to projects"}
+            >
               <ArrowLeft className="h-4 w-4" />
             </button>
           )}
@@ -219,7 +239,23 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
           {board.isArchived && <Badge tone="slate">Archived</Badge>}
         </div>
         <div className="flex items-center gap-2">
-          {boardIdProp && (
+          {board.procurementRecord && (
+            <div className="flex rounded-lg border border-slate-300 p-0.5">
+              <button
+                onClick={() => setPanel("project")}
+                className={clsx("flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium", panelView === "project" ? "bg-brand-600 text-white" : "text-slate-500")}
+              >
+                <Trello className="h-3.5 w-3.5" /> Project
+              </button>
+              <button
+                onClick={() => setPanel("procurement")}
+                className={clsx("flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium", panelView === "procurement" ? "bg-brand-600 text-white" : "text-slate-500")}
+              >
+                <PackageSearch className="h-3.5 w-3.5" /> Procurement
+              </button>
+            </div>
+          )}
+          {boardIdProp && panelView === "project" && (
             <div className="flex rounded-lg border border-slate-300 p-0.5">
               <button
                 onClick={() => setView("list")}
@@ -235,7 +271,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
               </button>
             </div>
           )}
-          {canCreateTask && !board.isArchived && board.name === "Enquiry List" && (
+          {panelView === "project" && canCreateTask && !board.isArchived && board.name === "Enquiry List" && (
             <>
               <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportEnquiriesFile} />
               <Button variant="outline" onClick={() => importFileInputRef.current?.click()} loading={importEnquiries.isPending}>
@@ -243,7 +279,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
               </Button>
             </>
           )}
-          {canCreateTask && !board.isArchived && (
+          {panelView === "project" && canCreateTask && !board.isArchived && (
             <Button onClick={() => { setRecurringPrefill(null); setNewTaskStageId(stages[0]?.id ?? null); }} disabled={stages.length === 0}>
               Add Task
             </Button>
@@ -251,6 +287,10 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         </div>
       </div>
 
+      {panelView === "procurement" ? (
+        <ProcurementPanel boardId={boardId!} />
+      ) : (
+        <>
       <KanbanToolbar
         board={board}
         employees={board.members.map((m: any) => ({ employeeId: m.userId, userId: m.userId, name: m.name, email: "" }))}
@@ -287,13 +327,15 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         />
       )}
 
-      {canManageBoard && board.name !== "Enquiry List" && board.name !== "Estimation" && !board.isCompleted && (
+      {canManageBoard && board.name !== "Enquiry List" && board.name !== "Estimation" && board.name !== "Accounts" && !board.isCompleted && (
         <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
           <p className="text-xs text-slate-500">Once every task on this project is done, mark it Completed to move it into Project/Task History.</p>
           <Button variant="outline" size="sm" onClick={() => setConfirmComplete(true)}>
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Mark as Completed
           </Button>
         </div>
+      )}
+        </>
       )}
 
       {newTaskStageId && (

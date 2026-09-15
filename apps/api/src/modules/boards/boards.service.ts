@@ -131,6 +131,7 @@ export async function getBoardDetail(boardId: string, user: AuthedUser) {
       linkedRecord: true,
       customer: { select: { id: true, customerId: true, name: true } },
       tags: { include: { tag: true } },
+      procurementRecord: true,
     },
   });
   if (!board || board.isDeleted) throw Errors.notFound("Board");
@@ -310,6 +311,29 @@ export async function getOrCreateEstimationBoard(actor: AuthedUser) {
     ESTIMATION_BOARD_NAME,
     "Costing and quoting for awarded enquiries — and anything estimated directly, without an enquiry first.",
     ESTIMATION_STAGES,
+    actor
+  );
+  return { id: board.id, name: board.name };
+}
+
+// Sits between Estimation and Projects: a Qualified/Awarded Estimation task
+// lands here first for Accounts sign-off — a flat list, not a Kanban board
+// (no stages are shown to the user; Pending/Rejected only exist so the
+// existing move/audit/history machinery has somewhere to put it). Approving
+// it (see awardTask()) both spins up the real Project and creates its
+// ProcurementRecord in the same step; rejecting moves it to "Rejected" and
+// ends its pipeline there.
+export const ACCOUNTS_BOARD_NAME = "Accounts";
+const ACCOUNTS_STAGES = [
+  { name: "Pending", color: "#60a5fa", isTerminal: false },
+  { name: "Rejected", color: "#ef4444", isTerminal: true },
+];
+
+export async function getOrCreateAccountsBoard(actor: AuthedUser) {
+  const board = await getOrCreateNamedBoard(
+    ACCOUNTS_BOARD_NAME,
+    "Accounts sign-off for Qualified estimations — approving hands a task to Procurement and Projects at once.",
+    ACCOUNTS_STAGES,
     actor
   );
   return { id: board.id, name: board.name };
@@ -633,4 +657,85 @@ export async function saveAsTemplate(boardId: string, name: string, actor: Authe
     },
   });
   return template;
+}
+
+// ---------------------------------------------------------------------------
+// Procurement — attached to a Project board once Accounts awards it (see
+// awardTask() in tasks.service.ts, which creates the ProcurementRecord in
+// the same transaction as the Project board itself). Manually filled in by
+// whoever handles procurement; the "Procurement" nav lists every board that
+// has one, and the Project board itself shows/edits it behind the
+// Project/Procurement toggle.
+// ---------------------------------------------------------------------------
+
+export async function listProcurementBoards(user: AuthedUser, search?: string) {
+  const boards = await prisma.board.findMany({
+    where: {
+      ...visibleBoardsWhere(user),
+      isDeleted: false,
+      procurementRecord: { isNot: null },
+      ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
+    },
+    include: { procurementRecord: true, service: true, customer: { select: { id: true, customerId: true, name: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  return boards.map((b) => ({
+    id: b.id,
+    boardId: b.boardId,
+    name: b.name,
+    service: b.service?.name ?? null,
+    customer: b.customer,
+    isCompleted: b.isCompleted,
+    procurement: b.procurementRecord,
+  }));
+}
+
+export async function getProcurementRecord(boardId: string, user: AuthedUser) {
+  await assertBoardVisible(boardId, user);
+  const record = await prisma.procurementRecord.findUnique({ where: { boardId } });
+  if (!record) throw Errors.notFound("Procurement record");
+  return record;
+}
+
+export interface UpdateProcurementInput {
+  vendorName?: string | null;
+  vendorContact?: string | null;
+  vendorAddress?: string | null;
+  poNumber?: string | null;
+  orderDate?: Date | null;
+  lineItems?: Array<{ description: string; quantity: number; unitCost: number }> | null;
+  expectedDeliveryDate?: Date | null;
+  actualDeliveryDate?: Date | null;
+  status?: "PENDING" | "ORDERED" | "DELIVERED" | "CANCELLED";
+  notes?: string | null;
+}
+
+export async function updateProcurementRecord(boardId: string, input: UpdateProcurementInput, actor: AuthedUser) {
+  const role = await assertBoardVisible(boardId, actor);
+  assertCanEditBoard(role);
+
+  const existing = await prisma.procurementRecord.findUnique({ where: { boardId } });
+  if (!existing) throw Errors.notFound("Procurement record");
+
+  const { lineItems, ...rest } = input;
+  const updated = await prisma.procurementRecord.update({
+    where: { boardId },
+    data: {
+      ...rest,
+      ...(lineItems !== undefined ? { lineItems: lineItems as any } : {}),
+      updatedById: actor.id,
+    },
+  });
+
+  await writeAudit({
+    actor,
+    action: AuditAction.EDIT,
+    entityType: "Board",
+    entityId: boardId,
+    boardId,
+    field: "procurement",
+    afterValue: { status: updated.status },
+  });
+
+  return updated;
 }

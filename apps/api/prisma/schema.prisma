@@ -363,6 +363,7 @@ model Board {
   members   BoardMember[]
   tasks     Task[]
   tags      TagOnBoard[]
+  procurementRecord ProcurementRecord?
 
   @@index([boardType])
   @@index([linkedRecordId])
@@ -984,6 +985,47 @@ model EnquiryRecord {
   sequence  Int
   enquiryId String   @unique // formatted QPTS-ENQ-2026-0001, from year + sequence (resets each year)
   createdAt DateTime @default(now())
+}
+
+// Attached to a real Project Board (not a Task — unlike EstimationRecord/
+// EnquiryRecord, which precede a board existing at all) the moment Accounts
+// awards it: created once, in the same transaction as the Project board
+// itself (see awardTask()), and manually filled in afterward from the
+// Procurement page. Its data is independent of the board's own stages/tasks
+// — the toggle at the top of the Project board just shows/hides this
+// instead, it never changes Task.boardId.
+model ProcurementRecord {
+  id                   String            @id @default(uuid())
+  boardId              String            @unique
+  board                Board             @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  year                 Int
+  sequence             Int
+  procurementId        String            @unique // formatted QPTS-PROC-2026-0001, from year + sequence (resets each year)
+
+  vendorName           String?
+  vendorContact        String?
+  vendorAddress        String?
+
+  poNumber             String?
+  orderDate            DateTime?
+  lineItems            Json? // [{ description, quantity, unitCost }]
+
+  expectedDeliveryDate DateTime?
+  actualDeliveryDate   DateTime?
+
+  status               ProcurementStatus @default(PENDING)
+  notes                String?
+
+  updatedById          String?
+  updatedAt            DateTime          @updatedAt
+  createdAt            DateTime          @default(now())
+}
+
+enum ProcurementStatus {
+  PENDING
+  ORDERED
+  DELIVERED
+  CANCELLED
 }
 
 // Backs every year-scoped id (Project, Estimation, Enquiry) — a single
