@@ -811,8 +811,12 @@ export async function decideLost(taskId: string, approve: boolean, actor: Authed
     return serializeTask(updated);
   }
 
-  await prisma.task.update({ where: { id: taskId }, data: { lostApprovalStatus: TaskApprovalStatus.APPROVED } });
+  // markTaskLost runs first and can throw (e.g. the board has no "Lost"
+  // stage) — only flip the flag once the move actually succeeds, so a
+  // failure here leaves the request PENDING_APPROVAL and retryable instead
+  // of stranding it at APPROVED with no path forward.
   const result = await markTaskLost(taskId, actor);
+  await prisma.task.update({ where: { id: taskId }, data: { lostApprovalStatus: TaskApprovalStatus.APPROVED } });
 
   await writeAudit({
     actor,
