@@ -256,9 +256,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
                 </option>
               ))}
             </Select>
-            <p className="mt-1 text-[11px] text-slate-400">
-              Which service this enquiry is about — used when it's {board.name === "Enquiry List" ? "Qualified" : "Awarded"} to start the project.
-            </p>
+            <p className="mt-1 text-[11px] text-slate-400">Which service this enquiry is about — used when it's Qualified to start the project.</p>
           </section>
         )}
 
@@ -267,8 +265,8 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
             <Label>Customer</Label>
             <CustomerPicker value={customer} onChange={setCustomer} placeholder="Search Customer Master by name or ID…" />
             <p className="mt-1 text-[11px] text-slate-400">
-              Pulls from CRM — if this customer already exists, pick them instead of retyping their details. Carries forward automatically if this is{" "}
-              {board.name === "Enquiry List" ? "Qualified" : "Awarded"} to a Project.
+              Pulls from CRM — if this customer already exists, pick them instead of retyping their details. Carries forward automatically if this is Qualified to a
+              Project.
             </p>
           </section>
         )}

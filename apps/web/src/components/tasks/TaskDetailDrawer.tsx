@@ -28,7 +28,7 @@ import { useToast } from "../../context/ToastContext";
 import { can, isAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, Award, BadgeCheck, ThumbsDown } from "lucide-react";
+import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown } from "lucide-react";
 import { format } from "date-fns";
 import clsx from "clsx";
 
@@ -216,7 +216,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                               onClose();
                               navigate(`/workflow/estimation`);
                             } else if (result.kind === "moved-to-accounts") {
-                              push({ variant: "success", title: "Awarded — sent to Accounts.", description: result.name });
+                              push({ variant: "success", title: "Qualified — sent to Accounts.", description: result.name });
                               onClose();
                               navigate(`/workflow/accounts`);
                             } else {
@@ -227,24 +227,19 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                           } catch (err) {
                             push({
                               variant: "error",
-                              title:
-                                task.board?.name === "Enquiry List" ? "Could not qualify" : task.board?.name === "Accounts" ? "Could not approve" : "Could not award",
+                              title: task.board?.name === "Accounts" ? "Could not approve" : "Could not qualify",
                               description: extractApiError(err).message,
                             });
                           }
                         }}
                       >
-                        {task.board?.name === "Enquiry List" ? (
-                          <>
-                            <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Qualified
-                          </>
-                        ) : task.board?.name === "Accounts" ? (
+                        {task.board?.name === "Accounts" ? (
                           <>
                             <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Approve
                           </>
                         ) : (
                           <>
-                            <Award className="h-3.5 w-3.5 text-emerald-600" /> Awarded
+                            <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Qualified
                           </>
                         )}
                       </Button>
