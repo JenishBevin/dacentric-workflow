@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Plus, UploadCloud, RotateCcw, UserX, UserCheck } from "lucide-react";
-import { useUsers, useCreateUser, useUpdateUser, useResendInvite, useBulkImportUsers, useUnlinkedEmployees } from "../../api/misc";
+import { Plus, UploadCloud, RotateCcw, UserX, UserCheck, Trash2, AlertTriangle } from "lucide-react";
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useResendInvite, useBulkImportUsers, useUnlinkedEmployees } from "../../api/misc";
 import { Button, Input, PasswordInput, Label, Select, Badge, Skeleton, ErrorState, EmptyState, Checkbox } from "../../components/ui/primitives";
 import { Drawer } from "../../components/ui/Drawer";
 import { Modal } from "../../components/ui/Modal";
@@ -50,18 +50,22 @@ interface UserRow {
 
 /** Section 6/7: Settings → Users — invitation-only provisioning, bulk import, resend, deactivate. */
 export default function UsersSettingsPage() {
+  const { user: actor } = useAuth();
   const { push } = useToast();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const { data: users, isLoading, isError, refetch } = useUsers({ search, status: statusFilter || undefined });
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
+  const deleteUser = useDeleteUser();
   const resendInvite = useResendInvite();
   const bulkImport = useBulkImportUsers();
 
   const [newOpen, setNewOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserRow | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   return (
     <div className="space-y-4">
@@ -187,6 +191,18 @@ export default function UsersSettingsPage() {
                           <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
                         </Button>
                       )}
+                      {isSuperAdmin(actor) && actor?.id !== u.id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDeleteTarget(u);
+                            setDeleteConfirmText("");
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -199,6 +215,65 @@ export default function UsersSettingsPage() {
       <NewUserDrawer open={newOpen} onClose={() => setNewOpen(false)} onCreate={createUser} />
       {editUser && <EditUserDrawer user={editUser} onClose={() => setEditUser(null)} onUpdate={updateUser} />}
       <BulkImportModal open={bulkOpen} onClose={() => setBulkOpen(false)} onImport={bulkImport} />
+
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => {
+          if (deleteUser.isPending) return;
+          setDeleteTarget(null);
+          setDeleteConfirmText("");
+        }}
+        title="Permanently delete this account"
+        size="sm"
+      >
+        {deleteTarget && (
+          <div className="flex gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+            <div className="space-y-3 text-sm text-slate-600">
+              <p>
+                This permanently deletes <strong>{deleteTarget.name}</strong>'s login and linked HR record, along with any tasks, leave requests and
+                expense claims that belong to them. This cannot be undone — it's not the same as Deactivate.
+              </p>
+              <div>
+                <Label>
+                  Type <span className="font-mono font-semibold text-slate-800">DELETE</span> to confirm
+                </Label>
+                <Input value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} placeholder="DELETE" autoFocus />
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="mt-4 flex justify-end gap-2">
+          <Button
+            variant="outline"
+            disabled={deleteUser.isPending}
+            onClick={() => {
+              setDeleteTarget(null);
+              setDeleteConfirmText("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            disabled={deleteConfirmText.trim() !== "DELETE"}
+            loading={deleteUser.isPending}
+            onClick={async () => {
+              if (!deleteTarget) return;
+              try {
+                await deleteUser.mutateAsync(deleteTarget.id);
+                push({ variant: "success", title: `${deleteTarget.name} permanently deleted.` });
+                setDeleteTarget(null);
+                setDeleteConfirmText("");
+              } catch (err) {
+                push({ variant: "error", title: "Could not delete account", description: extractApiError(err).message });
+              }
+            }}
+          >
+            Delete permanently
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

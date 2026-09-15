@@ -99,6 +99,18 @@ export function useUpdateUser() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
   });
 }
+/** Permanent, irreversible delete — Super Admin only, enforced server-side. */
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => (await api.delete(`/users/${userId}`)).data.data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["all-employees"] });
+      qc.invalidateQueries({ queryKey: ["unlinked-employees"] });
+    },
+  });
+}
 export function useResendInvite() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: async (userId: string) => api.post(`/users/${userId}/resend-invite`), onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }) });

@@ -212,6 +212,85 @@ export async function updateUser(
   return prisma.user.findUnique({ where: { id: userId }, select: SAFE_USER_SELECT });
 }
 
+/** Permanently removes a User (and its linked Employee, if any) — Super
+ *  Admin only, and irreversible, unlike Deactivate. Company assets they
+ *  merely created (boards, customers, tickets) block this rather than being
+ *  swept away silently; their own personal records (tasks they authored,
+ *  leave, expense claims, chat messages) are deleted with them. The formal
+ *  audit trail survives — Business Rule 15 forbids editing/deleting it even
+ *  for Admin — by dropping the dangling userId reference and keeping the
+ *  row (actorName is already a denormalized snapshot for this exact case). */
+export async function deleteUserPermanently(userId: string, actor: AuthedUser) {
+  if (!actor.roles.includes(RoleCode.SUPER_ADMIN)) {
+    throw Errors.forbidden("Only a Super Admin can permanently delete a user.");
+  }
+  if (userId === actor.id) {
+    throw Errors.badRequest("You can't permanently delete the account you're currently signed in as.");
+  }
+
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target) throw Errors.notFound("User");
+  const employeeId = target.employeeId;
+
+  const [boardsOwned, customersCreated, ticketsCreated] = await Promise.all([
+    prisma.board.count({ where: { createdById: userId } }),
+    prisma.customer.count({ where: { createdById: userId } }),
+    prisma.supportTicket.count({ where: { createdById: userId } }),
+  ]);
+  const blockers: string[] = [];
+  if (boardsOwned > 0) blockers.push(`${boardsOwned} project board(s)`);
+  if (customersCreated > 0) blockers.push(`${customersCreated} customer record(s)`);
+  if (ticketsCreated > 0) blockers.push(`${ticketsCreated} support ticket(s)`);
+  if (blockers.length) {
+    throw Errors.conflict(`Can't delete this account — it still owns ${blockers.join(", ")} it created. Reassign or remove those first.`);
+  }
+
+  const summary = { name: target.name, workEmail: target.workEmail };
+
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.auditLog.updateMany({ where: { userId }, data: { userId: null } });
+
+      // This person's own authored content is deleted with them (its own
+      // children cascade automatically) — a going-forward equivalent of
+      // deleting each of these individually.
+      await tx.task.deleteMany({ where: { createdById: userId } });
+      await tx.taskStatusHistory.deleteMany({ where: { updatedById: userId } });
+      await tx.chatMessage.deleteMany({ where: { senderId: userId } });
+      if (employeeId) {
+        await tx.leaveRequest.deleteMany({ where: { employeeId } });
+        await tx.expenseClaim.deleteMany({ where: { employeeId } });
+      }
+
+      // References from OTHER people's records that merely point at this
+      // user/employee (a handover contact, a past decision-maker) are
+      // cleared rather than deleted — that other record isn't theirs to lose.
+      await tx.customer.updateMany({ where: { accountManagerId: userId }, data: { accountManagerId: null } });
+      await tx.checklistItem.updateMany({ where: { ownerId: userId }, data: { ownerId: null } });
+      await tx.taskApproval.updateMany({ where: { decidedById: userId }, data: { decidedById: null } });
+      await tx.leaveRequest.updateMany({ where: { decidedById: userId }, data: { decidedById: null } });
+      await tx.expenseClaim.updateMany({ where: { managementDecidedById: userId }, data: { managementDecidedById: null } });
+      await tx.expenseClaim.updateMany({ where: { settledById: userId }, data: { settledById: null } });
+      if (employeeId) {
+        await tx.team.updateMany({ where: { managerId: employeeId }, data: { managerId: null } });
+        await tx.leaveRequest.updateMany({ where: { handoverToEmployeeId: employeeId }, data: { handoverToEmployeeId: null } });
+      }
+
+      // Everything else referencing userId cascades automatically: Session,
+      // UserRole, PasswordReset, WorkSession, BoardMember, TaskAssignee,
+      // TaskWatcher, Notification, NotificationPreference,
+      // ConversationParticipant, Invitation.
+      await tx.user.delete({ where: { id: userId } });
+      if (employeeId) await tx.employee.delete({ where: { id: employeeId } });
+    },
+    { timeout: 60_000 }
+  );
+
+  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "User", entityId: userId, beforeValue: summary });
+
+  return summary;
+}
+
 // ---------------------------------------------------------------------------
 // HRMS employee records. This build has no real external HRMS to sync from
 // (Section 31 scopes that module out), so — unlike the rest of the app,

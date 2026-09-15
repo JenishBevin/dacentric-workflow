@@ -207,3 +207,15 @@ usersRouter.patch(
     return ok(res, user);
   })
 );
+
+// Permanent, irreversible delete — Super Admin only, enforced in
+// users.service.ts#deleteUserPermanently regardless of this route's own
+// (broader) permission gate.
+usersRouter.delete(
+  "/:id",
+  requirePermission(PermissionKey.MANAGE_USERS, "ALL"),
+  asyncHandler(async (req, res) => {
+    const result = await usersService.deleteUserPermanently(req.params.id, req.user!);
+    return ok(res, result);
+  })
+);
