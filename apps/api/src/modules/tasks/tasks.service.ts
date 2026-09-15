@@ -464,9 +464,20 @@ export async function quickEdit(taskId: string, input: { priority?: string; dueD
 // Stage movement — WIP limits, dependency gate, approval gate (UC-07, UC-09)
 // ---------------------------------------------------------------------------
 
-export async function moveTask(taskId: string, targetStageId: string, actor: AuthedUser, confirmWipOverride = false, expectedVersion?: number) {
+export async function moveTask(
+  taskId: string,
+  targetStageId: string,
+  actor: AuthedUser,
+  confirmWipOverride = false,
+  expectedVersion?: number,
+  skipEditCheck = false
+) {
   const ctx = await loadTaskWithAccess(taskId, actor);
-  assertCanEditTask(ctx);
+  // A Lost-approval decision is executed by the Management approver, not the
+  // original requester — they were already authorized via APPROVE_TASK in
+  // decideLost(), and won't generally be a board Owner/Editor/assignee on
+  // the task itself, so the normal edit-rights check doesn't apply here.
+  if (!skipEditCheck) assertCanEditTask(ctx);
 
   if (expectedVersion !== undefined && expectedVersion !== ctx.task.version) {
     throw Errors.conflict("This task was updated by someone else. Please refresh.");
@@ -696,13 +707,13 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
  *
  *  Called directly for every board except Enquiry List — see
  *  requestLostApproval() below for the gated path. */
-export async function markTaskLost(taskId: string, actor: AuthedUser) {
+export async function markTaskLost(taskId: string, actor: AuthedUser, skipEditCheck = false) {
   const ctx = await loadTaskWithAccess(taskId, actor);
   const lostStage = await prisma.boardStage.findFirst({
     where: { boardId: ctx.task.boardId, name: { equals: "Lost", mode: "insensitive" } },
   });
   if (!lostStage) throw Errors.badRequest('This board has no "Lost" stage.');
-  return moveTask(taskId, lostStage.id, actor);
+  return moveTask(taskId, lostStage.id, actor, false, undefined, skipEditCheck);
 }
 
 // Anyone holding Approve Task: All (Management, by default — configurable
@@ -815,7 +826,7 @@ export async function decideLost(taskId: string, approve: boolean, actor: Authed
   // stage) — only flip the flag once the move actually succeeds, so a
   // failure here leaves the request PENDING_APPROVAL and retryable instead
   // of stranding it at APPROVED with no path forward.
-  const result = await markTaskLost(taskId, actor);
+  const result = await markTaskLost(taskId, actor, true);
   await prisma.task.update({ where: { id: taskId }, data: { lostApprovalStatus: TaskApprovalStatus.APPROVED } });
 
   await writeAudit({

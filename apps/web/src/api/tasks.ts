@@ -56,6 +56,7 @@ function invalidateTaskEverywhere(qc: ReturnType<typeof useQueryClient>, taskId?
   qc.invalidateQueries({ queryKey: ["my-tasks"] });
   qc.invalidateQueries({ queryKey: ["team-workload"] });
   qc.invalidateQueries({ queryKey: ["dashboard"] });
+  qc.invalidateQueries({ queryKey: ["dashboard-tasks"] });
   qc.invalidateQueries({ queryKey: ["boards"] });
   if (taskId) {
     qc.invalidateQueries({ queryKey: ["task", taskId] });
