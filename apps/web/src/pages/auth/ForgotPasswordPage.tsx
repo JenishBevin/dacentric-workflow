@@ -26,16 +26,16 @@ export default function ForgotPasswordPage() {
   return (
     <AuthLayout title="Forgot password" subtitle="We'll email you a link to reset it.">
       {sent ? (
-        <div className="space-y-4 text-sm text-slate-600">
+        <div className="space-y-4 text-sm text-slate-300">
           <p>If that email is registered, a reset link is on its way. It expires in 2 hours.</p>
-          <Link to="/login" className="font-medium text-brand-600 hover:text-brand-700">
+          <Link to="/login" className="font-medium text-blue-300 hover:text-blue-200">
             Back to sign in
           </Link>
         </div>
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div>
-            <Label htmlFor="email" required>
+            <Label htmlFor="email" required className="!text-slate-200">
               Work email
             </Label>
             <Input id="email" type="email" error={errors.email?.message} {...register("email")} />
@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
           <Button type="submit" className="w-full" loading={isSubmitting}>
             Send reset link
           </Button>
-          <Link to="/login" className="block text-center text-xs font-medium text-slate-500 hover:text-slate-700">
+          <Link to="/login" className="block text-center text-xs font-medium text-slate-300 hover:text-white">
             Back to sign in
           </Link>
         </form>
