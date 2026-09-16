@@ -58,9 +58,9 @@ export default function LoginPage() {
       />
 
       <div className="relative z-10 flex w-full max-w-5xl items-center justify-center gap-16">
-        <div className="hidden flex-1 flex-col gap-8 lg:flex">
-          <div>
-            <div className="flex items-center gap-3">
+        <div className="hidden flex-1 flex-col items-center gap-8 lg:flex">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-3">
               <img src={qplusIcon} alt="" className="h-16 w-16 object-contain" />
               <h1 className="text-4xl font-extrabold tracking-tight text-white">
                 Q<span className="text-amber-400">Plus</span>
