@@ -10,8 +10,6 @@ import { extractApiError } from "../../lib/apiClient";
 import qplusIcon from "../../assets/qplus-icon.png";
 import dubaiSkyline from "../../assets/dubai-skyline-sunset.jpg";
 
-const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
-
 const schema = z.object({
   email: z.string().email("Enter a valid work email."),
   password: z.string().min(1, "Password is required."),
@@ -48,12 +46,10 @@ export default function LoginPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1330] px-4 py-10">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b1330] via-[#111c4e] to-[#1c2f7f]" />
-      {isLocalhost && (
-        <div
-          className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-20"
-          style={{ backgroundImage: `url(${dubaiSkyline})` }}
-        />
-      )}
+      <div
+        className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-30"
+        style={{ backgroundImage: `url(${dubaiSkyline})` }}
+      />
       <div className="pointer-events-none absolute -left-28 -top-28 h-80 w-80 rounded-full bg-blue-600/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-32 left-10 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
       <div
