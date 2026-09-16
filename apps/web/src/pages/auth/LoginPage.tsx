@@ -3,16 +3,24 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
-import { AuthLayout } from "../../components/layout/AuthLayout";
+import { ArrowRight, BarChart3, Lock, Mail, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { Button, Input, PasswordInput, Label } from "../../components/ui/primitives";
 import { useAuth } from "../../context/AuthContext";
 import { extractApiError } from "../../lib/apiClient";
+import qplusIcon from "../../assets/qplus-icon.png";
 
 const schema = z.object({
   email: z.string().email("Enter a valid work email."),
   password: z.string().min(1, "Password is required."),
 });
 type FormValues = z.infer<typeof schema>;
+
+const FEATURES = [
+  { icon: BarChart3, label: "Manage Operations" },
+  { icon: Users, label: "Collaborate with Ease" },
+  { icon: ShieldCheck, label: "Secure & Reliable" },
+  { icon: TrendingUp, label: "Drive Business Growth" },
+];
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -35,37 +43,108 @@ export default function LoginPage() {
   };
 
   return (
-    <AuthLayout title="Sign in">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-        <div>
-          <Label htmlFor="email" required>
-            Work email
-          </Label>
-          <Input id="email" type="email" autoComplete="email" placeholder="you@dacentric.example" error={errors.email?.message} {...register("email")} />
-        </div>
-        <div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password" required>
-              Password
-            </Label>
-            <Link to="/forgot-password" className="text-xs font-medium text-brand-600 hover:text-brand-700">
-              Forgot password?
-            </Link>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1330] px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b1330] via-[#111c4e] to-[#1c2f7f]" />
+      <div className="pointer-events-none absolute -left-28 -top-28 h-80 w-80 rounded-full bg-blue-600/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 left-10 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
+      <div
+        className="pointer-events-none absolute right-0 top-0 h-72 w-72 [mask-image:linear-gradient(to_bottom_left,black,transparent)]"
+        style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.35) 1px, transparent 1.5px)", backgroundSize: "16px 16px" }}
+      />
+
+      <div className="relative z-10 flex w-full max-w-5xl items-center justify-center gap-16">
+        <div className="hidden flex-1 flex-col gap-8 lg:flex">
+          <div>
+            <img src={qplusIcon} alt="" className="h-16 w-16 object-contain" />
+            <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-white">
+              Q<span className="text-blue-400">Plus</span>
+            </h1>
+            <p className="mt-1 text-lg font-medium text-slate-200">Unified Business Module Platform</p>
+            <p className="mt-4 text-sm font-medium tracking-wide text-blue-300">Simplify &nbsp;·&nbsp; Connect &nbsp;·&nbsp; Grow</p>
           </div>
-          <PasswordInput id="password" autoComplete="current-password" error={errors.password?.message} {...register("password")} />
-        </div>
-        {serverError && (
-          <div role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-            {serverError}
+          <div className="grid max-w-md grid-cols-2 gap-3">
+            {FEATURES.map(({ icon: Icon, label }) => (
+              <div
+                key={label}
+                className="flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-center backdrop-blur-sm"
+              >
+                <Icon className="h-5 w-5 text-blue-300" />
+                <span className="text-xs font-medium text-slate-200">{label}</span>
+              </div>
+            ))}
           </div>
-        )}
-        <Button type="submit" className="w-full" loading={isSubmitting}>
-          Sign in
-        </Button>
-      </form>
-      <p className="mt-5 text-center text-xs text-slate-400">
-        Accounts are provisioned by an Administrator. There is no self-registration.
-      </p>
-    </AuthLayout>
+        </div>
+
+        <div className="w-full max-w-sm lg:max-w-md">
+          <div className="mb-6 flex flex-col items-center gap-2 text-center lg:hidden">
+            <img src={qplusIcon} alt="" className="h-12 w-12 object-contain" />
+            <h1 className="text-xl font-bold text-white">
+              Q<span className="text-blue-400">Plus</span>
+            </h1>
+            <p className="text-xs text-slate-300">Unified Business Module Platform</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+            <h2 className="text-xl font-semibold text-white">Sign in</h2>
+            <p className="mt-1 text-sm text-slate-300">Access your account to continue</p>
+
+            <form onSubmit={handleSubmit(onSubmit)} className="mt-5 space-y-4" noValidate>
+              <div>
+                <Label htmlFor="email" required className="!text-slate-200">
+                  Work email
+                </Label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@dacentric.example"
+                    error={errors.email?.message}
+                    className="!border-white/15 !bg-white/10 !pl-9 !text-white placeholder:!text-slate-400"
+                    {...register("email")}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" required className="!text-slate-200">
+                    Password
+                  </Label>
+                  <Link to="/forgot-password" className="text-xs font-medium text-blue-300 hover:text-blue-200">
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <PasswordInput
+                    id="password"
+                    autoComplete="current-password"
+                    error={errors.password?.message}
+                    className="!border-white/15 !bg-white/10 !pl-9 !text-white placeholder:!text-slate-400"
+                    {...register("password")}
+                  />
+                </div>
+              </div>
+              {serverError && (
+                <div role="alert" className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                  {serverError}
+                </div>
+              )}
+              <Button
+                type="submit"
+                className="w-full !bg-gradient-to-r !from-blue-500 !to-indigo-500 hover:!brightness-110"
+                loading={isSubmitting}
+              >
+                Sign in <ArrowRight className="h-4 w-4" />
+              </Button>
+            </form>
+            <p className="mt-5 text-center text-xs text-slate-400">
+              Accounts are provisioned by an Administrator. There is no self-registration.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
