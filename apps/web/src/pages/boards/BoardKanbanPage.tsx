@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload, Trello, PackageSearch } from "lucide-react";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload, Trello, PackageSearch, Building2 } from "lucide-react";
 import { useBoardDetail, useReorderStages, useSetBoardCompleted } from "../../api/boards";
 import { useBoardTasks, useDuplicateTask, useDeleteTask, useImportEnquiries } from "../../api/tasks";
 import { downloadExport } from "../../api/misc";
@@ -235,6 +235,11 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
               <span className="shrink-0 text-xs font-medium text-slate-400">{board.boardId}</span>
             </div>
             {board.description && <p className="truncate text-xs text-slate-500">{board.description}</p>}
+            {board.customer && (
+              <Link to={`/workflow/customers/${board.customer.id}`} className="mt-0.5 flex items-center gap-1 truncate text-xs text-brand-600 hover:underline">
+                <Building2 className="h-3 w-3 shrink-0" /> {board.customer.name}
+              </Link>
+            )}
           </div>
           {board.isArchived && <Badge tone="slate">Archived</Badge>}
         </div>

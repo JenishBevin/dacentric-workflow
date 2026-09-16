@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, Building2, Plus, User, Mail, Phone, FileText, Download, Trash2, History, Briefcase, Inbox } from "lucide-react";
+import { ArrowLeft, Building2, Plus, Pencil, User, Mail, Phone, FileText, Download, Trash2, History, Briefcase, Inbox } from "lucide-react";
 import {
   useCustomerDetail,
   useUpdateCustomer,
   useAddContact,
+  useUpdateContact,
   useDeleteContact,
   useUploadCustomerDocument,
   useDeleteCustomerDocument,
@@ -45,6 +46,7 @@ export default function CustomerDetailPage() {
   const { data: customer, isLoading, isError, refetch } = useCustomerDetail(customerId);
   const updateCustomer = useUpdateCustomer(customerId ?? "");
   const addContact = useAddContact(customerId ?? "");
+  const updateContact = useUpdateContact(customerId ?? "");
   const deleteContact = useDeleteContact(customerId ?? "");
   const uploadDoc = useUploadCustomerDocument(customerId ?? "");
   const deleteDoc = useDeleteCustomerDocument(customerId ?? "");
@@ -52,13 +54,47 @@ export default function CustomerDetailPage() {
   const canManage = can(user, "CRM_ERP_LINKING", "OWN");
 
   const [contactOpen, setContactOpen] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [contactName, setContactName] = useState("");
   const [contactDesignation, setContactDesignation] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
 
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [profileIndustry, setProfileIndustry] = useState("");
+  const [profileCountry, setProfileCountry] = useState("");
+  const [profileWebsite, setProfileWebsite] = useState("");
+  const [profileMainContactName, setProfileMainContactName] = useState("");
+  const [profileDesignation, setProfileDesignation] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileAlternateContact, setProfileAlternateContact] = useState("");
+
   if (isLoading) return <Skeleton className="h-96 w-full" />;
   if (isError || !customer) return <ErrorState message="Could not load this customer." onRetry={() => refetch()} />;
+
+  function resetContactForm() {
+    setEditingContactId(null);
+    setContactName("");
+    setContactDesignation("");
+    setContactEmail("");
+    setContactPhone("");
+  }
+
+  function openAddContact() {
+    resetContactForm();
+    setContactOpen(true);
+  }
+
+  function openEditContact(c: { id: string; name: string; designation: string | null; email: string | null; phone: string | null }) {
+    setEditingContactId(c.id);
+    setContactName(c.name);
+    setContactDesignation(c.designation ?? "");
+    setContactEmail(c.email ?? "");
+    setContactPhone(c.phone ?? "");
+    setContactOpen(true);
+  }
 
   async function submitContact() {
     if (!contactName.trim()) {
@@ -66,15 +102,54 @@ export default function CustomerDetailPage() {
       return;
     }
     try {
-      await addContact.mutateAsync({ name: contactName.trim(), designation: contactDesignation, email: contactEmail, phone: contactPhone });
-      push({ variant: "success", title: "Contact added." });
-      setContactName("");
-      setContactDesignation("");
-      setContactEmail("");
-      setContactPhone("");
+      if (editingContactId) {
+        await updateContact.mutateAsync({ contactId: editingContactId, name: contactName.trim(), designation: contactDesignation, email: contactEmail, phone: contactPhone });
+        push({ variant: "success", title: "Contact updated." });
+      } else {
+        await addContact.mutateAsync({ name: contactName.trim(), designation: contactDesignation, email: contactEmail, phone: contactPhone });
+        push({ variant: "success", title: "Contact added." });
+      }
+      resetContactForm();
       setContactOpen(false);
     } catch (err) {
-      push({ variant: "error", title: "Could not add contact", description: extractApiError(err).message });
+      push({ variant: "error", title: editingContactId ? "Could not update contact" : "Could not add contact", description: extractApiError(err).message });
+    }
+  }
+
+  function openEditProfile() {
+    setProfileName(customer.name);
+    setProfileIndustry(customer.industry ?? "");
+    setProfileCountry(customer.country ?? "");
+    setProfileWebsite(customer.website ?? "");
+    setProfileMainContactName(customer.mainContactName ?? "");
+    setProfileDesignation(customer.designation ?? "");
+    setProfileEmail(customer.email ?? "");
+    setProfilePhone(customer.phone ?? "");
+    setProfileAlternateContact(customer.alternateContact ?? "");
+    setProfileOpen(true);
+  }
+
+  async function submitProfile() {
+    if (!profileName.trim()) {
+      push({ variant: "error", title: "Company name is required." });
+      return;
+    }
+    try {
+      await updateCustomer.mutateAsync({
+        name: profileName.trim(),
+        industry: profileIndustry,
+        country: profileCountry,
+        website: profileWebsite,
+        mainContactName: profileMainContactName,
+        designation: profileDesignation,
+        email: profileEmail,
+        phone: profilePhone,
+        alternateContact: profileAlternateContact,
+      });
+      push({ variant: "success", title: "Customer updated." });
+      setProfileOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not update customer", description: extractApiError(err).message });
     }
   }
 
@@ -96,20 +171,27 @@ export default function CustomerDetailPage() {
               <p className="font-mono text-xs text-slate-400">{customer.customerId}</p>
             </div>
           </div>
-          {canManage && (
-            <Select
-              value={customer.status}
-              onChange={async (e) => {
-                await updateCustomer.mutateAsync({ status: e.target.value });
-                push({ variant: "success", title: "Status updated." });
-              }}
-              className="w-36"
-            >
-              <option value="PROSPECT">Prospect</option>
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-            </Select>
-          )}
+          <div className="flex items-center gap-2">
+            {canManage && (
+              <Button variant="outline" size="sm" onClick={openEditProfile}>
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Button>
+            )}
+            {canManage && (
+              <Select
+                value={customer.status}
+                onChange={async (e) => {
+                  await updateCustomer.mutateAsync({ status: e.target.value });
+                  push({ variant: "success", title: "Status updated." });
+                }}
+                className="w-36"
+              >
+                <option value="PROSPECT">Prospect</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </Select>
+            )}
+          </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <div>
@@ -128,6 +210,33 @@ export default function CustomerDetailPage() {
             <p className="text-xs text-slate-400">Country</p>
             <p className="text-slate-700">{customer.country ?? "—"}</p>
           </div>
+          <div>
+            <p className="text-xs text-slate-400">Main Contact</p>
+            <p className="text-slate-700">
+              {customer.mainContactName ?? "—"}
+              {customer.designation ? ` (${customer.designation})` : ""}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">Email</p>
+            <p className="text-slate-700">{customer.email ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">Phone</p>
+            <p className="text-slate-700">{customer.phone ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">Alternate Number</p>
+            <p className="text-slate-700">{customer.alternateContact ?? "—"}</p>
+          </div>
+          {customer.website && (
+            <div>
+              <p className="text-xs text-slate-400">Website</p>
+              <a href={customer.website} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+                {customer.website}
+              </a>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -137,7 +246,7 @@ export default function CustomerDetailPage() {
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-semibold text-slate-800">Contacts</p>
             {canManage && (
-              <Button variant="ghost" size="sm" onClick={() => setContactOpen(true)}>
+              <Button variant="ghost" size="sm" onClick={openAddContact}>
                 <Plus className="h-3.5 w-3.5" /> Add
               </Button>
             )}
@@ -166,13 +275,22 @@ export default function CustomerDetailPage() {
                   </div>
                 </div>
                 {canManage && (
-                  <button
-                    className="shrink-0 rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500"
-                    onClick={() => deleteContact.mutateAsync(c.id)}
-                    aria-label="Remove contact"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-600"
+                      onClick={() => openEditContact(c)}
+                      aria-label="Edit contact"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500"
+                      onClick={() => deleteContact.mutateAsync(c.id)}
+                      aria-label="Remove contact"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
@@ -301,7 +419,7 @@ export default function CustomerDetailPage() {
         </div>
       </Card>
 
-      <Modal open={contactOpen} onClose={() => setContactOpen(false)} title="Add Contact">
+      <Modal open={contactOpen} onClose={() => { setContactOpen(false); resetContactForm(); }} title={editingContactId ? "Edit Contact" : "Add Contact"}>
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -324,11 +442,68 @@ export default function CustomerDetailPage() {
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setContactOpen(false)}>
+            <Button variant="outline" onClick={() => { setContactOpen(false); resetContactForm(); }}>
               Cancel
             </Button>
-            <Button onClick={submitContact} loading={addContact.isPending}>
-              Add Contact
+            <Button onClick={submitContact} loading={addContact.isPending || updateContact.isPending}>
+              {editingContactId ? "Save Changes" : "Add Contact"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={profileOpen} onClose={() => setProfileOpen(false)} title="Edit Customer" size="lg">
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Company / Customer Name <span className="text-red-500">*</span>
+            </label>
+            <Input value={profileName} onChange={(e) => setProfileName(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Industry</label>
+              <Input value={profileIndustry} onChange={(e) => setProfileIndustry(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Country</label>
+              <Input value={profileCountry} onChange={(e) => setProfileCountry(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Website</label>
+            <Input value={profileWebsite} onChange={(e) => setProfileWebsite(e.target.value)} placeholder="https://example.com" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Main Contact Person</label>
+              <Input value={profileMainContactName} onChange={(e) => setProfileMainContactName(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Designation</label>
+              <Input value={profileDesignation} onChange={(e) => setProfileDesignation(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
+              <Input type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Phone</label>
+              <Input value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Alternate Number</label>
+            <Input value={profileAlternateContact} onChange={(e) => setProfileAlternateContact(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setProfileOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={submitProfile} loading={updateCustomer.isPending}>
+              Save Changes
             </Button>
           </div>
         </div>

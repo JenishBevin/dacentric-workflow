@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { MoreVertical, Link2, LayoutGrid, AlertCircle } from "lucide-react";
+import { MoreVertical, Link2, LayoutGrid, AlertCircle, Building2 } from "lucide-react";
 import clsx from "clsx";
 import { Card, Badge, AvatarGroup } from "../ui/primitives";
 import { Board } from "../../lib/types";
@@ -87,6 +87,12 @@ export const BoardCard: React.FC<Props> = ({ board, onEdit, onDuplicate, onArchi
       </div>
 
       {board.linkedRecord && <p className="truncate text-xs text-slate-400">Linked to: {board.linkedRecord.name}</p>}
+
+      {board.customer && (
+        <Link to={`/workflow/customers/${board.customer.id}`} className="flex items-center gap-1 truncate text-xs text-brand-600 hover:underline">
+          <Building2 className="h-3 w-3 shrink-0" /> {board.customer.name}
+        </Link>
+      )}
 
       <div className="mt-auto flex items-center justify-between pt-1">
         <AvatarGroup names={board.members.map((m) => m.name)} />
