@@ -3,7 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, BarChart3, Lock, Mail, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import clsx from "clsx";
+import { ArrowRight, BarChart3, Eye, Lock, Mail, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { Button, Input, PasswordInput, Label } from "../../components/ui/primitives";
 import { useAuth } from "../../context/AuthContext";
 import { extractApiError } from "../../lib/apiClient";
@@ -27,6 +28,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState(false);
   const {
     register,
     handleSubmit,
@@ -93,64 +95,86 @@ export default function LoginPage() {
             <p className="text-xs text-slate-300">Unified Business Module Platform</p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-6 shadow-2xl backdrop-blur-xl sm:p-8">
-            <h2 className="text-xl font-semibold text-white">Sign in</h2>
-            <p className="mt-1 text-sm text-slate-300">Access your account to continue</p>
-
-            <form onSubmit={handleSubmit(onSubmit)} className="mt-5 space-y-4" noValidate>
-              <div>
-                <Label htmlFor="email" required className="!text-slate-200">
-                  Work email
-                </Label>
-                <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@dacentric.example"
-                    error={errors.email?.message}
-                    className="!border-white/15 !bg-white/10 !pl-9 !text-white placeholder:!text-slate-400"
-                    {...register("email")}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" required className="!text-slate-200">
-                    Password
-                  </Label>
-                  <Link to="/forgot-password" className="text-xs font-medium text-blue-300 hover:text-blue-200">
-                    Forgot password?
-                  </Link>
-                </div>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <PasswordInput
-                    id="password"
-                    autoComplete="current-password"
-                    error={errors.password?.message}
-                    className="!border-white/15 !bg-white/10 !pl-9 !text-white placeholder:!text-slate-400"
-                    {...register("password")}
-                  />
-                </div>
-              </div>
-              {serverError && (
-                <div role="alert" className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                  {serverError}
-                </div>
+          <div
+            className={clsx(
+              "relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.07] shadow-2xl backdrop-blur-xl",
+              !revealed && "cursor-pointer"
+            )}
+            onClick={() => setRevealed(true)}
+          >
+            <div
+              className={clsx(
+                "p-6 transition-all duration-500 ease-out sm:p-8",
+                revealed ? "scale-100 opacity-100 blur-0" : "pointer-events-none scale-[0.97] select-none opacity-70 blur-md"
               )}
-              <Button
-                type="submit"
-                className="w-full !bg-gradient-to-r !from-blue-500 !to-indigo-500 hover:!brightness-110"
-                loading={isSubmitting}
-              >
-                Sign in <ArrowRight className="h-4 w-4" />
-              </Button>
-            </form>
-            <p className="mt-5 text-center text-xs text-slate-400">
-              Accounts are provisioned by an Administrator. There is no self-registration.
-            </p>
+            >
+              <h2 className="text-xl font-semibold text-white">Sign in</h2>
+              <p className="mt-1 text-sm text-slate-300">Access your account to continue</p>
+
+              <form onSubmit={handleSubmit(onSubmit)} className="mt-5 space-y-4" noValidate>
+                <div>
+                  <Label htmlFor="email" required className="!text-slate-200">
+                    Work email
+                  </Label>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@dacentric.example"
+                      error={errors.email?.message}
+                      className="!border-white/15 !bg-white/10 !pl-9 !text-white placeholder:!text-slate-400"
+                      {...register("email")}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password" required className="!text-slate-200">
+                      Password
+                    </Label>
+                    <Link to="/forgot-password" className="text-xs font-medium text-blue-300 hover:text-blue-200">
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <PasswordInput
+                      id="password"
+                      autoComplete="current-password"
+                      error={errors.password?.message}
+                      className="!border-white/15 !bg-white/10 !pl-9 !text-white placeholder:!text-slate-400"
+                      {...register("password")}
+                    />
+                  </div>
+                </div>
+                {serverError && (
+                  <div role="alert" className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                    {serverError}
+                  </div>
+                )}
+                <Button
+                  type="submit"
+                  className="w-full !bg-gradient-to-r !from-blue-500 !to-indigo-500 hover:!brightness-110"
+                  loading={isSubmitting}
+                >
+                  Sign in <ArrowRight className="h-4 w-4" />
+                </Button>
+              </form>
+              <p className="mt-5 text-center text-xs text-slate-400">
+                Accounts are provisioned by an Administrator. There is no self-registration.
+              </p>
+            </div>
+
+            {!revealed && (
+              <div className="absolute inset-0 flex animate-pulse flex-col items-center justify-center gap-2 bg-slate-900/20">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white">
+                  <Eye className="h-5 w-5" />
+                </div>
+                <p className="text-sm font-medium text-white">Click to sign in</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
