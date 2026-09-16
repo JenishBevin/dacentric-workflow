@@ -33,10 +33,13 @@ export default function CustomersListPage() {
     if (!file) return;
     try {
       const result = await importCustomers.mutateAsync(file);
+      const descriptionParts = [];
+      if (result.mergedAsContact) descriptionParts.push(`${result.mergedAsContact} row(s) added as contacts on existing companies.`);
+      if (result.skipped.length) descriptionParts.push(`${result.skipped.length} row(s) skipped — see console for details.`);
       push({
-        variant: result.skipped.length ? "success" : "success",
+        variant: "success",
         title: `Imported ${result.created} customer${result.created === 1 ? "" : "s"}.`,
-        description: result.skipped.length ? `${result.skipped.length} row(s) skipped — see console for details.` : undefined,
+        description: descriptionParts.join(" ") || undefined,
       });
       if (result.skipped.length) console.warn("Customer import — skipped rows:", result.skipped);
     } catch (err) {

@@ -105,6 +105,7 @@ export function useDownloadCustomerDocumentUrl(customerId: string, documentId: s
 
 export interface ImportCustomersResult {
   created: number;
+  mergedAsContact: number;
   skipped: Array<{ row: number; reason: string }>;
 }
 

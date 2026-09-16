@@ -72,7 +72,21 @@ export async function searchCustomers(q: string) {
   return customers;
 }
 
+/** Case-insensitive, trimmed — the same normalization used everywhere else
+ * this file compares customer names (the Excel import's merge check, this
+ * guard). Keeps "Acme Inc" and "acme inc " recognized as the same company. */
+function normalizedName(name: string) {
+  return name.trim().toLowerCase();
+}
+
 export async function createCustomer(input: CreateCustomerInput, actor: AuthedUser) {
+  // One company, one Customer record — additional people at the same
+  // company are contacts (see addContact), never a second Customer row.
+  const existing = await prisma.customer.findFirst({ where: { isDeleted: false, name: { equals: input.name.trim(), mode: "insensitive" } } });
+  if (existing) {
+    throw Errors.conflict(`"${existing.name}" already exists (${existing.customerId}). Add this person as a contact on the existing company instead of creating a duplicate.`);
+  }
+
   const customer = await prisma.$transaction(async (tx) => {
     const placeholder = `TEMP-${Date.now()}-${Math.random()}`;
     const created = await tx.customer.create({
@@ -342,14 +356,22 @@ const IMPORT_COLUMN_ALIASES: Record<string, string[]> = {
 
 export interface ImportCustomersResult {
   created: number;
+  mergedAsContact: number;
   skipped: Array<{ row: number; reason: string }>;
 }
 
 /** Reads an uploaded .xlsx (first sheet, header row first) and creates one
- * Customer per data row via the same createCustomer() path the UI uses —
- * matching header text to a fixed set of Customer Profile field aliases, in
- * any column order. Only "Customer Name" is required; every other column is
- * optional and simply left blank if missing or empty. */
+ * Customer per distinct company name — matching header text to a fixed set
+ * of Customer Profile field aliases, in any column order. Only "Customer
+ * Name" is required; every other column is optional and simply left blank
+ * if missing or empty.
+ *
+ * Two rows naming the same company (matched case-insensitively, against
+ * both earlier rows in this same file and any customer already in the
+ * database) are never two Customer records — the first row creates the
+ * customer, and every later row for that company becomes an additional
+ * CustomerContact under it instead, same as clicking "Add contact" on the
+ * Customer 360 page. */
 export async function importCustomersFromExcel(buffer: Buffer, actor: AuthedUser): Promise<ImportCustomersResult> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as any);
@@ -375,7 +397,11 @@ export async function importCustomersFromExcel(buffer: Buffer, actor: AuthedUser
     throw Errors.badRequest('The file must have a "Customer Name" column (row 1).');
   }
 
-  const result: ImportCustomersResult = { created: 0, skipped: [] };
+  const result: ImportCustomersResult = { created: 0, mergedAsContact: 0, skipped: [] };
+  // Company name -> its Customer id, seeded lazily as rows are processed so
+  // later rows in the same file recognize a company the file itself just
+  // created, not only ones that already existed before this import started.
+  const seenCompanies = new Map<string, string>();
 
   for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
     const row = sheet.getRow(rowNumber);
@@ -393,8 +419,35 @@ export async function importCustomersFromExcel(buffer: Buffer, actor: AuthedUser
     const statusRaw = cellText(fieldColumns.status).toUpperCase();
     const status = (Object.values(CustomerStatus) as string[]).includes(statusRaw) ? (statusRaw as CustomerStatus) : CustomerStatus.PROSPECT;
 
+    const contactName = cellText(fieldColumns.mainContactName) || undefined;
+    const contactDesignation = cellText(fieldColumns.designation) || undefined;
+    const contactEmail = cellText(fieldColumns.email) || undefined;
+    const contactPhone = cellText(fieldColumns.phone) || undefined;
+
     try {
-      await createCustomer(
+      const key = normalizedName(name);
+      let existingId = seenCompanies.get(key);
+      if (existingId === undefined) {
+        const existing = await prisma.customer.findFirst({ where: { isDeleted: false, name: { equals: name, mode: "insensitive" } } });
+        if (existing) existingId = existing.id;
+      }
+
+      if (existingId) {
+        if (!contactName && !contactEmail && !contactPhone) {
+          result.skipped.push({ row: rowNumber, reason: `"${name}" already exists and this row has no contact details to add` });
+          continue;
+        }
+        await addContact(
+          existingId,
+          { name: contactName || contactEmail || "Additional contact", designation: contactDesignation, email: contactEmail, phone: contactPhone },
+          actor
+        );
+        seenCompanies.set(key, existingId);
+        result.mergedAsContact++;
+        continue;
+      }
+
+      const created = await createCustomer(
         {
           name,
           customerType: cellText(fieldColumns.customerType) || undefined,
@@ -403,10 +456,10 @@ export async function importCustomersFromExcel(buffer: Buffer, actor: AuthedUser
           country: cellText(fieldColumns.country) || undefined,
           city: cellText(fieldColumns.city) || undefined,
           address: cellText(fieldColumns.address) || undefined,
-          mainContactName: cellText(fieldColumns.mainContactName) || undefined,
-          designation: cellText(fieldColumns.designation) || undefined,
-          email: cellText(fieldColumns.email) || undefined,
-          phone: cellText(fieldColumns.phone) || undefined,
+          mainContactName: contactName,
+          designation: contactDesignation,
+          email: contactEmail,
+          phone: contactPhone,
           alternateContact: cellText(fieldColumns.alternateContact) || undefined,
           status,
           rating: cellText(fieldColumns.rating) || undefined,
@@ -414,6 +467,7 @@ export async function importCustomersFromExcel(buffer: Buffer, actor: AuthedUser
         },
         actor
       );
+      seenCompanies.set(key, created.id);
       result.created++;
     } catch (err: any) {
       result.skipped.push({ row: rowNumber, reason: err?.message ?? "Unknown error" });
@@ -424,7 +478,7 @@ export async function importCustomersFromExcel(buffer: Buffer, actor: AuthedUser
     actor,
     action: AuditAction.CREATE,
     entityType: "Customer",
-    afterValue: { source: "excel-import", created: result.created, skipped: result.skipped.length },
+    afterValue: { source: "excel-import", created: result.created, mergedAsContact: result.mergedAsContact, skipped: result.skipped.length },
   });
 
   return result;
