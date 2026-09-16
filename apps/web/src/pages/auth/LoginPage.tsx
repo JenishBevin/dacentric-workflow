@@ -57,7 +57,7 @@ export default function LoginPage() {
           <div>
             <img src={qplusIcon} alt="" className="h-16 w-16 object-contain" />
             <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-white">
-              Q<span className="text-blue-400">Plus</span>
+              Q<span className="text-amber-400">Plus</span>
             </h1>
             <p className="mt-1 text-lg font-medium text-slate-200">Unified Business Module Platform</p>
             <p className="mt-4 text-sm font-medium tracking-wide text-blue-300">Simplify &nbsp;·&nbsp; Connect &nbsp;·&nbsp; Grow</p>
@@ -79,7 +79,7 @@ export default function LoginPage() {
           <div className="mb-6 flex flex-col items-center gap-2 text-center lg:hidden">
             <img src={qplusIcon} alt="" className="h-12 w-12 object-contain" />
             <h1 className="text-xl font-bold text-white">
-              Q<span className="text-blue-400">Plus</span>
+              Q<span className="text-amber-400">Plus</span>
             </h1>
             <p className="text-xs text-slate-300">Unified Business Module Platform</p>
           </div>
