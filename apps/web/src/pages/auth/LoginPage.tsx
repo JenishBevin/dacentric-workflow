@@ -122,7 +122,7 @@ export default function LoginPage() {
                       id="email"
                       type="email"
                       autoComplete="email"
-                      placeholder="you@dacentric.example"
+                      placeholder="Enter your work mail"
                       error={errors.email?.message}
                       className="!border-white/15 !bg-white/10 !pl-9 !text-white placeholder:!text-slate-400"
                       {...register("email")}
