@@ -1,6 +1,6 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Building2, Upload } from "lucide-react";
+import { Plus, Building2, Upload, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { useCustomers, useCreateCustomer, useImportCustomers } from "../../api/customers";
 import { Button, Input, Select, Badge, Skeleton, ErrorState, EmptyState } from "../../components/ui/primitives";
 import { Drawer } from "../../components/ui/Drawer";
@@ -22,6 +22,14 @@ export default function CustomersListPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const { data: customers, isLoading, isError, refetch } = useCustomers({ search: search || undefined, status: status || undefined });
+  const [nameSort, setNameSort] = useState<"asc" | "desc" | null>(null);
+  const sortedCustomers = useMemo(() => {
+    if (!customers || !nameSort) return customers;
+    return [...customers].sort((a, b) => (nameSort === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)));
+  }, [customers, nameSort]);
+  function toggleNameSort() {
+    setNameSort((cur) => (cur === "asc" ? "desc" : cur === "desc" ? null : "asc"));
+  }
   const [newOpen, setNewOpen] = useState(false);
   const canManage = can(user, "CRM_ERP_LINKING", "OWN");
   const importCustomers = useImportCustomers();
@@ -92,7 +100,14 @@ export default function CustomersListPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-4 py-2.5">Customer</th>
+                <th className="px-4 py-2.5">
+                  <button onClick={toggleNameSort} className="flex items-center gap-1 hover:text-slate-700">
+                    Customer
+                    {nameSort === "asc" && <ArrowUp className="h-3.5 w-3.5" />}
+                    {nameSort === "desc" && <ArrowDown className="h-3.5 w-3.5" />}
+                    {!nameSort && <ArrowUpDown className="h-3.5 w-3.5 text-slate-300" />}
+                  </button>
+                </th>
                 <th className="px-4 py-2.5">Main Contact</th>
                 <th className="px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5">Account Manager</th>
@@ -101,7 +116,7 @@ export default function CustomersListPage() {
               </tr>
             </thead>
             <tbody>
-              {customers.map((c) => (
+              {sortedCustomers!.map((c) => (
                 <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="px-4 py-2.5">
                     <Link to={`/workflow/customers/${c.id}`} className="font-medium text-brand-700 hover:underline">
