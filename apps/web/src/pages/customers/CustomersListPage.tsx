@@ -1,7 +1,8 @@
 import React, { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Building2, Upload, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
-import { useCustomers, useCreateCustomer, useImportCustomers } from "../../api/customers";
+import clsx from "clsx";
+import { Plus, Building2, Upload, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from "lucide-react";
+import { useCustomers, useCreateCustomer, useImportCustomers, useDeleteCustomer } from "../../api/customers";
 import { Button, Input, Select, Badge, Skeleton, ErrorState, EmptyState } from "../../components/ui/primitives";
 import { Drawer } from "../../components/ui/Drawer";
 import { useToast } from "../../context/ToastContext";
@@ -16,24 +17,70 @@ const STATUS_TONE: Record<CustomerStatus, "green" | "slate" | "amber"> = {
   PROSPECT: "amber",
 };
 
+type SortKey = "name" | "enquiryCount" | "projectCount";
+
+const SortableHeader: React.FC<{
+  label: string;
+  sortKey: SortKey;
+  active: { key: SortKey; dir: "asc" | "desc" } | null;
+  onSort: (key: SortKey) => void;
+  align?: "left" | "right";
+}> = ({ label, sortKey, active, onSort, align = "left" }) => (
+  <th className={clsx("px-4 py-2.5", align === "right" && "text-right")}>
+    <button
+      onClick={() => onSort(sortKey)}
+      className={clsx("flex items-center gap-1 hover:text-slate-700", align === "right" && "ml-auto")}
+    >
+      {label}
+      {active?.key === sortKey ? (
+        active.dir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+      ) : (
+        <ArrowUpDown className="h-3.5 w-3.5 text-slate-300" />
+      )}
+    </button>
+  </th>
+);
+
 export default function CustomersListPage() {
   const { user } = useAuth();
   const { push } = useToast();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const { data: customers, isLoading, isError, refetch } = useCustomers({ search: search || undefined, status: status || undefined });
-  const [nameSort, setNameSort] = useState<"asc" | "desc" | null>(null);
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" } | null>(null);
   const sortedCustomers = useMemo(() => {
-    if (!customers || !nameSort) return customers;
-    return [...customers].sort((a, b) => (nameSort === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)));
-  }, [customers, nameSort]);
-  function toggleNameSort() {
-    setNameSort((cur) => (cur === "asc" ? "desc" : cur === "desc" ? null : "asc"));
+    if (!customers || !sort) return customers;
+    const { key, dir } = sort;
+    return [...customers].sort((a, b) => {
+      const diff = key === "name" ? a.name.localeCompare(b.name) : a[key] - b[key];
+      return dir === "asc" ? diff : -diff;
+    });
+  }, [customers, sort]);
+  function toggleSort(key: SortKey) {
+    setSort((cur) => {
+      if (!cur || cur.key !== key) return { key, dir: "asc" };
+      return cur.dir === "asc" ? { key, dir: "desc" } : null;
+    });
   }
   const [newOpen, setNewOpen] = useState(false);
   const canManage = can(user, "CRM_ERP_LINKING", "OWN");
   const importCustomers = useImportCustomers();
+  const deleteCustomer = useDeleteCustomer();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleDelete(c: { id: string; name: string; enquiryCount: number; projectCount: number }) {
+    const linked: string[] = [];
+    if (c.enquiryCount) linked.push(`${c.enquiryCount} enquir${c.enquiryCount === 1 ? "y" : "ies"}`);
+    if (c.projectCount) linked.push(`${c.projectCount} project${c.projectCount === 1 ? "" : "s"}`);
+    const warning = linked.length ? ` It still has ${linked.join(" and ")} linked to it.` : "";
+    if (!window.confirm(`Delete "${c.name}"?${warning} This removes it from the customer list.`)) return;
+    try {
+      await deleteCustomer.mutateAsync(c.id);
+      push({ variant: "success", title: "Customer deleted." });
+    } catch (err) {
+      push({ variant: "error", title: "Could not delete customer", description: extractApiError(err).message });
+    }
+  }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -100,19 +147,13 @@ export default function CustomersListPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-4 py-2.5">
-                  <button onClick={toggleNameSort} className="flex items-center gap-1 hover:text-slate-700">
-                    Customer
-                    {nameSort === "asc" && <ArrowUp className="h-3.5 w-3.5" />}
-                    {nameSort === "desc" && <ArrowDown className="h-3.5 w-3.5" />}
-                    {!nameSort && <ArrowUpDown className="h-3.5 w-3.5 text-slate-300" />}
-                  </button>
-                </th>
+                <SortableHeader label="Customer" sortKey="name" active={sort} onSort={toggleSort} />
                 <th className="px-4 py-2.5">Main Contact</th>
                 <th className="px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5">Account Manager</th>
-                <th className="px-4 py-2.5 text-right">Enquiries</th>
-                <th className="px-4 py-2.5 text-right">Projects</th>
+                <SortableHeader label="Enquiries" sortKey="enquiryCount" active={sort} onSort={toggleSort} align="right" />
+                <SortableHeader label="Projects" sortKey="projectCount" active={sort} onSort={toggleSort} align="right" />
+                {canManage && <th className="px-4 py-2.5" />}
               </tr>
             </thead>
             <tbody>
@@ -134,6 +175,18 @@ export default function CustomersListPage() {
                   <td className="px-4 py-2.5 text-slate-600">{c.accountManager?.name ?? <span className="text-slate-400">—</span>}</td>
                   <td className="px-4 py-2.5 text-right text-slate-600">{c.enquiryCount}</td>
                   <td className="px-4 py-2.5 text-right text-slate-600">{c.projectCount}</td>
+                  {canManage && (
+                    <td className="px-4 py-2.5 text-right">
+                      <button
+                        onClick={() => handleDelete(c)}
+                        disabled={deleteCustomer.isPending}
+                        aria-label={`Delete ${c.name}`}
+                        className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
