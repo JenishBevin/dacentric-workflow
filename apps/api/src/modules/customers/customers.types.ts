@@ -8,6 +8,7 @@ export interface CreateCustomerInput {
   country?: string;
   city?: string;
   address?: string;
+  vatNumber?: string;
   mainContactName?: string;
   designation?: string;
   email?: string;

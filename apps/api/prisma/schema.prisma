@@ -489,6 +489,7 @@ model Customer {
   country          String?
   city             String?
   address          String?
+  vatNumber        String?
   mainContactName  String?
   designation      String?
   email            String?

@@ -65,6 +65,8 @@ export default function CustomerDetailPage() {
   const [profileIndustry, setProfileIndustry] = useState("");
   const [profileCountry, setProfileCountry] = useState("");
   const [profileWebsite, setProfileWebsite] = useState("");
+  const [profileAddress, setProfileAddress] = useState("");
+  const [profileVatNumber, setProfileVatNumber] = useState("");
   const [profileMainContactName, setProfileMainContactName] = useState("");
   const [profileDesignation, setProfileDesignation] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
@@ -121,6 +123,8 @@ export default function CustomerDetailPage() {
     setProfileIndustry(customer.industry ?? "");
     setProfileCountry(customer.country ?? "");
     setProfileWebsite(customer.website ?? "");
+    setProfileAddress(customer.address ?? "");
+    setProfileVatNumber(customer.vatNumber ?? "");
     setProfileMainContactName(customer.mainContactName ?? "");
     setProfileDesignation(customer.designation ?? "");
     setProfileEmail(customer.email ?? "");
@@ -140,6 +144,8 @@ export default function CustomerDetailPage() {
         industry: profileIndustry,
         country: profileCountry,
         website: profileWebsite,
+        address: profileAddress,
+        vatNumber: profileVatNumber,
         mainContactName: profileMainContactName,
         designation: profileDesignation,
         email: profileEmail,
@@ -228,6 +234,14 @@ export default function CustomerDetailPage() {
           <div>
             <p className="text-xs text-slate-400">Alternate Number</p>
             <p className="text-slate-700">{customer.alternateContact ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">VAT Number</p>
+            <p className="text-slate-700">{customer.vatNumber ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">Address</p>
+            <p className="text-slate-700">{customer.address ?? "—"}</p>
           </div>
           {customer.website && (
             <div>
@@ -473,6 +487,14 @@ export default function CustomerDetailPage() {
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Website</label>
             <Input value={profileWebsite} onChange={(e) => setProfileWebsite(e.target.value)} placeholder="https://example.com" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Address</label>
+            <Input value={profileAddress} onChange={(e) => setProfileAddress(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">VAT Number</label>
+            <Input value={profileVatNumber} onChange={(e) => setProfileVatNumber(e.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

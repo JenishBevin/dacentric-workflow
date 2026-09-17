@@ -127,6 +127,7 @@ export interface CustomerDetail extends CustomerSummary {
   website?: string | null;
   city?: string | null;
   address?: string | null;
+  vatNumber?: string | null;
   designation?: string | null;
   alternateContact?: string | null;
   rating?: string | null;

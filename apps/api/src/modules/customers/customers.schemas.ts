@@ -9,6 +9,7 @@ export const createCustomerSchema = z.object({
   country: z.string().max(100).optional(),
   city: z.string().max(100).optional(),
   address: z.string().max(500).optional(),
+  vatNumber: z.string().max(50).optional(),
   mainContactName: z.string().max(150).optional(),
   designation: z.string().max(150).optional(),
   email: z.string().email().max(200).optional().or(z.literal("")),

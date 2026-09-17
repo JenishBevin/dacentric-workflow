@@ -242,6 +242,8 @@ const NewCustomerDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ o
   const [industry, setIndustry] = useState("");
   const [country, setCountry] = useState("");
   const [website, setWebsite] = useState("");
+  const [address, setAddress] = useState("");
+  const [vatNumber, setVatNumber] = useState("");
   const [mainContactName, setMainContactName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -253,6 +255,8 @@ const NewCustomerDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ o
     setIndustry("");
     setCountry("");
     setWebsite("");
+    setAddress("");
+    setVatNumber("");
     setMainContactName("");
     setEmail("");
     setPhone("");
@@ -266,7 +270,19 @@ const NewCustomerDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ o
       return;
     }
     try {
-      await createCustomer.mutateAsync({ name: name.trim(), industry, country, website, mainContactName, email, phone, alternateContact, status });
+      await createCustomer.mutateAsync({
+        name: name.trim(),
+        industry,
+        country,
+        website,
+        address,
+        vatNumber,
+        mainContactName,
+        email,
+        phone,
+        alternateContact,
+        status,
+      });
       push({ variant: "success", title: "Customer created." });
       reset();
       onClose();
@@ -321,6 +337,14 @@ const NewCustomerDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ o
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Website</label>
           <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://example.com" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Address</label>
+          <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">VAT Number</label>
+          <Input value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Main Contact Person</label>
