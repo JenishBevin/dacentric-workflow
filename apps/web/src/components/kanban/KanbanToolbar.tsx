@@ -28,7 +28,7 @@ export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onCh
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="sticky top-14 z-10 -mx-4 mb-3 border-b border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:bg-white sm:px-3 sm:py-2 sm:shadow-card">
+    <div className="sticky top-0 z-10 -mx-4 mb-3 border-b border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:bg-white sm:px-3 sm:py-2 sm:shadow-card">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[160px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
