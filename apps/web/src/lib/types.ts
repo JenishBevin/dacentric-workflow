@@ -176,6 +176,37 @@ export interface CustomerDetail extends CustomerSummary {
     metadata?: unknown;
     createdAt: string;
   }>;
+  tickets: {
+    total: number;
+    open: number;
+    items: Array<{
+      id: string;
+      ticketId: string;
+      title: string;
+      status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+      priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+      createdAt: string;
+      createdBy: { id: string; name: string };
+    }>;
+  };
+  products: Array<{
+    id: string;
+    name: string;
+    quantity: number | null;
+    amount: number | null;
+    purchasedAt: string | null;
+    notes: string | null;
+    createdAt: string;
+  }>;
+  interactions: Array<{
+    id: string;
+    type: "EMAIL" | "CALL" | "MEETING";
+    subject: string;
+    notes: string | null;
+    occurredAt: string;
+    loggedBy: { id: string; name: string };
+    createdAt: string;
+  }>;
 }
 
 export interface TaskStatusHistoryEntry {

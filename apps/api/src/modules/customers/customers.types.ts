@@ -31,3 +31,18 @@ export interface CreateContactInput {
 }
 
 export type UpdateContactInput = Partial<CreateContactInput>;
+
+export interface CreateProductInput {
+  name: string;
+  quantity?: number;
+  amount?: number;
+  purchasedAt?: Date;
+  notes?: string;
+}
+
+export interface CreateInteractionInput {
+  type: "EMAIL" | "CALL" | "MEETING";
+  subject: string;
+  notes?: string;
+  occurredAt: Date;
+}

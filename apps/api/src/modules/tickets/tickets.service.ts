@@ -11,6 +11,7 @@ export interface CreateTicketInput {
   title: string;
   description: string;
   priority?: TaskPriority;
+  customerId?: string;
 }
 
 /** Anyone signed in can raise a ticket — there's no permission gate on
@@ -25,6 +26,7 @@ export async function createTicket(actor: AuthedUser, input: CreateTicketInput) 
         description: input.description,
         priority: (input.priority as any) ?? TaskPriority.MEDIUM,
         createdById: actor.id,
+        customerId: input.customerId ?? null,
         ticketId: placeholderId,
       },
     });

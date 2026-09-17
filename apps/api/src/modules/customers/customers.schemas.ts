@@ -36,3 +36,18 @@ export const updateContactSchema = createContactSchema.partial();
 export const setCustomerLinkSchema = z.object({
   customerId: z.string().uuid().nullable(),
 });
+
+export const createProductSchema = z.object({
+  name: z.string().min(1, "Product name is required.").max(200),
+  quantity: z.number().int().positive().optional(),
+  amount: z.number().nonnegative().optional(),
+  purchasedAt: z.coerce.date().optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const createInteractionSchema = z.object({
+  type: z.enum(["EMAIL", "CALL", "MEETING"]),
+  subject: z.string().min(1, "Subject is required.").max(200),
+  notes: z.string().max(4000).optional(),
+  occurredAt: z.coerce.date(),
+});

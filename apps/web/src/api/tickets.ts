@@ -52,7 +52,7 @@ export function useTicket(ticketId: string | undefined) {
 export function useCreateTicket() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { title: string; description: string; priority?: TicketPriority }) =>
+    mutationFn: async (payload: { title: string; description: string; priority?: TicketPriority; customerId?: string }) =>
       (await api.post<{ data: Ticket }>("/tickets", payload)).data.data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tickets"] }),
   });

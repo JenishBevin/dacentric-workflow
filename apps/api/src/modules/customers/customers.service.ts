@@ -4,7 +4,7 @@ import { Errors } from "../../common/errors";
 import { writeAudit } from "../../common/audit";
 import { AuthedUser } from "../../middleware/authenticate";
 import { AuditAction, CustomerStatus, formatCustomerId } from "@dacentric/types";
-import { CreateCustomerInput, UpdateCustomerInput, CreateContactInput, UpdateContactInput } from "./customers.types";
+import { CreateCustomerInput, UpdateCustomerInput, CreateContactInput, UpdateContactInput, CreateProductInput, CreateInteractionInput } from "./customers.types";
 import { getStorageAdapter, validateFile, scanFile } from "../../lib/storage";
 
 const CUSTOMER_SUMMARY_SELECT = {
@@ -205,6 +205,23 @@ export async function getCustomerDetail(id: string) {
     orderBy: { createdAt: "desc" },
   });
 
+  const tickets = await prisma.supportTicket.findMany({
+    where: { customerId: id },
+    select: { id: true, ticketId: true, title: true, status: true, priority: true, createdAt: true, createdBy: { select: { id: true, name: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const products = await prisma.customerProduct.findMany({
+    where: { customerId: id },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const interactions = await prisma.customerInteraction.findMany({
+    where: { customerId: id },
+    include: { loggedBy: { select: { id: true, name: true } } },
+    orderBy: { occurredAt: "desc" },
+  });
+
   const boardIds = boards.map((b) => b.id);
   const taskIds = tasks.map((t) => t.id);
 
@@ -240,6 +257,13 @@ export async function getCustomerDetail(id: string) {
       inProgress: boards.filter((b) => !b.isCompleted).length,
       items: boards,
     },
+    tickets: {
+      total: tickets.length,
+      open: tickets.filter((t) => t.status !== "RESOLVED" && t.status !== "CLOSED").length,
+      items: tickets,
+    },
+    products,
+    interactions,
     recentActivity,
   };
 }
@@ -290,6 +314,64 @@ export async function deleteContact(customerId: string, contactId: string, actor
   if (!existing) throw Errors.notFound("Contact");
   await prisma.customerContact.delete({ where: { id: contactId } });
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "CustomerContact", entityId: contactId, beforeValue: { name: existing.name } });
+}
+
+// --- Products purchased (manually logged, no real inventory/ERP source yet) ---
+
+export async function addProduct(customerId: string, input: CreateProductInput, actor: AuthedUser) {
+  const customer = await prisma.customer.findFirst({ where: { id: customerId, isDeleted: false } });
+  if (!customer) throw Errors.notFound("Customer");
+
+  const product = await prisma.customerProduct.create({
+    data: {
+      customerId,
+      name: input.name,
+      quantity: input.quantity,
+      amount: input.amount,
+      purchasedAt: input.purchasedAt,
+      notes: input.notes,
+      createdById: actor.id,
+    },
+  });
+
+  await writeAudit({ actor, action: AuditAction.CREATE, entityType: "CustomerProduct", entityId: product.id, afterValue: { name: product.name, customerId } });
+  return product;
+}
+
+export async function deleteProduct(customerId: string, productId: string, actor: AuthedUser) {
+  const existing = await prisma.customerProduct.findFirst({ where: { id: productId, customerId } });
+  if (!existing) throw Errors.notFound("Product");
+  await prisma.customerProduct.delete({ where: { id: productId } });
+  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "CustomerProduct", entityId: productId, beforeValue: { name: existing.name } });
+}
+
+// --- Interactions (Emails/Calls/Meetings — manually logged, not a real
+// email/telephony integration) ---
+
+export async function addInteraction(customerId: string, input: CreateInteractionInput, actor: AuthedUser) {
+  const customer = await prisma.customer.findFirst({ where: { id: customerId, isDeleted: false } });
+  if (!customer) throw Errors.notFound("Customer");
+
+  const interaction = await prisma.customerInteraction.create({
+    data: {
+      customerId,
+      type: input.type as any,
+      subject: input.subject,
+      notes: input.notes,
+      occurredAt: input.occurredAt,
+      loggedById: actor.id,
+    },
+  });
+
+  await writeAudit({ actor, action: AuditAction.CREATE, entityType: "CustomerInteraction", entityId: interaction.id, afterValue: { subject: interaction.subject, customerId } });
+  return interaction;
+}
+
+export async function deleteInteraction(customerId: string, interactionId: string, actor: AuthedUser) {
+  const existing = await prisma.customerInteraction.findFirst({ where: { id: interactionId, customerId } });
+  if (!existing) throw Errors.notFound("Interaction");
+  await prisma.customerInteraction.delete({ where: { id: interactionId } });
+  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "CustomerInteraction", entityId: interactionId, beforeValue: { subject: existing.subject } });
 }
 
 // --- Documents ---

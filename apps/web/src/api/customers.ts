@@ -79,6 +79,38 @@ export function useDeleteContact(customerId: string) {
   });
 }
 
+export function useAddProduct(customerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: unknown) => (await api.post(`/customers/${customerId}/products`, payload)).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["customer", customerId] }),
+  });
+}
+
+export function useDeleteProduct(customerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (productId: string) => (await api.delete(`/customers/${customerId}/products/${productId}`)).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["customer", customerId] }),
+  });
+}
+
+export function useAddInteraction(customerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: unknown) => (await api.post(`/customers/${customerId}/interactions`, payload)).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["customer", customerId] }),
+  });
+}
+
+export function useDeleteInteraction(customerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (interactionId: string) => (await api.delete(`/customers/${customerId}/interactions/${interactionId}`)).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["customer", customerId] }),
+  });
+}
+
 export function useUploadCustomerDocument(customerId: string) {
   const qc = useQueryClient();
   return useMutation({

@@ -6,7 +6,7 @@ import { authenticate } from "../../middleware/authenticate";
 import { requirePermission } from "../../middleware/authorize";
 import { Errors } from "../../common/errors";
 import * as customersService from "./customers.service";
-import { createCustomerSchema, updateCustomerSchema, createContactSchema, updateContactSchema } from "./customers.schemas";
+import { createCustomerSchema, updateCustomerSchema, createContactSchema, updateContactSchema, createProductSchema, createInteractionSchema } from "./customers.schemas";
 import { PermissionKey } from "@dacentric/types";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
@@ -93,6 +93,40 @@ customersRouter.delete(
   asyncHandler(async (req, res) => {
     await customersService.deleteContact(req.params.id, req.params.contactId, req.user!);
     return ok(res, { message: "Contact removed." });
+  })
+);
+
+// --- Products purchased ---
+customersRouter.post(
+  "/:id/products",
+  requirePermission(PermissionKey.CRM_ERP_LINKING, "OWN"),
+  validate(createProductSchema),
+  asyncHandler(async (req, res) => created(res, await customersService.addProduct(req.params.id, (req as any).validatedBody, req.user!)))
+);
+
+customersRouter.delete(
+  "/:id/products/:productId",
+  requirePermission(PermissionKey.CRM_ERP_LINKING, "OWN"),
+  asyncHandler(async (req, res) => {
+    await customersService.deleteProduct(req.params.id, req.params.productId, req.user!);
+    return ok(res, { message: "Product removed." });
+  })
+);
+
+// --- Interactions (Emails/Calls/Meetings) ---
+customersRouter.post(
+  "/:id/interactions",
+  requirePermission(PermissionKey.CRM_ERP_LINKING, "OWN"),
+  validate(createInteractionSchema),
+  asyncHandler(async (req, res) => created(res, await customersService.addInteraction(req.params.id, (req as any).validatedBody, req.user!)))
+);
+
+customersRouter.delete(
+  "/:id/interactions/:interactionId",
+  requirePermission(PermissionKey.CRM_ERP_LINKING, "OWN"),
+  asyncHandler(async (req, res) => {
+    await customersService.deleteInteraction(req.params.id, req.params.interactionId, req.user!);
+    return ok(res, { message: "Interaction removed." });
   })
 );
 

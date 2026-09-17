@@ -1,7 +1,24 @@
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, Building2, Plus, Pencil, User, Mail, Phone, FileText, Download, Trash2, History, Briefcase, Inbox } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  Plus,
+  Pencil,
+  User,
+  Mail,
+  Phone,
+  FileText,
+  Download,
+  Trash2,
+  History,
+  Briefcase,
+  Inbox,
+  LifeBuoy,
+  Package,
+  Video,
+} from "lucide-react";
 import {
   useCustomerDetail,
   useUpdateCustomer,
@@ -11,20 +28,43 @@ import {
   useUploadCustomerDocument,
   useDeleteCustomerDocument,
   useDownloadCustomerDocumentUrl,
+  useAddProduct,
+  useDeleteProduct,
+  useAddInteraction,
+  useDeleteInteraction,
 } from "../../api/customers";
-import { Button, Input, Select, Badge, Skeleton, ErrorState, Card } from "../../components/ui/primitives";
+import { useCreateTicket } from "../../api/tickets";
+import { Button, Input, Select, Textarea, Badge, Skeleton, ErrorState, Card } from "../../components/ui/primitives";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
 import { CustomerStatus } from "../../lib/types";
 import { can } from "../../lib/permissions";
 import { useAuth } from "../../context/AuthContext";
+import { isLocalhost } from "../../lib/isLocalhost";
 
 const STATUS_TONE: Record<CustomerStatus, "green" | "slate" | "amber"> = {
   ACTIVE: "green",
   INACTIVE: "slate",
   PROSPECT: "amber",
 };
+
+const TICKET_STATUS_TONE: Record<string, "slate" | "amber" | "green"> = {
+  OPEN: "slate",
+  IN_PROGRESS: "amber",
+  RESOLVED: "green",
+  CLOSED: "slate",
+};
+
+const TICKET_PRIORITY_TONE: Record<string, "slate" | "amber" | "red"> = {
+  LOW: "slate",
+  MEDIUM: "slate",
+  HIGH: "amber",
+  URGENT: "red",
+};
+
+const INTERACTION_ICON: Record<string, React.ElementType> = { EMAIL: Mail, CALL: Phone, MEETING: Video };
+const INTERACTION_LABEL: Record<string, string> = { EMAIL: "Email", CALL: "Call", MEETING: "Meeting" };
 
 const ACTION_LABEL: Record<string, string> = {
   CREATE: "created",
@@ -50,6 +90,11 @@ export default function CustomerDetailPage() {
   const deleteContact = useDeleteContact(customerId ?? "");
   const uploadDoc = useUploadCustomerDocument(customerId ?? "");
   const deleteDoc = useDeleteCustomerDocument(customerId ?? "");
+  const createTicket = useCreateTicket();
+  const addProduct = useAddProduct(customerId ?? "");
+  const deleteProduct = useDeleteProduct(customerId ?? "");
+  const addInteraction = useAddInteraction(customerId ?? "");
+  const deleteInteraction = useDeleteInteraction(customerId ?? "");
 
   const canManage = can(user, "CRM_ERP_LINKING", "OWN");
 
@@ -72,6 +117,24 @@ export default function CustomerDetailPage() {
   const [profileEmail, setProfileEmail] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
   const [profileAlternateContact, setProfileAlternateContact] = useState("");
+
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [ticketTitle, setTicketTitle] = useState("");
+  const [ticketDescription, setTicketDescription] = useState("");
+  const [ticketPriority, setTicketPriority] = useState<"LOW" | "MEDIUM" | "HIGH" | "URGENT">("MEDIUM");
+
+  const [productOpen, setProductOpen] = useState(false);
+  const [productName, setProductName] = useState("");
+  const [productQuantity, setProductQuantity] = useState("");
+  const [productAmount, setProductAmount] = useState("");
+  const [productPurchasedAt, setProductPurchasedAt] = useState("");
+  const [productNotes, setProductNotes] = useState("");
+
+  const [interactionOpen, setInteractionOpen] = useState(false);
+  const [interactionType, setInteractionType] = useState<"EMAIL" | "CALL" | "MEETING">("CALL");
+  const [interactionSubject, setInteractionSubject] = useState("");
+  const [interactionOccurredAt, setInteractionOccurredAt] = useState("");
+  const [interactionNotes, setInteractionNotes] = useState("");
 
   if (isLoading) return <Skeleton className="h-96 w-full" />;
   if (isError || !customer) return <ErrorState message="Could not load this customer." onRetry={() => refetch()} />;
@@ -156,6 +219,72 @@ export default function CustomerDetailPage() {
       setProfileOpen(false);
     } catch (err) {
       push({ variant: "error", title: "Could not update customer", description: extractApiError(err).message });
+    }
+  }
+
+  async function submitTicket() {
+    if (!ticketTitle.trim() || !ticketDescription.trim()) {
+      push({ variant: "error", title: "Title and description are required." });
+      return;
+    }
+    try {
+      await createTicket.mutateAsync({ title: ticketTitle.trim(), description: ticketDescription.trim(), priority: ticketPriority, customerId });
+      await refetch();
+      push({ variant: "success", title: "Ticket logged." });
+      setTicketTitle("");
+      setTicketDescription("");
+      setTicketPriority("MEDIUM");
+      setTicketOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not log ticket", description: extractApiError(err).message });
+    }
+  }
+
+  async function submitProduct() {
+    if (!productName.trim()) {
+      push({ variant: "error", title: "Product name is required." });
+      return;
+    }
+    try {
+      await addProduct.mutateAsync({
+        name: productName.trim(),
+        quantity: productQuantity ? Number(productQuantity) : undefined,
+        amount: productAmount ? Number(productAmount) : undefined,
+        purchasedAt: productPurchasedAt || undefined,
+        notes: productNotes || undefined,
+      });
+      push({ variant: "success", title: "Product added." });
+      setProductName("");
+      setProductQuantity("");
+      setProductAmount("");
+      setProductPurchasedAt("");
+      setProductNotes("");
+      setProductOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not add product", description: extractApiError(err).message });
+    }
+  }
+
+  async function submitInteraction() {
+    if (!interactionSubject.trim() || !interactionOccurredAt) {
+      push({ variant: "error", title: "Subject and date are required." });
+      return;
+    }
+    try {
+      await addInteraction.mutateAsync({
+        type: interactionType,
+        subject: interactionSubject.trim(),
+        occurredAt: interactionOccurredAt,
+        notes: interactionNotes || undefined,
+      });
+      push({ variant: "success", title: "Activity logged." });
+      setInteractionSubject("");
+      setInteractionOccurredAt("");
+      setInteractionNotes("");
+      setInteractionType("CALL");
+      setInteractionOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not log activity", description: extractApiError(err).message });
     }
   }
 
@@ -396,6 +525,119 @@ export default function CustomerDetailPage() {
             ))}
           </div>
         </Card>
+
+        {isLocalhost && (
+          <>
+            {/* Support Tickets */}
+            <Card className="p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-800">
+                  <LifeBuoy className="mr-1.5 inline h-4 w-4 text-slate-400" /> Support Tickets
+                </p>
+                {canManage && (
+                  <Button variant="ghost" size="sm" onClick={() => setTicketOpen(true)}>
+                    <Plus className="h-3.5 w-3.5" /> Log Ticket
+                  </Button>
+                )}
+              </div>
+              {customer.tickets.items.length === 0 && <p className="text-sm text-slate-400">No support tickets yet.</p>}
+              <div className="space-y-1.5">
+                {customer.tickets.items.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 px-2.5 py-2 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-800">{t.title}</p>
+                      <p className="font-mono text-xs text-slate-400">{t.ticketId}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <Badge tone={TICKET_PRIORITY_TONE[t.priority]}>{t.priority}</Badge>
+                      <Badge tone={TICKET_STATUS_TONE[t.status]}>{t.status.replace("_", " ")}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Products Purchased */}
+            <Card className="p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-800">
+                  <Package className="mr-1.5 inline h-4 w-4 text-slate-400" /> Products Purchased
+                </p>
+                {canManage && (
+                  <Button variant="ghost" size="sm" onClick={() => setProductOpen(true)}>
+                    <Plus className="h-3.5 w-3.5" /> Add
+                  </Button>
+                )}
+              </div>
+              {customer.products.length === 0 && <p className="text-sm text-slate-400">No products recorded yet.</p>}
+              <div className="space-y-2">
+                {customer.products.map((p) => (
+                  <div key={p.id} className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 p-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-400">
+                        {[p.quantity != null && `Qty ${p.quantity}`, p.amount != null && `AED ${p.amount.toLocaleString()}`, p.purchasedAt && format(new Date(p.purchasedAt), "d MMM yyyy")]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
+                      </p>
+                    </div>
+                    {canManage && (
+                      <button
+                        className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500"
+                        onClick={() => deleteProduct.mutateAsync(p.id)}
+                        aria-label="Remove product"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Activity Log — Emails / Calls / Meetings */}
+            <Card className="p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-800">
+                  <Video className="mr-1.5 inline h-4 w-4 text-slate-400" /> Emails, Calls &amp; Meetings
+                </p>
+                {canManage && (
+                  <Button variant="ghost" size="sm" onClick={() => setInteractionOpen(true)}>
+                    <Plus className="h-3.5 w-3.5" /> Log Activity
+                  </Button>
+                )}
+              </div>
+              {customer.interactions.length === 0 && <p className="text-sm text-slate-400">No activity logged yet.</p>}
+              <div className="space-y-2">
+                {customer.interactions.map((i) => {
+                  const Icon = INTERACTION_ICON[i.type];
+                  return (
+                    <div key={i.id} className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 p-2.5">
+                      <div className="flex min-w-0 flex-1 items-start gap-2">
+                        <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-800">{i.subject}</p>
+                          <p className="text-xs text-slate-400">
+                            {INTERACTION_LABEL[i.type]} · {format(new Date(i.occurredAt), "d MMM yyyy, HH:mm")} · {i.loggedBy.name}
+                          </p>
+                        </div>
+                      </div>
+                      {canManage && (
+                        <button
+                          className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500"
+                          onClick={() => deleteInteraction.mutateAsync(i.id)}
+                          aria-label="Remove activity"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Documents */}
@@ -530,6 +772,118 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       </Modal>
+
+      {isLocalhost && (
+        <>
+          <Modal open={ticketOpen} onClose={() => setTicketOpen(false)} title="Log Support Ticket">
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <Input value={ticketTitle} onChange={(e) => setTicketTitle(e.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Description <span className="text-red-500">*</span>
+                </label>
+                <Textarea rows={4} value={ticketDescription} onChange={(e) => setTicketDescription(e.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Priority</label>
+                <Select value={ticketPriority} onChange={(e) => setTicketPriority(e.target.value as typeof ticketPriority)}>
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setTicketOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={submitTicket} loading={createTicket.isPending}>
+                  Log Ticket
+                </Button>
+              </div>
+            </div>
+          </Modal>
+
+          <Modal open={productOpen} onClose={() => setProductOpen(false)} title="Add Product Purchased">
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Product Name <span className="text-red-500">*</span>
+                </label>
+                <Input value={productName} onChange={(e) => setProductName(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Quantity</label>
+                  <Input type="number" min="1" value={productQuantity} onChange={(e) => setProductQuantity(e.target.value)} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Amount</label>
+                  <Input type="number" min="0" step="0.01" value={productAmount} onChange={(e) => setProductAmount(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Purchase Date</label>
+                <Input type="date" value={productPurchasedAt} onChange={(e) => setProductPurchasedAt(e.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Notes</label>
+                <Textarea rows={3} value={productNotes} onChange={(e) => setProductNotes(e.target.value)} />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setProductOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={submitProduct} loading={addProduct.isPending}>
+                  Add Product
+                </Button>
+              </div>
+            </div>
+          </Modal>
+
+          <Modal open={interactionOpen} onClose={() => setInteractionOpen(false)} title="Log Activity">
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Type</label>
+                <Select value={interactionType} onChange={(e) => setInteractionType(e.target.value as typeof interactionType)}>
+                  <option value="EMAIL">Email</option>
+                  <option value="CALL">Call</option>
+                  <option value="MEETING">Meeting</option>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Subject <span className="text-red-500">*</span>
+                </label>
+                <Input value={interactionSubject} onChange={(e) => setInteractionSubject(e.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Date &amp; Time <span className="text-red-500">*</span>
+                </label>
+                <Input type="datetime-local" value={interactionOccurredAt} onChange={(e) => setInteractionOccurredAt(e.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Notes</label>
+                <Textarea rows={3} value={interactionNotes} onChange={(e) => setInteractionNotes(e.target.value)} />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setInteractionOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={submitInteraction} loading={addInteraction.isPending}>
+                  Log Activity
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        </>
+      )}
     </div>
   );
 }

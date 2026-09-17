@@ -178,6 +178,8 @@ model User {
   managedCustomers      Customer[]           @relation("CustomerAccountManager")
   uploadedCustomerDocs  CustomerDocument[]
   taskStatusUpdates     TaskStatusHistory[]
+  loggedCustomerProducts     CustomerProduct[]     @relation("CustomerProductCreatedBy")
+  loggedCustomerInteractions CustomerInteraction[] @relation("CustomerInteractionLoggedBy")
 
   @@index([status])
 }
@@ -507,10 +509,13 @@ model Customer {
   updatedAt        DateTime       @updatedAt
   isDeleted        Boolean        @default(false)
 
-  contacts  CustomerContact[]
-  documents CustomerDocument[]
-  tasks     Task[]
-  boards    Board[]
+  contacts     CustomerContact[]
+  documents    CustomerDocument[]
+  tasks        Task[]
+  boards       Board[]
+  tickets      SupportTicket[]
+  products     CustomerProduct[]
+  interactions CustomerInteraction[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -543,6 +548,48 @@ model CustomerDocument {
   uploadedBy    User     @relation(fields: [uploadedById], references: [id])
   scanStatus    String   @default("CLEAN")
   createdAt     DateTime @default(now())
+
+  @@index([customerId])
+}
+
+// A manually-logged record of something the customer bought — there's no
+// real inventory/ERP system to source this from yet, so this is just a
+// free-text record kept on the Customer 360 page.
+model CustomerProduct {
+  id          String    @id @default(uuid())
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name        String
+  quantity    Int?
+  amount      Float?
+  purchasedAt DateTime?
+  notes       String?
+  createdById String
+  createdBy   User      @relation("CustomerProductCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([customerId])
+}
+
+enum InteractionType {
+  EMAIL
+  CALL
+  MEETING
+}
+
+// A manually-logged customer touchpoint — not a real email/telephony
+// integration, just a record-keeping entry for the Customer 360 timeline.
+model CustomerInteraction {
+  id         String           @id @default(uuid())
+  customerId String
+  customer   Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  type       InteractionType
+  subject    String
+  notes      String?
+  occurredAt DateTime
+  loggedById String
+  loggedBy   User             @relation("CustomerInteractionLoggedBy", fields: [loggedById], references: [id])
+  createdAt  DateTime         @default(now())
 
   @@index([customerId])
 }
@@ -1066,6 +1113,8 @@ model SupportTicket {
   priority       TaskPriority @default(MEDIUM)
   createdById    String
   createdBy      User         @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  customerId     String?
+  customer       Customer?    @relation(fields: [customerId], references: [id])
   resolutionNote String?
   resolvedAt     DateTime?
   createdAt      DateTime     @default(now())
@@ -1074,6 +1123,7 @@ model SupportTicket {
   attachments TicketAttachment[]
 
   @@index([status])
+  @@index([customerId])
   @@index([createdById])
 }
 
