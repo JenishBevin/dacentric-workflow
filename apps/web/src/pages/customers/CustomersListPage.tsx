@@ -5,9 +5,10 @@ import { Plus, Building2, Upload, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from
 import { useCustomers, useCreateCustomer, useImportCustomers, useDeleteCustomer } from "../../api/customers";
 import { Button, Input, Select, Badge, Skeleton, ErrorState, EmptyState } from "../../components/ui/primitives";
 import { Drawer } from "../../components/ui/Drawer";
+import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
-import { CustomerStatus } from "../../lib/types";
+import { CustomerStatus, CustomerSummary } from "../../lib/types";
 import { can } from "../../lib/permissions";
 import { useAuth } from "../../context/AuthContext";
 
@@ -67,16 +68,14 @@ export default function CustomersListPage() {
   const importCustomers = useImportCustomers();
   const deleteCustomer = useDeleteCustomer();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CustomerSummary | null>(null);
 
-  async function handleDelete(c: { id: string; name: string; enquiryCount: number; projectCount: number }) {
-    const linked: string[] = [];
-    if (c.enquiryCount) linked.push(`${c.enquiryCount} enquir${c.enquiryCount === 1 ? "y" : "ies"}`);
-    if (c.projectCount) linked.push(`${c.projectCount} project${c.projectCount === 1 ? "" : "s"}`);
-    const warning = linked.length ? ` It still has ${linked.join(" and ")} linked to it.` : "";
-    if (!window.confirm(`Delete "${c.name}"?${warning} This removes it from the customer list.`)) return;
+  async function confirmDelete() {
+    if (!deleteTarget) return;
     try {
-      await deleteCustomer.mutateAsync(c.id);
+      await deleteCustomer.mutateAsync(deleteTarget.id);
       push({ variant: "success", title: "Customer deleted." });
+      setDeleteTarget(null);
     } catch (err) {
       push({ variant: "error", title: "Could not delete customer", description: extractApiError(err).message });
     }
@@ -178,10 +177,9 @@ export default function CustomersListPage() {
                   {canManage && (
                     <td className="px-4 py-2.5 text-right">
                       <button
-                        onClick={() => handleDelete(c)}
-                        disabled={deleteCustomer.isPending}
+                        onClick={() => setDeleteTarget(c)}
                         aria-label={`Delete ${c.name}`}
-                        className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                        className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -195,6 +193,44 @@ export default function CustomersListPage() {
       )}
 
       <NewCustomerDrawer open={newOpen} onClose={() => setNewOpen(false)} />
+
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete customer?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={confirmDelete} loading={deleteCustomer.isPending}>
+              Delete Customer
+            </Button>
+          </>
+        }
+      >
+        {deleteTarget && (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600">
+              Delete <span className="font-medium text-slate-900">{deleteTarget.name}</span> ({deleteTarget.customerId})? This removes it
+              from the customer list.
+            </p>
+            {(deleteTarget.enquiryCount > 0 || deleteTarget.projectCount > 0) && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                It still has{" "}
+                {[
+                  deleteTarget.enquiryCount > 0 && `${deleteTarget.enquiryCount} enquir${deleteTarget.enquiryCount === 1 ? "y" : "ies"}`,
+                  deleteTarget.projectCount > 0 && `${deleteTarget.projectCount} project${deleteTarget.projectCount === 1 ? "" : "s"}`,
+                ]
+                  .filter(Boolean)
+                  .join(" and ")}{" "}
+                linked to it.
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
