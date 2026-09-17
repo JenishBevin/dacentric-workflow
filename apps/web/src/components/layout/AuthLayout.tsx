@@ -1,9 +1,6 @@
 import React from "react";
 import qplusIcon from "../../assets/qplus-icon.png";
 import dubaiSkyline from "../../assets/dubai-skyline-sunset.jpg";
-import dacnexusLogo from "../../assets/dacnexus-logo.png";
-
-const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
 
 export const AuthLayout: React.FC<{ title: string; subtitle?: string; children: React.ReactNode }> = ({ title, subtitle, children }) => (
   <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1330] px-4 py-10">
@@ -22,12 +19,6 @@ export const AuthLayout: React.FC<{ title: string; subtitle?: string; children: 
     <div className="relative z-10 w-full max-w-sm">
       <div className="mb-6 flex flex-col items-center gap-2 text-center">
         <div className="flex items-center gap-2">
-          {isLocalhost && (
-            <>
-              <img src={dacnexusLogo} alt="DaCneXus" className="h-12 w-auto object-contain" />
-              <div className="mx-1 h-8 w-px bg-white/20" />
-            </>
-          )}
           <img src={qplusIcon} alt="" className="h-12 w-12 object-contain" />
           <h1 className="text-xl font-bold text-white">
             Q<span className="text-amber-400">Plus</span>

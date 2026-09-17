@@ -10,9 +10,6 @@ import { useAuth } from "../../context/AuthContext";
 import { extractApiError } from "../../lib/apiClient";
 import qplusIcon from "../../assets/qplus-icon.png";
 import dubaiSkyline from "../../assets/dubai-skyline-sunset.jpg";
-import dacnexusLogo from "../../assets/dacnexus-logo.png";
-
-const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
 
 const schema = z.object({
   email: z.string().email("Enter a valid work email."),
@@ -66,12 +63,6 @@ export default function LoginPage() {
         <div className="hidden flex-1 flex-col items-center gap-8 lg:flex">
           <div className="text-center">
             <div className="flex items-center justify-center gap-3">
-              {isLocalhost && (
-                <>
-                  <img src={dacnexusLogo} alt="DaCneXus" className="h-16 w-auto object-contain" />
-                  <div className="mx-1 h-12 w-px bg-white/20" />
-                </>
-              )}
               <img src={qplusIcon} alt="" className="h-16 w-16 object-contain" />
               <h1 className="text-4xl font-extrabold tracking-tight text-white">
                 Q<span className="text-amber-400">Plus</span>
@@ -96,12 +87,6 @@ export default function LoginPage() {
         <div className="w-full max-w-sm lg:max-w-md">
           <div className="mb-6 flex flex-col items-center gap-2 text-center lg:hidden">
             <div className="flex items-center gap-2">
-              {isLocalhost && (
-                <>
-                  <img src={dacnexusLogo} alt="DaCneXus" className="h-12 w-auto object-contain" />
-                  <div className="mx-1 h-8 w-px bg-white/20" />
-                </>
-              )}
               <img src={qplusIcon} alt="" className="h-12 w-12 object-contain" />
               <h1 className="text-xl font-bold text-white">
                 Q<span className="text-amber-400">Plus</span>
