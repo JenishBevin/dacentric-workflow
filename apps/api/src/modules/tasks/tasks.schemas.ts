@@ -5,7 +5,7 @@ const isoDate = z.coerce.date();
 
 export const createTaskSchema = z
   .object({
-    boardId: z.string().uuid("Board is required."),
+    boardId: z.string().uuid().optional(),
     stageId: z.string().uuid().optional(),
     serviceId: z.string().uuid().optional(),
     customerId: z.string().uuid().optional().nullable(),

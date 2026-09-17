@@ -10,11 +10,11 @@ import { computeDueDateStatus } from "./task-formatting";
 import { formatTaskId, formatProjectId, formatEstimationId, formatEnquiryId, formatProcurementId, AuditAction, TaskApprovalStatus, TaskType, TaskPriority, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
 import { getPermissionScope, scopeAtLeast, isSystemLevelAdmin } from "../../common/permissions";
 import { createRecurringSeries, attachTemplateAndScheduleFirst } from "../recurrence/recurrence.service";
-import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard, getOrCreateAccountsBoard, ACCOUNTS_BOARD_NAME } from "../boards/boards.service";
+import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard, getOrCreateAccountsBoard, ACCOUNTS_BOARD_NAME, getOrCreatePersonalBoard } from "../boards/boards.service";
 import { nextYearlySequence } from "../../common/sequence";
 
 export interface CreateTaskInput {
-  boardId: string;
+  boardId?: string;
   stageId?: string;
   serviceId?: string;
   customerId?: string | null;
@@ -102,17 +102,19 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
   await assertActiveWorkflowUsers(input.assigneeUserIds);
   if (input.approverUserId) await assertActiveWorkflowUsers([input.approverUserId]);
 
-  const board = await prisma.board.findFirst({ where: { id: input.boardId, isDeleted: false } });
+  const boardId = input.boardId ?? (await getOrCreatePersonalBoard(actor)).id;
+
+  const board = await prisma.board.findFirst({ where: { id: boardId, isDeleted: false } });
   if (!board) throw Errors.notFound("Board");
 
   const stage = input.stageId
-    ? await prisma.boardStage.findFirst({ where: { id: input.stageId, boardId: input.boardId } })
-    : await prisma.boardStage.findFirst({ where: { boardId: input.boardId }, orderBy: { position: "asc" } });
+    ? await prisma.boardStage.findFirst({ where: { id: input.stageId, boardId } })
+    : await prisma.boardStage.findFirst({ where: { boardId }, orderBy: { position: "asc" } });
   if (!stage) throw Errors.badRequest("Selected board has no stages configured.");
 
   let seriesId: string | undefined;
   if (input.recurring) {
-    const series = await createRecurringSeries(input.boardId, input.recurring, actor);
+    const series = await createRecurringSeries(boardId, input.recurring, actor);
     seriesId = series.id;
   }
 
@@ -120,7 +122,7 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
     const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
     const created = await tx.task.create({
       data: {
-        boardId: input.boardId,
+        boardId,
         stageId: stage.id,
         serviceId: input.serviceId ?? null,
         customerId: input.customerId ?? null,
@@ -172,7 +174,7 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
       title: input.title,
       description: task.description,
       priority: input.priority,
-      boardId: input.boardId,
+      boardId,
       stageId: stage.id,
       assigneeUserIds: input.assigneeUserIds,
       estimatedEffortHours: input.estimatedEffortHours ?? undefined,
@@ -189,7 +191,7 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
     action: AuditAction.CREATE,
     entityType: "Task",
     entityId: task.id,
-    boardId: input.boardId,
+    boardId,
     afterValue: { title: task.title, taskId: task.taskId },
   });
 
@@ -197,7 +199,7 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
     event: NotificationEvent.TASK_ASSIGNED,
     title: `You were assigned to ${task.taskId}: ${task.title}`,
     taskId: task.id,
-    boardId: input.boardId,
+    boardId,
   });
 
   if (input.requiresApproval && input.approverUserId) {

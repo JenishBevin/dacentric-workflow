@@ -339,6 +339,53 @@ export async function getOrCreateAccountsBoard(actor: AuthedUser) {
   return { id: board.id, name: board.name };
 }
 
+// A private, per-user catch-all board — unlike the company-wide system boards
+// above, each user gets their own (looked up by createdById, not just name),
+// so a task can be created without picking a project at all.
+export const PERSONAL_BOARD_NAME = "Personal Tasks";
+const PERSONAL_STAGES = [
+  { name: "To Do", color: "#60a5fa", isTerminal: false },
+  { name: "In Progress", color: "#f59e0b", isTerminal: false },
+  { name: "Done", color: "#22c55e", isTerminal: true },
+];
+
+export async function getOrCreatePersonalBoard(actor: AuthedUser) {
+  let board = await prisma.board.findFirst({ where: { name: PERSONAL_BOARD_NAME, createdById: actor.id, isDeleted: false } });
+
+  if (!board) {
+    board = await prisma.$transaction(async (tx) => {
+      const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
+      const created = await tx.board.create({
+        data: {
+          boardId: placeholderId,
+          name: PERSONAL_BOARD_NAME,
+          description: "Tasks that aren't tied to any project.",
+          boardType: BoardType.STANDALONE,
+          createdById: actor.id,
+          stages: {
+            create: PERSONAL_STAGES.map((s, idx) => ({ name: s.name, color: s.color, position: idx, isTerminal: s.isTerminal ?? false })),
+          },
+          members: { create: [{ userId: actor.id, role: "OWNER" }] },
+        },
+      });
+      const year = new Date().getFullYear();
+      const sequence = await nextYearlySequence("PROJECT", year, tx);
+      return tx.board.update({ where: { id: created.id }, data: { boardId: formatProjectId(year, sequence) } });
+    });
+
+    await writeAudit({
+      actor,
+      action: AuditAction.CREATE,
+      entityType: "Board",
+      entityId: board.id,
+      boardId: board.id,
+      afterValue: { name: board.name, boardType: board.boardType, system: true, personal: true },
+    });
+  }
+
+  return { id: board.id, name: board.name };
+}
+
 // ---------------------------------------------------------------------------
 // List of Services — the fixed company service catalog (seeded by
 // servicesSeed.ts). "Projects" nav shows this list first; picking one shows

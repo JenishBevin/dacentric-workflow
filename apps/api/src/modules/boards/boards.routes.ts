@@ -67,6 +67,13 @@ boardsRouter.get(
   asyncHandler(async (req, res) => ok(res, await boardsService.getOrCreateAccountsBoard(req.user!)))
 );
 
+// Same ordering requirement as "/enquiry-list" above.
+boardsRouter.get(
+  "/personal-tasks",
+  requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await boardsService.getOrCreatePersonalBoard(req.user!)))
+);
+
 // Every board that has an attached ProcurementRecord — the "Procurement" nav.
 // Must come before "/:boardId" — otherwise Express would capture
 // "procurement" as a boardId path param and never reach this handler.

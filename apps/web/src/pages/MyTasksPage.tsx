@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { List, LayoutGrid, Plus } from "lucide-react";
 import { useMyTasks } from "../api/misc";
 import { useQuickComplete, useMoveTask } from "../api/tasks";
-import { useBoardDetail, useBoards } from "../api/boards";
+import { useBoardDetail, useBoards, usePersonalTasksBoard } from "../api/boards";
 import { Button, Checkbox, Skeleton, EmptyState, ErrorState, Badge } from "../components/ui/primitives";
 import { PriorityBadge, DueDateBadge, ChecklistProgress } from "../components/workflow/badges";
 import { MoveToStageSheet, MovableTask } from "../components/kanban/MoveToStageSheet";
@@ -55,6 +55,7 @@ export default function MyTasksPage() {
   const [newTaskBoardId, setNewTaskBoardId] = useState<string | null>(null);
   const { data: myBoards } = useBoards({ scope: "MY" });
   const { data: newTaskBoard } = useBoardDetail(newTaskBoardId ?? undefined);
+  const { data: personalBoard } = usePersonalTasksBoard(boardPickerOpen);
 
   useEffect(() => {
     if (searchParams.get("newTask")) {
@@ -213,20 +214,38 @@ export default function MyTasksPage() {
 
       <Modal open={boardPickerOpen} onClose={() => setBoardPickerOpen(false)} title="Create task on which project?">
         <div className="max-h-64 space-y-1 overflow-y-auto">
-          {myBoards?.map((b) => (
-            <button
-              key={b.id}
-              onClick={() => {
-                setNewTaskBoardId(b.id);
-                setBoardPickerOpen(false);
-              }}
-              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50"
-            >
-              {b.name}
-              <span className="text-xs text-slate-400">{b.stageCount} stages</span>
-            </button>
-          ))}
-          {myBoards?.length === 0 && <p className="text-sm text-slate-400">You aren't a member of any projects yet.</p>}
+          <button
+            onClick={() => {
+              if (!personalBoard) return;
+              setNewTaskBoardId(personalBoard.id);
+              setBoardPickerOpen(false);
+            }}
+            disabled={!personalBoard}
+            className="mb-1 flex w-full items-center justify-between rounded-lg border border-dashed border-slate-300 px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:cursor-wait disabled:opacity-60"
+          >
+            No project — personal task
+            <span className="text-xs font-normal text-slate-400">Just for you</span>
+          </button>
+          {(() => {
+            const otherBoards = myBoards?.filter((b) => b.id !== personalBoard?.id) ?? [];
+            return otherBoards.length > 0 ? (
+              otherBoards.map((b) => (
+                <button
+                  key={b.id}
+                  onClick={() => {
+                    setNewTaskBoardId(b.id);
+                    setBoardPickerOpen(false);
+                  }}
+                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50"
+                >
+                  {b.name}
+                  <span className="text-xs text-slate-400">{b.stageCount} stages</span>
+                </button>
+              ))
+            ) : (
+              <p className="px-3 py-1 text-sm text-slate-400">You aren't a member of any other projects yet.</p>
+            );
+          })()}
         </div>
       </Modal>
 

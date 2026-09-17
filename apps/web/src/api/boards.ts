@@ -55,6 +55,18 @@ export function useAccountsBoard() {
   });
 }
 
+/** Same lazy-provisioning pattern, but per-user rather than company-wide —
+ * lets a task be created without picking a project. `enabled` defaults to
+ * true; pass false to avoid provisioning the board until it's actually needed. */
+export function usePersonalTasksBoard(enabled = true) {
+  return useQuery({
+    queryKey: ["personal-tasks-board"],
+    queryFn: async () => (await api.get<{ data: { id: string; name: string } }>("/boards/personal-tasks")).data.data,
+    retry: false,
+    enabled,
+  });
+}
+
 export interface ProcurementRecord {
   id: string;
   boardId: string;
