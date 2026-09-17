@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import {
   LayoutDashboard,
@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { can, isSuperAdmin } from "../../lib/permissions";
+import { isLocalhost } from "../../lib/isLocalhost";
 import { useMyTasks, useHrmsLeaveRequests } from "../../api/misc";
 import qplusIcon from "../../assets/qplus-icon.png";
 import { useAllTickets } from "../../api/tickets";
@@ -146,12 +147,15 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
         </button>
       </div>
 
-      {!isStaff && <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} visible badge={undefined} onNavigate={onCloseMobile} />}
+      {/* On localhost, clicking "Workflow" below already opens this same
+          page, making this separate link redundant — kept in production,
+          where that module-header click-through doesn't apply. */}
+      {!isStaff && !isLocalhost && <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} visible badge={undefined} onNavigate={onCloseMobile} />}
 
       <div className="flex flex-col gap-1">
-        <ModuleGroup title="Workflow" items={workflowItems} onNavigate={onCloseMobile} />
-        <ModuleGroup title="CRM" items={crmItems} onNavigate={onCloseMobile} />
-        <ModuleGroup title="HRMS" items={hrmsItems} onNavigate={onCloseMobile} />
+        <ModuleGroup title="Workflow" items={workflowItems} onNavigate={onCloseMobile} dashboardTo="/" />
+        <ModuleGroup title="CRM" items={crmItems} onNavigate={onCloseMobile} dashboardTo="/crm" />
+        <ModuleGroup title="HRMS" items={hrmsItems} onNavigate={onCloseMobile} dashboardTo="/hrms" />
         <ModuleGroup title="ERP" items={erpItems} onNavigate={onCloseMobile} />
       </div>
       <NavSection title="Tools" items={toolsItems} onNavigate={onCloseMobile} />
@@ -192,19 +196,30 @@ const NavSection: React.FC<NavSectionProps> = ({ title, items, onNavigate }) => 
 // than a plain section label. Expanded by default, and forced visibly
 // "current" (via containsActive) whenever the active route is one of its
 // own children, even while collapsed.
-const ModuleGroup: React.FC<{ title: string; items: NavItem[]; onNavigate?: () => void }> = ({ title, items, onNavigate }) => {
+//
+// `dashboardTo`, when given, also makes the header itself navigate to that
+// module's dashboard on click (alongside the usual expand/collapse) — a
+// localhost-only preview (see ../../lib/isLocalhost) of per-module
+// dashboards, so it's a no-op in production even if passed.
+const ModuleGroup: React.FC<{ title: string; items: NavItem[]; onNavigate?: () => void; dashboardTo?: string }> = ({ title, items, onNavigate, dashboardTo }) => {
   const visible = items.filter((i) => i.visible);
   const location = useLocation();
-  const containsActive = visible.some((i) => location.pathname.startsWith(i.to));
+  const navigate = useNavigate();
+  const containsActive = visible.some((i) => location.pathname.startsWith(i.to)) || (!!dashboardTo && location.pathname === dashboardTo);
   const [open, setOpen] = React.useState(true);
 
   if (!visible.length) return null;
+
+  function handleHeaderClick() {
+    setOpen((o) => !o);
+    if (isLocalhost && dashboardTo) navigate(dashboardTo);
+  }
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleHeaderClick}
         className={clsx(
           "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors",
           containsActive ? "bg-brand-600/15 text-brand-300" : "text-slate-400 hover:bg-white/5 hover:text-white"

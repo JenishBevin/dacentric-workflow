@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import clsx from "clsx";
 import { Plus, Building2, Upload, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from "lucide-react";
 import { useCustomers, useCreateCustomer, useImportCustomers, useDeleteCustomer } from "../../api/customers";
@@ -45,8 +45,9 @@ const SortableHeader: React.FC<{
 export default function CustomersListPage() {
   const { user } = useAuth();
   const { push } = useToast();
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(() => searchParams.get("status") ?? "");
   const { data: customers, isLoading, isError, refetch } = useCustomers({ search: search || undefined, status: status || undefined });
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" } | null>(null);
   const sortedCustomers = useMemo(() => {

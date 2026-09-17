@@ -76,6 +76,43 @@ export function StatCard({
   );
 }
 
+/** Simpler stat tile (icon + number + label, no decorative photo) for
+ * dashboards that don't have themed background images available — CRM and
+ * HRMS, unlike the Workflow dashboards above. */
+export function MiniStatCard({
+  icon: Icon,
+  label,
+  value,
+  tone,
+  onClick,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number | string;
+  tone: string;
+  onClick?: () => void;
+}) {
+  return (
+    <Card
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => (e.key === "Enter" || e.key === " ") && onClick() : undefined}
+      className={clsx(
+        "p-3 text-left",
+        onClick &&
+          "group cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-brand-500"
+      )}
+    >
+      <div className={clsx("mb-2 flex h-8 w-8 items-center justify-center rounded-lg transition-transform duration-150", onClick && "group-hover:scale-110", tone)}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <p className="text-xl font-semibold text-slate-900">{value}</p>
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+    </Card>
+  );
+}
+
 export function BoardOverviewCard({ board }: { board: Board }) {
   const status =
     board.overdueTaskCount > 0

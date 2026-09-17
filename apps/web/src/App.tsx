@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Spinner } from "./components/ui/primitives";
+import { isLocalhost } from "./lib/isLocalhost";
 
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/auth/ForgotPasswordPage"));
@@ -10,6 +11,8 @@ const ResetPasswordPage = lazy(() => import("./pages/auth/ResetPasswordPage"));
 const ActivateAccountPage = lazy(() => import("./pages/auth/ActivateAccountPage"));
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const CrmDashboardPage = lazy(() => import("./pages/dashboard/CrmDashboardPage"));
+const HrmsDashboardPage = lazy(() => import("./pages/dashboard/HrmsDashboardPage"));
 const BoardsListPage = lazy(() => import("./pages/boards/BoardsListPage"));
 const ServiceProjectsPage = lazy(() => import("./pages/boards/ServiceProjectsPage"));
 const BoardKanbanPage = lazy(() => import("./pages/boards/BoardKanbanPage"));
@@ -69,6 +72,10 @@ export default function App() {
           }
         >
           <Route path="/" element={<DashboardPage />} />
+          {/* Per-module dashboards — localhost-only preview, reached by clicking
+              a module name in the sidebar (see Sidebar.tsx's ModuleGroup). */}
+          {isLocalhost && <Route path="/crm" element={<CrmDashboardPage />} />}
+          {isLocalhost && <Route path="/hrms" element={<HrmsDashboardPage />} />}
           <Route path="/workflow/boards" element={<BoardsListPage />} />
           <Route path="/workflow/boards/service/:serviceId" element={<ServiceProjectsPage />} />
           <Route path="/workflow/boards/:boardId" element={<BoardKanbanPage />} />
