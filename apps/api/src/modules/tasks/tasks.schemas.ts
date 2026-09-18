@@ -116,6 +116,12 @@ export const rejectApprovalSchema = z.object({
   reason: z.string().min(1, "A rejection reason is required."),
 });
 
+export const saveEstimationQuoteSchema = z.object({
+  currency: z.string().min(1).max(10),
+  amount: z.number().nonnegative(),
+  vatRate: z.number().min(0).max(100),
+});
+
 // Only actually required when the task is on Enquiry List (checked in
 // requestLostApproval itself) — every other board's Lost action ignores it.
 export const requestLostSchema = z.object({

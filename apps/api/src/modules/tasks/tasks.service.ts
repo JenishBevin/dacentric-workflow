@@ -10,7 +10,7 @@ import { computeDueDateStatus } from "./task-formatting";
 import { formatTaskId, formatProjectId, formatEstimationId, formatEnquiryId, formatProcurementId, AuditAction, TaskApprovalStatus, TaskType, TaskPriority, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
 import { getPermissionScope, scopeAtLeast, isSystemLevelAdmin } from "../../common/permissions";
 import { createRecurringSeries, attachTemplateAndScheduleFirst } from "../recurrence/recurrence.service";
-import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard, getOrCreateAccountsBoard, ACCOUNTS_BOARD_NAME, getOrCreatePersonalBoard } from "../boards/boards.service";
+import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard, ACCOUNTS_BOARD_NAME, getOrCreatePersonalBoard } from "../boards/boards.service";
 import { nextYearlySequence } from "../../common/sequence";
 
 export interface CreateTaskInput {
@@ -51,6 +51,55 @@ async function ensureEstimationRecord(tx: any, taskId: string) {
   const year = new Date().getFullYear();
   const sequence = await nextYearlySequence("ESTIMATION", year, tx);
   return tx.estimationRecord.create({ data: { taskId, year, sequence, estimationId: formatEstimationId(year, sequence) } });
+}
+
+export interface SaveEstimationQuoteInput {
+  currency: string;
+  amount: number;
+  vatRate: number;
+}
+
+/** The "Create Quotation" popup on an Estimation-board task — multi-currency
+ * (default AED, per NewTaskDrawer/frontend), with VAT computed server-side
+ * from whatever rate the client sends (5% is only a suggested default for
+ * AED, applied client-side, not hard-coded here). */
+export async function saveEstimationQuote(taskId: string, input: SaveEstimationQuoteInput, actor: AuthedUser) {
+  const ctx = await loadTaskWithAccess(taskId, actor);
+  assertCanEditTask(ctx);
+
+  if (ctx.task.board?.name !== ESTIMATION_BOARD_NAME) {
+    throw Errors.badRequest("Quotations can only be created while a task is on the Estimation board.");
+  }
+
+  const estimationRecord = await ensureEstimationRecord(prisma, taskId);
+
+  const vatAmount = Math.round(input.amount * (input.vatRate / 100) * 100) / 100;
+  const totalAmount = Math.round((input.amount + vatAmount) * 100) / 100;
+
+  const updated = await prisma.estimationRecord.update({
+    where: { id: estimationRecord.id },
+    data: {
+      currency: input.currency,
+      amount: input.amount,
+      vatRate: input.vatRate,
+      vatAmount,
+      totalAmount,
+      quotedAt: new Date(),
+      quotedById: actor.id,
+    },
+  });
+
+  await writeAudit({
+    actor,
+    action: AuditAction.EDIT,
+    entityType: "EstimationRecord",
+    entityId: updated.id,
+    boardId: ctx.task.boardId,
+    field: "quotation",
+    afterValue: { currency: updated.currency, amount: updated.amount, vatRate: updated.vatRate, vatAmount: updated.vatAmount, totalAmount: updated.totalAmount },
+  });
+
+  return updated;
 }
 
 // Same idea, for a task's first (and only ever) landing on the Enquiry List
@@ -254,6 +303,16 @@ function serializeTask(task: any) {
     isCompleted: task.isCompleted,
     isHighlighted: task.isHighlighted,
     estimationId: task.estimationRecord?.estimationId ?? null,
+    quotation: task.estimationRecord?.amount != null
+      ? {
+          currency: task.estimationRecord.currency,
+          amount: task.estimationRecord.amount,
+          vatRate: task.estimationRecord.vatRate,
+          vatAmount: task.estimationRecord.vatAmount,
+          totalAmount: task.estimationRecord.totalAmount,
+          quotedAt: task.estimationRecord.quotedAt,
+        }
+      : null,
     enquiryId: task.enquiryRecord?.enquiryId ?? null,
     requiresApproval: task.requiresApproval,
     approverUserId: task.approverUserId,
@@ -300,7 +359,7 @@ const TASK_DETAIL_INCLUDE = {
   linkedRecord: { include: { linkedRecord: true } },
   blockingLinks: { include: { targetTask: true } },
   _count: { select: { attachments: true, comments: true } },
-  estimationRecord: { select: { estimationId: true } },
+  estimationRecord: { select: { estimationId: true, currency: true, amount: true, vatRate: true, vatAmount: true, totalAmount: true, quotedAt: true } },
   enquiryRecord: { select: { enquiryId: true } },
 };
 
@@ -488,6 +547,11 @@ export async function moveTask(
   const targetStage = await prisma.boardStage.findFirst({ where: { id: targetStageId, boardId: ctx.task.boardId } });
   if (!targetStage) throw Errors.badRequest("Target stage does not belong to this board.");
 
+  // --- Accounts sign-off gate — see awardTask()'s "Stage 2" ---
+  if (targetStage.isTerminal && (ctx.task.board as any)?.accountsApprovalStatus === "PENDING") {
+    throw Errors.forbidden("This project is waiting on Accounts approval — it can't be marked Lost or Completed until Accounts signs off.");
+  }
+
   if (targetStage.wipLimit) {
     const currentCount = await prisma.task.count({ where: { stageId: targetStageId, isDeleted: false, isCompleted: false } });
     if (currentCount >= targetStage.wipLimit && !confirmWipOverride) {
@@ -599,22 +663,24 @@ export async function moveTask(
 }
 
 // ---------------------------------------------------------------------------
-// Awarded — a three-stage pipeline:
+// Awarded — a two-stage pipeline:
 //   1. An Enquiry List task Awarded lands on the (lazily-provisioned)
 //      Estimation board instead of becoming a Project directly — no board is
 //      created yet, the task just moves and gets highlighted there.
-//   2. An Estimation-board task Awarded (Qualified) moves onto the
-//      (lazily-provisioned) Accounts board for sign-off — still no Project
-//      yet.
-//   3. An Accounts-board task Awarded is what actually spins up a real
-//      Project (under the task's chosen Service, if any) AND a
-//      ProcurementRecord for it in the same transaction, moving the task
-//      onto the new Project's first stage, highlighted. From here on the
-//      same task/board is reachable from both Projects and Procurement,
-//      switched with the toggle on the Project board.
-// Every other write only ever moves a task between stages of the SAME
-// board — this is the one path that reassigns a task's boardId, and it does
-// so at each of the three hand-off points above.
+//   2. An Estimation-board task Awarded spins up a real Project (under the
+//      task's chosen Service, if any) AND a ProcurementRecord for it, in the
+//      same transaction, immediately — so Accounts, Procurement, and the
+//      Project team all see it at the same time. It's gated behind Accounts
+//      sign-off from the moment it's created: Board.accountsApprovalStatus
+//      starts at PENDING, and moveTask()/setBoardCompleted() both refuse to
+//      let the task be marked Lost/Completed while it's still PENDING (see
+//      those functions). Accounts approves/rejects the *Board* directly
+//      (approveAccountsBoard/rejectAccountsBoard in boards.service.ts) —
+//      there's no separate "Accounts board" hand-off anymore.
+// A legacy branch below still handles any task that was already sitting on
+// the old Accounts board before this change shipped (sourceBoard.name ===
+// ACCOUNTS_BOARD_NAME) — Awarding it there still runs the old
+// approve-on-award behavior, since Accounts already fully owns it by then.
 // ---------------------------------------------------------------------------
 
 export async function awardTask(taskId: string, actor: AuthedUser) {
@@ -655,46 +721,77 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
     return { kind: "moved-to-estimation" as const, id: estimationBoard.id, name: estimationBoard.name };
   }
 
-  if (sourceBoard.name === ESTIMATION_BOARD_NAME) {
-    // Stage 2: move onto Accounts for sign-off — no Project exists yet.
-    const accountsStub = await getOrCreateAccountsBoard(actor);
-    const accountsBoard = await prisma.board.findUniqueOrThrow({
-      where: { id: accountsStub.id },
-      include: { stages: { orderBy: { position: "asc" } } },
-    });
-    const firstStage = accountsBoard.stages[0];
+  // Legacy branch: a task still physically sitting on the old Accounts
+  // board from before this pipeline change — Awarding it here still spins
+  // up the Project/Procurement (already fully signed off by Accounts by
+  // this point, so no PENDING gate is set).
+  if (sourceBoard.name === ACCOUNTS_BOARD_NAME) {
+    const { board: newBoard, firstStageId } = await createProjectFromAwardedTask(ctx.task, actor, null);
 
-    await prisma.task.update({
-      where: { id: taskId },
-      data: { boardId: accountsBoard.id, stageId: firstStage.id, isHighlighted: true, version: { increment: 1 } },
+    await writeAudit({
+      actor,
+      action: AuditAction.CREATE,
+      entityType: "Board",
+      entityId: newBoard.id,
+      boardId: newBoard.id,
+      afterValue: { name: newBoard.name, awardedFromTaskId: ctx.task.taskId },
     });
-
     await writeAudit({
       actor,
       action: AuditAction.MOVE,
       entityType: "Task",
       entityId: taskId,
-      boardId: accountsBoard.id,
-      metadata: { awarded: true, fromBoardId: sourceBoard.id, toBoardId: accountsBoard.id, toStageId: firstStage.id },
+      boardId: newBoard.id,
+      metadata: { awarded: true, fromBoardId: ctx.task.boardId, toBoardId: newBoard.id, toStageId: firstStageId },
     });
+    await recordStatusHistory(taskId, newBoard.stages[0].name, actor, "Awarded to Project");
 
-    await recordStatusHistory(taskId, firstStage.name, actor, "Qualified to Accounts");
-
-    return { kind: "moved-to-accounts" as const, id: accountsBoard.id, name: accountsBoard.name };
+    return { kind: "project-created" as const, id: newBoard.id, name: newBoard.name };
   }
 
-  // Stage 3: Accounts awarded — spin up the real Project and its
-  // ProcurementRecord together, so the two are never out of sync.
-  const { board: newBoard, firstStageId } = await prisma.$transaction(async (tx) => {
+  // Stage 2 (current pipeline): Estimation awarded — spin up the Project and
+  // its ProcurementRecord together immediately, pending Accounts sign-off.
+  const { board: newBoard, firstStageId } = await createProjectFromAwardedTask(ctx.task, actor, "PENDING");
+
+  await writeAudit({
+    actor,
+    action: AuditAction.CREATE,
+    entityType: "Board",
+    entityId: newBoard.id,
+    boardId: newBoard.id,
+    afterValue: { name: newBoard.name, awardedFromTaskId: ctx.task.taskId, accountsApprovalStatus: "PENDING" },
+  });
+  await writeAudit({
+    actor,
+    action: AuditAction.MOVE,
+    entityType: "Task",
+    entityId: taskId,
+    boardId: newBoard.id,
+    metadata: { awarded: true, fromBoardId: ctx.task.boardId, toBoardId: newBoard.id, toStageId: firstStageId, pendingAccountsApproval: true },
+  });
+
+  await recordStatusHistory(taskId, newBoard.stages[0].name, actor, "Awarded — pending Accounts approval");
+
+  return { kind: "project-created-pending-approval" as const, id: newBoard.id, name: newBoard.name };
+}
+
+/** Shared by both the current and legacy Award-to-Project paths: creates the
+ * Project board and its ProcurementRecord in one transaction, and moves the
+ * task onto the new board's first stage. `accountsApprovalStatus` is
+ * "PENDING" for a fresh award (current pipeline) or null for the legacy
+ * path, where Accounts has already signed off by the time this runs. */
+async function createProjectFromAwardedTask(task: { id: string; title: string; boardId: string } & Record<string, any>, actor: AuthedUser, accountsApprovalStatus: "PENDING" | null) {
+  return prisma.$transaction(async (tx) => {
     const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
     const created = await tx.board.create({
       data: {
         boardId: placeholderId,
-        name: ctx.task.title,
+        name: task.title,
         boardType: BoardType.STANDALONE,
-        serviceId: (ctx.task as any).serviceId ?? null,
-        customerId: (ctx.task as any).customerId ?? null,
+        serviceId: task.serviceId ?? null,
+        customerId: task.customerId ?? null,
         isHighlighted: true,
+        accountsApprovalStatus: accountsApprovalStatus ?? undefined,
         createdById: actor.id,
         stages: {
           create: DEFAULT_STAGES.map((s, idx) => ({
@@ -717,7 +814,7 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
     });
 
     await tx.task.update({
-      where: { id: taskId },
+      where: { id: task.id },
       data: { boardId: board.id, stageId: board.stages[0].id, isHighlighted: true, version: { increment: 1 } },
     });
 
@@ -729,27 +826,6 @@ export async function awardTask(taskId: string, actor: AuthedUser) {
 
     return { board, firstStageId: board.stages[0].id };
   });
-
-  await writeAudit({
-    actor,
-    action: AuditAction.CREATE,
-    entityType: "Board",
-    entityId: newBoard.id,
-    boardId: newBoard.id,
-    afterValue: { name: newBoard.name, awardedFromTaskId: ctx.task.taskId },
-  });
-  await writeAudit({
-    actor,
-    action: AuditAction.MOVE,
-    entityType: "Task",
-    entityId: taskId,
-    boardId: newBoard.id,
-    metadata: { awarded: true, fromBoardId: ctx.task.boardId, toBoardId: newBoard.id, toStageId: firstStageId },
-  });
-
-  await recordStatusHistory(taskId, newBoard.stages[0].name, actor, "Awarded to Project");
-
-  return { kind: "project-created" as const, id: newBoard.id, name: newBoard.name };
 }
 
 /** The "Lost" action on an enquiry — moves it to its board's "Lost" stage

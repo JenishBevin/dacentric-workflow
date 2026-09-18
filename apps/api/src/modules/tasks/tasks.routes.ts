@@ -26,6 +26,7 @@ import {
   watcherSchema,
   rejectApprovalSchema,
   requestLostSchema,
+  saveEstimationQuoteSchema,
 } from "./tasks.schemas";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma";
@@ -143,6 +144,14 @@ tasksRouter.post(
   "/:taskId/award",
   requirePermission(PermissionKey.CREATE_BOARD, "OWN"),
   asyncHandler(async (req, res) => ok(res, await tasksService.awardTask(req.params.taskId, req.user!)))
+);
+
+// The "Create Quotation" popup on an Estimation-board task.
+tasksRouter.put(
+  "/:taskId/quotation",
+  requirePermission(PermissionKey.EDIT_TASK, "OWN"),
+  validate(saveEstimationQuoteSchema),
+  asyncHandler(async (req, res) => ok(res, await tasksService.saveEstimationQuote(req.params.taskId, (req as any).validatedBody, req.user!)))
 );
 
 // The "Lost" action on an enquiry, the counterpart to "Qualified"/"Awarded".

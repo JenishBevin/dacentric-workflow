@@ -47,11 +47,40 @@ export function useEstimationBoard() {
 
 /** Same lazy-provisioning pattern, for the Accounts board that sits between
  * Estimation and Projects. */
-export function useAccountsBoard() {
+/** Every Project awaiting Accounts sign-off — the Project and its
+ * ProcurementRecord already exist by this point (see awardTask()), gated
+ * behind Board.accountsApprovalStatus rather than a literal Accounts board. */
+export function useAccountsPendingBoards(search?: string) {
   return useQuery({
-    queryKey: ["accounts-board"],
-    queryFn: async () => (await api.get<{ data: { id: string; name: string } }>("/boards/accounts")).data.data,
-    retry: false,
+    queryKey: ["accounts-pending-boards", search],
+    queryFn: async () => (await api.get("/boards/accounts", { params: { search: search || undefined } })).data.data,
+  });
+}
+
+export function useApproveAccountsBoard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (boardId: string) => (await api.post(`/boards/${boardId}/accounts-approve`)).data.data,
+    onSuccess: (_result, boardId) => {
+      qc.invalidateQueries({ queryKey: ["accounts-pending-boards"] });
+      qc.invalidateQueries({ queryKey: ["board", boardId] });
+      qc.invalidateQueries({ queryKey: ["boards"] });
+      qc.invalidateQueries({ queryKey: ["procurement-boards"] });
+    },
+  });
+}
+
+export function useRejectAccountsBoard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ boardId, reason }: { boardId: string; reason: string }) =>
+      (await api.post(`/boards/${boardId}/accounts-reject`, { reason })).data.data,
+    onSuccess: (_result, { boardId }) => {
+      qc.invalidateQueries({ queryKey: ["accounts-pending-boards"] });
+      qc.invalidateQueries({ queryKey: ["board", boardId] });
+      qc.invalidateQueries({ queryKey: ["boards"] });
+      qc.invalidateQueries({ queryKey: ["procurement-boards"] });
+    },
   });
 }
 

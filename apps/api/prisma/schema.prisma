@@ -180,6 +180,8 @@ model User {
   taskStatusUpdates     TaskStatusHistory[]
   loggedCustomerProducts     CustomerProduct[]     @relation("CustomerProductCreatedBy")
   loggedCustomerInteractions CustomerInteraction[] @relation("CustomerInteractionLoggedBy")
+  boardAccountsDecisions     Board[]               @relation("BoardAccountsDecidedBy")
+  estimationQuotes           EstimationRecord[]    @relation("EstimationQuotedBy")
 
   @@index([status])
 }
@@ -355,6 +357,15 @@ model Board {
   // flow, so it stands out wherever it's listed; cleared by the next edit
   // to the project (see updateBoard).
   isHighlighted   Boolean    @default(false)
+  // Set the moment Estimation awards a task: the Project and its
+  // ProcurementRecord are created immediately (see awardTask()), but stay
+  // gated behind Accounts sign-off — null on every board that never went
+  // through this pipeline (e.g. a plain manually-created project).
+  accountsApprovalStatus AccountsApprovalStatus?
+  accountsDecisionNote   String?
+  accountsDecidedById    String?
+  accountsDecidedBy      User?                   @relation("BoardAccountsDecidedBy", fields: [accountsDecidedById], references: [id])
+  accountsDecidedAt      DateTime?
   createdById     String
   createdBy       User       @relation("BoardCreatedBy", fields: [createdById], references: [id])
   createdAt       DateTime   @default(now())
@@ -372,6 +383,13 @@ model Board {
   @@index([isArchived, isDeleted])
   @@index([serviceId])
   @@index([customerId])
+  @@index([accountsApprovalStatus])
+}
+
+enum AccountsApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model BoardStage {
@@ -1022,6 +1040,18 @@ model EstimationRecord {
   sequence     Int
   estimationId String   @unique // formatted QPTS-2026-0001, from year + sequence (resets each year)
   createdAt    DateTime @default(now())
+
+  // Quotation — filled in from the Estimation task's "Create Quotation"
+  // popup. VAT is auto-applied at 5% for AED and left at 0% for every other
+  // currency by default, but quotedById can still override vatRate by hand.
+  currency    String    @default("AED")
+  amount      Float?
+  vatRate     Float     @default(0)
+  vatAmount   Float?
+  totalAmount Float?
+  quotedAt    DateTime?
+  quotedById  String?
+  quotedBy    User?     @relation("EstimationQuotedBy", fields: [quotedById], references: [id])
 }
 
 // Same idea as EstimationRecord, for tasks on the Enquiry List board —

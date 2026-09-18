@@ -274,6 +274,14 @@ export interface TaskSummary {
   isHighlighted: boolean;
   estimationId?: string | null;
   enquiryId?: string | null;
+  quotation?: {
+    currency: string;
+    amount: number;
+    vatRate: number;
+    vatAmount: number | null;
+    totalAmount: number | null;
+    quotedAt: string | null;
+  } | null;
   requiresApproval: boolean;
   approverUserId?: string | null;
   approvalStatus: TaskApprovalStatus;

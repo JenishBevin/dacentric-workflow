@@ -68,6 +68,7 @@ export default function ProcurementListPage() {
                 <th className="px-4 py-2.5">Service</th>
                 <th className="px-4 py-2.5">Vendor</th>
                 <th className="px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5">Accounts</th>
                 <th className="px-4 py-2.5">Updated</th>
               </tr>
             </thead>
@@ -85,6 +86,13 @@ export default function ProcurementListPage() {
                   <td className="px-4 py-2.5 text-xs text-slate-500">{r.procurement.vendorName ?? "—"}</td>
                   <td className="px-4 py-2.5">
                     <Badge tone={STATUS_TONE[r.procurement.status]}>{STATUS_LABEL[r.procurement.status] ?? r.procurement.status}</Badge>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {r.accountsApprovalStatus === "PENDING" ? (
+                      <Badge tone="amber">Awaiting approval</Badge>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-500">{format(new Date(r.procurement.updatedAt), "d MMM yyyy")}</td>
                 </tr>

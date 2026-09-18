@@ -99,16 +99,19 @@ export function useMoveTask() {
 }
 
 export interface AwardTaskResult {
-  kind: "moved-to-estimation" | "moved-to-accounts" | "project-created";
+  kind: "moved-to-estimation" | "project-created-pending-approval" | "project-created";
   id: string;
   name: string;
 }
 
-/** "Awarded" is a three-stage pipeline: from Enquiry List it moves the task
- * onto Estimation; from Estimation it moves onto Accounts for sign-off; from
- * Accounts it creates a new Project (and a ProcurementRecord alongside it)
- * under the task's Service and moves the task onto it. The `kind` on the
- * result tells the caller which one just happened. */
+/** "Awarded" is a two-stage pipeline: from Enquiry List it moves the task
+ * onto Estimation; from Estimation it immediately creates the Project (and
+ * a ProcurementRecord alongside it) under the task's Service, moving the
+ * task onto it — gated behind Accounts sign-off (accountsApprovalStatus on
+ * the new board) rather than a separate hand-off stage. `project-created` is
+ * only returned by the legacy path (a task still on the old Accounts
+ * board). The `kind` on the result tells the caller which one just
+ * happened. */
 export function useAwardTask() {
   const qc = useQueryClient();
   return useMutation({
@@ -117,9 +120,29 @@ export function useAwardTask() {
       invalidateTaskEverywhere(qc, taskId, result.id);
       qc.invalidateQueries({ queryKey: ["services"] });
       qc.invalidateQueries({ queryKey: ["estimation-board"] });
-      qc.invalidateQueries({ queryKey: ["accounts-board"] });
+      qc.invalidateQueries({ queryKey: ["accounts-pending-boards"] });
       qc.invalidateQueries({ queryKey: ["procurement-boards"] });
+      qc.invalidateQueries({ queryKey: ["boards"] });
     },
+  });
+}
+
+export interface EstimationQuote {
+  currency: string;
+  amount: number;
+  vatRate: number;
+  vatAmount: number | null;
+  totalAmount: number | null;
+  quotedAt: string | null;
+}
+
+/** The "Create Quotation" popup on an Estimation-board task. */
+export function useSaveEstimationQuote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, currency, amount, vatRate }: { taskId: string; currency: string; amount: number; vatRate: number }) =>
+      (await api.put<{ data: EstimationQuote }>(`/tasks/${taskId}/quotation`, { currency, amount, vatRate })).data.data,
+    onSuccess: (_result, { taskId }) => qc.invalidateQueries({ queryKey: ["task", taskId] }),
   });
 }
 

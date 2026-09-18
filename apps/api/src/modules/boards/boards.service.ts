@@ -524,6 +524,13 @@ export async function setBoardCompleted(boardId: string, completed: boolean, act
   const role = await assertBoardVisible(boardId, actor);
   assertIsBoardOwnerOrAdmin(role, actor);
 
+  if (completed) {
+    const existing = await prisma.board.findUniqueOrThrow({ where: { id: boardId } });
+    if (existing.accountsApprovalStatus === "PENDING") {
+      throw Errors.forbidden("This project is waiting on Accounts approval — it can't be marked Complete until Accounts signs off.");
+    }
+  }
+
   const board = await prisma.board.update({
     where: { id: boardId },
     data: { isCompleted: completed, completedAt: completed ? new Date() : null },
@@ -734,7 +741,126 @@ export async function listProcurementBoards(user: AuthedUser, search?: string) {
     customer: b.customer,
     isCompleted: b.isCompleted,
     procurement: b.procurementRecord,
+    accountsApprovalStatus: b.accountsApprovalStatus,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Accounts sign-off — every Project awarded straight from Estimation exists
+// (with its ProcurementRecord) the moment it's created, gated behind
+// Board.accountsApprovalStatus. This is the Accounts nav page's data source:
+// every board still PENDING, decided here rather than by moving a task
+// between stages (see awardTask() in tasks.service.ts for how it gets set).
+// ---------------------------------------------------------------------------
+
+export async function listAccountsPendingBoards(user: AuthedUser, search?: string) {
+  const boards = await prisma.board.findMany({
+    where: {
+      ...visibleBoardsWhere(user),
+      isDeleted: false,
+      accountsApprovalStatus: "PENDING",
+      ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
+    },
+    include: {
+      service: true,
+      customer: { select: { id: true, customerId: true, name: true } },
+      tasks: {
+        take: 1,
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          taskId: true,
+          priority: true,
+          estimationRecord: { select: { estimationId: true, currency: true, totalAmount: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  return boards.map((b) => ({
+    id: b.id,
+    boardId: b.boardId,
+    name: b.name,
+    service: b.service?.name ?? null,
+    customer: b.customer,
+    createdAt: b.createdAt,
+    task: b.tasks[0]
+      ? {
+          id: b.tasks[0].id,
+          taskId: b.tasks[0].taskId,
+          priority: b.tasks[0].priority,
+          estimationId: b.tasks[0].estimationRecord?.estimationId ?? null,
+          currency: b.tasks[0].estimationRecord?.currency ?? null,
+          totalAmount: b.tasks[0].estimationRecord?.totalAmount ?? null,
+        }
+      : null,
+  }));
+}
+
+export async function approveAccountsBoard(boardId: string, actor: AuthedUser) {
+  const canDecide = scopeAtLeast(getPermissionScope(actor.permissions, PermissionKey.CREATE_BOARD), "OWN");
+  if (!canDecide) throw Errors.forbidden("You do not have permission to do that.");
+
+  const board = await prisma.board.findFirst({ where: { id: boardId, isDeleted: false } });
+  if (!board) throw Errors.notFound("Project");
+  if (board.accountsApprovalStatus !== "PENDING") throw Errors.badRequest("This project isn't waiting on Accounts approval.");
+
+  const updated = await prisma.board.update({
+    where: { id: boardId },
+    data: { accountsApprovalStatus: "APPROVED", accountsDecidedById: actor.id, accountsDecidedAt: new Date(), accountsDecisionNote: null },
+  });
+
+  await writeAudit({
+    actor,
+    action: AuditAction.EDIT,
+    entityType: "Board",
+    entityId: boardId,
+    boardId,
+    field: "accountsApprovalStatus",
+    beforeValue: "PENDING",
+    afterValue: "APPROVED",
+  });
+
+  return { id: updated.id, name: updated.name };
+}
+
+export async function rejectAccountsBoard(boardId: string, reason: string, actor: AuthedUser) {
+  const canDecide = scopeAtLeast(getPermissionScope(actor.permissions, PermissionKey.CREATE_BOARD), "OWN");
+  if (!canDecide) throw Errors.forbidden("You do not have permission to do that.");
+
+  const board = await prisma.board.findFirst({ where: { id: boardId, isDeleted: false }, include: { procurementRecord: true } });
+  if (!board) throw Errors.notFound("Project");
+  if (board.accountsApprovalStatus !== "PENDING") throw Errors.badRequest("This project isn't waiting on Accounts approval.");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.board.update({
+      where: { id: boardId },
+      data: {
+        accountsApprovalStatus: "REJECTED",
+        accountsDecisionNote: reason,
+        accountsDecidedById: actor.id,
+        accountsDecidedAt: new Date(),
+        isArchived: true,
+        archivedAt: new Date(),
+      },
+    });
+    if (board.procurementRecord) {
+      await tx.procurementRecord.update({ where: { id: board.procurementRecord.id }, data: { status: "CANCELLED" } });
+    }
+  });
+
+  await writeAudit({
+    actor,
+    action: AuditAction.REJECT,
+    entityType: "Board",
+    entityId: boardId,
+    boardId,
+    field: "accountsApprovalStatus",
+    beforeValue: "PENDING",
+    afterValue: reason,
+  });
+
+  return { id: boardId };
 }
 
 export async function getProcurementRecord(boardId: string, user: AuthedUser) {

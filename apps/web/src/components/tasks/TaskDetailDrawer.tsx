@@ -20,7 +20,7 @@ import { AttachmentsSection } from "./AttachmentsSection";
 import { DependenciesSection } from "./DependenciesSection";
 import { ActivitySection } from "./ActivitySection";
 import { PriorityBadge, ApprovalStatusBadge } from "../workflow/badges";
-import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask, useAwardTask, useMarkTaskLost, useLostApprovalMutations, useRejectAccountsTask } from "../../api/tasks";
+import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask, useAwardTask, useMarkTaskLost, useLostApprovalMutations, useRejectAccountsTask, useSaveEstimationQuote } from "../../api/tasks";
 import { useBoardDetail } from "../../api/boards";
 import { useTags, useCreateTag } from "../../api/misc";
 import { useAuth } from "../../context/AuthContext";
@@ -28,7 +28,7 @@ import { useToast } from "../../context/ToastContext";
 import { can, isAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown } from "lucide-react";
+import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt } from "lucide-react";
 import { format } from "date-fns";
 import clsx from "clsx";
 
@@ -62,6 +62,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const awardTask = useAwardTask();
   const markTaskLost = useMarkTaskLost();
   const rejectAccountsTask = useRejectAccountsTask();
+  const saveQuote = useSaveEstimationQuote();
   const { data: allTags } = useTags();
   const createTag = useCreateTag();
 
@@ -78,6 +79,10 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const [accountsRejectOpen, setAccountsRejectOpen] = useState(false);
   const [accountsRejectReason, setAccountsRejectReason] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [quotationOpen, setQuotationOpen] = useState(false);
+  const [quoteCurrency, setQuoteCurrency] = useState("AED");
+  const [quoteAmount, setQuoteAmount] = useState("");
+  const [quoteVatRate, setQuoteVatRate] = useState("5");
 
   useEffect(() => {
     if (task) {
@@ -115,6 +120,41 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
       } else {
         push({ variant: "error", title: "Could not move task", description: apiErr.message });
       }
+    }
+  }
+
+  function openQuotation() {
+    if (task?.quotation) {
+      setQuoteCurrency(task.quotation.currency);
+      setQuoteAmount(String(task.quotation.amount));
+      setQuoteVatRate(String(task.quotation.vatRate));
+    } else {
+      setQuoteCurrency("AED");
+      setQuoteAmount("");
+      setQuoteVatRate("5");
+    }
+    setQuotationOpen(true);
+  }
+
+  function handleQuoteCurrencyChange(currency: string) {
+    setQuoteCurrency(currency);
+    setQuoteVatRate(currency === "AED" ? "5" : "0");
+  }
+
+  async function submitQuotation() {
+    if (!taskId) return;
+    const amount = Number(quoteAmount);
+    const vatRate = Number(quoteVatRate);
+    if (!quoteAmount.trim() || Number.isNaN(amount) || amount < 0) {
+      push({ variant: "error", title: "Enter a valid amount." });
+      return;
+    }
+    try {
+      await saveQuote.mutateAsync({ taskId, currency: quoteCurrency, amount, vatRate: Number.isNaN(vatRate) ? 0 : vatRate });
+      push({ variant: "success", title: "Quotation saved." });
+      setQuotationOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not save quotation", description: extractApiError(err).message });
     }
   }
 
@@ -215,10 +255,14 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                               push({ variant: "success", title: "Qualified — moved to Estimation.", description: result.name });
                               onClose();
                               navigate(`/workflow/estimation`);
-                            } else if (result.kind === "moved-to-accounts") {
-                              push({ variant: "success", title: "Qualified — sent to Accounts.", description: result.name });
+                            } else if (result.kind === "project-created-pending-approval") {
+                              push({
+                                variant: "success",
+                                title: "Awarded — sent to Accounts, Procurement, and the Project team.",
+                                description: `${result.name} is now waiting on Accounts sign-off.`,
+                              });
                               onClose();
-                              navigate(`/workflow/accounts`);
+                              navigate(`/workflow/boards/${result.id}`);
                             } else {
                               push({ variant: "success", title: "Approved — project and procurement created.", description: result.name });
                               onClose();
@@ -227,7 +271,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                           } catch (err) {
                             push({
                               variant: "error",
-                              title: task.board?.name === "Accounts" ? "Could not approve" : "Could not qualify",
+                              title: task.board?.name === "Accounts" ? "Could not approve" : "Could not award",
                               description: extractApiError(err).message,
                             });
                           }
@@ -236,6 +280,10 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                         {task.board?.name === "Accounts" ? (
                           <>
                             <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Approve
+                          </>
+                        ) : task.board?.name === "Estimation" ? (
+                          <>
+                            <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Awarded
                           </>
                         ) : (
                           <>
@@ -352,6 +400,13 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
             )}
           </section>
 
+          {board?.accountsApprovalStatus === "PENDING" && (
+            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <Landmark className="h-4 w-4 shrink-0" />
+              Waiting for approval from the Accounts department — this can't be marked Lost or Completed until then.
+            </div>
+          )}
+
           {/* Workflow */}
           <section
             className={clsx(
@@ -403,6 +458,38 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
               <PriorityBadge priority={task.priority} />
             </div>
           </section>
+
+          {task.board?.name === "Estimation" && (
+            <section className="rounded-lg border border-slate-200 p-3">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                  <Receipt className="h-4 w-4 text-slate-400" /> Quotation
+                </p>
+                {canEdit && (
+                  <Button variant="outline" size="sm" onClick={openQuotation}>
+                    {task.quotation ? "Edit Quotation" : "Create Quotation"}
+                  </Button>
+                )}
+              </div>
+              {task.quotation ? (
+                <p className="mt-2 text-sm text-slate-700">
+                  {task.quotation.currency} {task.quotation.amount.toLocaleString()}
+                  {task.quotation.vatRate > 0 && (
+                    <span className="text-slate-500">
+                      {" "}
+                      + {task.quotation.vatRate}% VAT ({task.quotation.currency} {(task.quotation.vatAmount ?? 0).toLocaleString()})
+                    </span>
+                  )}
+                  {" = "}
+                  <span className="font-semibold">
+                    {task.quotation.currency} {(task.quotation.totalAmount ?? task.quotation.amount).toLocaleString()}
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-slate-400">No quotation yet.</p>
+              )}
+            </section>
+          )}
 
           {/* Assignment */}
           <section className="space-y-3">
@@ -776,6 +863,55 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
           >
             Reject task
           </Button>
+        </div>
+      </Modal>
+
+      <Modal open={quotationOpen} onClose={() => setQuotationOpen(false)} title={task?.quotation ? "Edit Quotation" : "Create Quotation"}>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Currency</Label>
+              <Select value={quoteCurrency} onChange={(e) => handleQuoteCurrencyChange(e.target.value)}>
+                <option value="AED">AED</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="SAR">SAR</option>
+              </Select>
+            </div>
+            <div>
+              <Label required>Amount</Label>
+              <Input type="number" min="0" step="0.01" value={quoteAmount} onChange={(e) => setQuoteAmount(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <Label>VAT %</Label>
+            <Input type="number" min="0" max="100" step="0.01" value={quoteVatRate} onChange={(e) => setQuoteVatRate(e.target.value)} />
+            <p className="mt-1 text-[11px] text-slate-400">Defaults to 5% for AED, 0% for every other currency — editable either way.</p>
+          </div>
+          {quoteAmount.trim() && !Number.isNaN(Number(quoteAmount)) && (
+            <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {quoteCurrency} {Number(quoteAmount).toLocaleString()}
+              {Number(quoteVatRate) > 0 && (
+                <>
+                  {" "}
+                  + {quoteVatRate}% VAT ({quoteCurrency} {((Number(quoteAmount) * Number(quoteVatRate)) / 100).toLocaleString()})
+                </>
+              )}
+              {" = "}
+              <span className="font-semibold">
+                {quoteCurrency} {(Number(quoteAmount) + (Number(quoteAmount) * (Number(quoteVatRate) || 0)) / 100).toLocaleString()}
+              </span>
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setQuotationOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={submitQuotation} loading={saveQuote.isPending}>
+              Save Quotation
+            </Button>
+          </div>
         </div>
       </Modal>
     </Drawer>

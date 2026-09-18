@@ -60,11 +60,14 @@ boardsRouter.get(
   asyncHandler(async (req, res) => ok(res, await boardsService.getOrCreateEstimationBoard(req.user!)))
 );
 
-// Same ordering requirement as "/enquiry-list" above.
+// Every Project awaiting Accounts sign-off (see awardTask() — the Project
+// and its ProcurementRecord already exist by this point, gated behind
+// Board.accountsApprovalStatus). Must come before "/:boardId", same
+// ordering requirement as "/enquiry-list" above.
 boardsRouter.get(
   "/accounts",
   requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
-  asyncHandler(async (req, res) => ok(res, await boardsService.getOrCreateAccountsBoard(req.user!)))
+  asyncHandler(async (req, res) => ok(res, await boardsService.listAccountsPendingBoards(req.user!, req.query.search as string | undefined)))
 );
 
 // Same ordering requirement as "/enquiry-list" above.
@@ -126,6 +129,20 @@ boardsRouter.post(
   "/:boardId/complete",
   validate(z.object({ completed: z.boolean() })),
   asyncHandler(async (req, res) => ok(res, await boardsService.setBoardCompleted(req.params.boardId, (req as any).validatedBody.completed, req.user!)))
+);
+
+// --- Accounts sign-off (see listAccountsPendingBoards above) ---
+boardsRouter.post(
+  "/:boardId/accounts-approve",
+  requirePermission(PermissionKey.CREATE_BOARD, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await boardsService.approveAccountsBoard(req.params.boardId, req.user!)))
+);
+
+boardsRouter.post(
+  "/:boardId/accounts-reject",
+  requirePermission(PermissionKey.CREATE_BOARD, "OWN"),
+  validate(z.object({ reason: z.string().min(1, "A rejection reason is required.") })),
+  asyncHandler(async (req, res) => ok(res, await boardsService.rejectAccountsBoard(req.params.boardId, (req as any).validatedBody.reason, req.user!)))
 );
 
 // --- Procurement (see ProcurementRecord — attached once Accounts awards a task) ---

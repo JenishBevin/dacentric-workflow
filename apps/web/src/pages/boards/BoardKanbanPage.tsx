@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload, Trello, PackageSearch, Building2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload, Trello, PackageSearch, Building2, Landmark } from "lucide-react";
 import { useBoardDetail, useReorderStages, useSetBoardCompleted } from "../../api/boards";
 import { useBoardTasks, useDuplicateTask, useDeleteTask, useImportEnquiries } from "../../api/tasks";
 import { downloadExport } from "../../api/misc";
@@ -291,6 +291,13 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
           )}
         </div>
       </div>
+
+      {board.accountsApprovalStatus === "PENDING" && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <Landmark className="h-4 w-4 shrink-0" />
+          Waiting for approval from the Accounts department — tasks here can't be marked Lost or Completed until then.
+        </div>
+      )}
 
       {panelView === "procurement" ? (
         <ProcurementPanel boardId={boardId!} />
