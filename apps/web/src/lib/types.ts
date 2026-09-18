@@ -79,6 +79,7 @@ export interface CurrentUser {
   permissions: Record<string, PermissionScope>;
   employee: { id: string; fullName: string; departmentId: string | null } | null;
   hasAvatar: boolean;
+  avatarUpdatedAt: string | null;
 }
 
 export type CustomerStatus = "ACTIVE" | "INACTIVE" | "PROSPECT";

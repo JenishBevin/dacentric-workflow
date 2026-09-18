@@ -146,6 +146,9 @@ authRouter.get(
       permissions: req.user!.permissions,
       employee: user?.employee ?? null,
       hasAvatar: !!user?.avatarStorageKey,
+      // Cache-busts the header/profile avatar <img> after an upload — bumps
+      // on any profile change, not just the avatar, which is harmless here.
+      avatarUpdatedAt: user?.updatedAt ?? null,
     });
   })
 );

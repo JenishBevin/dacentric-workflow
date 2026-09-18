@@ -224,7 +224,7 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
         <NotificationBell />
         <div className="relative" ref={ref}>
           <button onClick={() => setMenuOpen((o) => !o)} className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-slate-100">
-            <Avatar name={user?.name ?? "?"} size="sm" src={user?.hasAvatar ? myAvatarUrl() : undefined} />
+            <Avatar name={user?.name ?? "?"} size="sm" src={user?.hasAvatar ? myAvatarUrl(user.avatarUpdatedAt ?? undefined) : undefined} />
             <span className="hidden text-left sm:block">
               <span className="block text-sm font-medium leading-tight text-slate-700">{user?.name}</span>
               <span className="block text-xs leading-tight text-slate-400">{user?.roles[0] ? roleLabel(user.roles[0]) : ""}</span>
