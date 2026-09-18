@@ -1071,6 +1071,7 @@ model EstimationRecord {
   // quotedById can still override vatRate by hand.
   currency          String    @default("AED")
   title             String? // e.g. "Proposal For Supply and Installation of Server" — the letterhead heading
+  quotationRef      String? // e.g. "QPTS/QN/2026-0006" — defaults from estimationId client-side, but editable
   recipientName     String? // "To," contact — auto-filled from the linked Customer, editable
   recipientCompany  String?
   recipientLocation String?
@@ -1081,6 +1082,12 @@ model EstimationRecord {
   totalAmount       Float?
   validityDays      Int?      @default(7)
   paymentTerms      String? // defaults to the standard 90/10 split, editable
+  // Signature block ("Thanks & Regards,") — defaults from the preparer's own
+  // account client-side, but editable since anyone with edit rights can
+  // create the quotation on someone else's behalf.
+  preparerName        String?
+  preparerDesignation String?
+  preparerMobile      String?
   quotedAt          DateTime?
   quotedById        String?
   quotedBy          User?     @relation("EstimationQuotedBy", fields: [quotedById], references: [id])

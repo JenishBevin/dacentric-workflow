@@ -299,6 +299,13 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         </div>
       )}
 
+      {board.accountsApprovalStatus === "REJECTED" && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <Landmark className="h-4 w-4 shrink-0" />
+          Rejected by Accounts — this project moved to Lost in Project/Task History. Restore it from there to reopen.
+        </div>
+      )}
+
       {panelView === "procurement" ? (
         <ProcurementPanel boardId={boardId!} />
       ) : (

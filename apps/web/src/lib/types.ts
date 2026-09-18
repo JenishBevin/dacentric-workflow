@@ -278,6 +278,7 @@ export interface TaskSummary {
   quotation?: {
     currency: string;
     title: string | null;
+    quotationRef: string | null;
     recipientName: string | null;
     recipientCompany: string | null;
     recipientLocation: string | null;
@@ -288,6 +289,9 @@ export interface TaskSummary {
     totalAmount: number | null;
     validityDays: number | null;
     paymentTerms: string | null;
+    preparerName: string | null;
+    preparerDesignation: string | null;
+    preparerMobile: string | null;
     quotedAt: string | null;
   } | null;
   requiresApproval: boolean;

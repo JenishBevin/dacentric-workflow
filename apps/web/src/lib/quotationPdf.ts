@@ -1,15 +1,21 @@
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
-import qplusIcon from "../assets/qplus-icon.png";
+import qplusLogo from "../assets/QPlus.png";
 
 // Fixed company letterhead details — never entered per-quotation, matches
 // the company's standard "Proposal For Supply and Installation of ..." PDF.
+// Font sizes below were measured directly off that reference PDF (via
+// pdfjs-dist text-run transforms), not eyeballed — page 1 is the cover
+// (letterhead/recipient/title/ref), page 2+ is the quotation body, which the
+// reference document renders almost entirely at 8.2pt.
 const COMPANY = {
   addressLines: ["Office No. 203,", "Dar Al Wuheida Building,", "Hor Al Anz East, Dubai, UAE.", "P.O Box-16615"],
   mobile: "+971 4 393 1110",
   email: "info@qplus-ts.com",
   website: "www.qplus-ts.com",
 };
+
+const LOGO_ASPECT = 1344 / 1239; // height / width, from the source PNG
 
 const NOTES = [
   "Material Price May Varies According to the Current Market Condition.",
@@ -40,7 +46,7 @@ export interface QuotationLineItem {
 }
 
 export interface QuotationPdfInput {
-  refId: string; // e.g. "QPTS-2026-0006", shown as "Ref. QPTS/QN/2026-0006"
+  refId: string; // final display value, e.g. "QPTS/QN/2026-0006" — printed verbatim
   projectName: string; // task title, shown as "PROJECT : X"
   title: string; // "Proposal For Supply and Installation of Server"
   recipientName: string;
@@ -75,8 +81,8 @@ function money(n: number) {
 }
 
 /** Renders the company's fixed proposal letterhead and downloads it as a PDF —
- * layout/sections/boilerplate all match the standard template; only the
- * fields on QuotationPdfInput vary per quotation. */
+ * layout/sections/boilerplate/font sizes all match the standard template;
+ * only the fields on QuotationPdfInput vary per quotation. */
 export async function generateQuotationPdf(input: QuotationPdfInput) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = 210;
@@ -85,7 +91,7 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   let y = 15;
 
   function ensureSpace(needed: number) {
-    if (y + needed > 282) {
+    if (y + needed > 280) {
       printFooter();
       doc.addPage();
       y = 15;
@@ -94,89 +100,95 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
 
   function printFooter() {
     doc.setDrawColor(203, 213, 225);
-    doc.line(marginX, 288, contentRight, 288);
-    doc.setFontSize(8);
+    doc.line(marginX, 285, contentRight, 285);
+    doc.setFontSize(7.6);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(71, 85, 105);
-    doc.text(`Contact ${COMPANY.mobile}`, marginX, 293);
-    doc.text(`Email: ${COMPANY.email}`, pageWidth / 2, 293, { align: "center" });
-    doc.text(COMPANY.website, contentRight, 293, { align: "right" });
+    doc.text(`Contact ${COMPANY.mobile}`, marginX, 290);
+    doc.text(`Email: ${COMPANY.email}`, pageWidth / 2, 290, { align: "center" });
+    doc.text(COMPANY.website, contentRight, 290, { align: "right" });
     doc.setTextColor(0, 0, 0);
   }
 
+  // ============================= PAGE 1 — cover =============================
   // --- Header: logo left, company address block right ---
   try {
-    const logoDataUrl = await toDataUrl(qplusIcon);
-    doc.addImage(logoDataUrl, "PNG", marginX, y, 16, 16.3);
+    const logoDataUrl = await toDataUrl(qplusLogo);
+    const logoW = 18;
+    doc.addImage(logoDataUrl, "PNG", marginX, y, logoW, logoW * LOGO_ASPECT);
   } catch {
     // Non-fatal — proceed without the logo rather than blocking the download.
   }
 
-  doc.setFontSize(9);
+  doc.setFontSize(6.8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(71, 85, 105);
   let addrY = y + 2;
   for (const line of COMPANY.addressLines) {
     doc.text(line, contentRight, addrY, { align: "right" });
-    addrY += 4;
+    addrY += 3.6;
   }
   doc.text(`Mob: ${COMPANY.mobile}`, contentRight, addrY, { align: "right" });
-  addrY += 4;
+  addrY += 3.6;
   doc.text(`Email: ${COMPANY.email}`, contentRight, addrY, { align: "right" });
-  addrY += 4;
+  addrY += 3.6;
   doc.text(COMPANY.website, contentRight, addrY, { align: "right" });
   doc.setTextColor(0, 0, 0);
 
-  y = Math.max(y + 20, addrY + 6);
+  y = Math.max(y + 26, addrY + 10);
 
-  doc.setFontSize(10);
+  doc.setFontSize(9.5);
   doc.text(`Date: ${format(new Date(), "d MMMM yyyy")}`, contentRight, y, { align: "right" });
-  y += 9;
+  y += 14;
 
   // --- Recipient ---
+  doc.setFontSize(12.2);
   doc.text("To,", marginX, y);
-  y += 5;
+  y += 6.5;
   if (input.recipientName) {
     doc.text(input.recipientName, marginX, y);
-    y += 5;
+    y += 6.5;
   }
   if (input.recipientCompany) {
     doc.text(input.recipientCompany, marginX, y);
-    y += 5;
+    y += 6.5;
   }
   if (input.recipientLocation) {
     doc.text(input.recipientLocation, marginX, y);
-    y += 5;
+    y += 6.5;
   }
-  y += 4;
 
-  // --- Title / project / ref ---
+  // --- Title / project / ref — vertically centered in the remaining cover space ---
+  const coverBottom = 260;
+  const blockHeight = 10 + 8 + 8;
+  y = Math.max(y + 20, (coverBottom - blockHeight) / 2 + blockHeight / 2);
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(16.3);
   doc.text(input.title, pageWidth / 2, y, { align: "center" });
-  y += 8;
+  y += 10;
 
-  doc.setFontSize(10);
+  doc.setFontSize(13.6);
   doc.text(`PROJECT : ${input.projectName.toUpperCase()}`, pageWidth / 2, y, { align: "center" });
-  y += 5;
-  doc.text(`Ref. ${input.refId.replace(/^QPTS-/, "QPTS/QN/").replace(/-(\d+)$/, "-$1")}`, pageWidth / 2, y, { align: "center" });
-  y += 6;
-
-  doc.setDrawColor(203, 213, 225);
-  doc.line(marginX, y, contentRight, y);
-  y += 5;
-
+  y += 8;
+  doc.text(`Ref. ${input.refId}`, pageWidth / 2, y, { align: "center" });
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.text(`Contact ${COMPANY.mobile}`, marginX, y);
-  doc.text(`Email: ${COMPANY.email}`, pageWidth / 2, y, { align: "center" });
-  doc.text(COMPANY.website, contentRight, y, { align: "right" });
-  y += 7;
 
-  // --- Boilerplate intro ---
-  doc.setFontSize(10);
+  printFooter();
+
+  // Page 1 is the cover only — the quotation body always starts on page 2,
+  // matching the reference document exactly.
+  doc.addPage();
+  y = 15;
+
+  // ============================= PAGE 2+ — body =============================
+  const BODY_SIZE = 8.2;
+  doc.setFontSize(BODY_SIZE);
+
+  doc.setFont("helvetica", "bold");
   doc.text(`Sub : ${input.title}`, marginX, y);
-  y += 6;
+  doc.setFont("helvetica", "normal");
+  y += 6.5;
   const intro = [
     "Thank you very much for your enquiry.",
     "Please find below our most competitive offer for your requirement.",
@@ -184,7 +196,7 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   ];
   for (const line of intro) {
     doc.text(line, marginX, y);
-    y += 5;
+    y += 4.8;
   }
   y += 3;
 
@@ -207,7 +219,7 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
 
   function drawTableHeader() {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
+    doc.setFontSize(BODY_SIZE);
     doc.setFillColor(241, 245, 249);
     doc.rect(marginX, y, tableWidth, 9, "F");
     cols.forEach((c, i) => {
@@ -221,14 +233,21 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   ensureSpace(20);
   drawTableHeader();
 
-  input.lineItems.forEach((item, idx) => {
+  input.lineItems.forEach((item) => {
     const descLines = doc.splitTextToSize(item.description, cols[1].width - 4);
-    const rowHeight = Math.max(7, descLines.length * 4 + 3);
+    const rowHeight = Math.max(7, descLines.length * 3.8 + 3);
     ensureSpace(rowHeight + 2);
     const rowTop = y;
-    doc.setFontSize(8.5);
-    doc.text(String(idx + 1), colX[0] + cols[0].width / 2, rowTop + 4.5, { align: "center" });
-    doc.text(descLines, colX[1] + 1.5, rowTop + 4.5);
+    doc.setFontSize(BODY_SIZE);
+    doc.setFont("helvetica", "bold");
+    doc.text(String(input.lineItems.indexOf(item) + 1), colX[0] + cols[0].width / 2, rowTop + 4.5, { align: "center" });
+    doc.setFont("helvetica", "italic");
+    doc.text(descLines[0] ?? "", colX[1] + 1.5, rowTop + 4.5);
+    if (descLines.length > 1) {
+      doc.setFont("helvetica", "normal");
+      doc.text(descLines.slice(1), colX[1] + 1.5, rowTop + 4.5 + 3.8);
+    }
+    doc.setFont("helvetica", "normal");
     doc.text(String(item.qty), colX[2] + cols[2].width / 2, rowTop + 4.5, { align: "center" });
     doc.text(item.unit, colX[3] + cols[3].width / 2, rowTop + 4.5, { align: "center" });
     doc.text(money(item.unitPrice), colX[4] + cols[4].width - 2, rowTop + 4.5, { align: "right" });
@@ -247,45 +266,45 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
     ["Gross Total in " + input.currency, money(input.totalAmount)],
   ];
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(BODY_SIZE);
   for (const [label, value] of totalsRows) {
     doc.rect(marginX, y, tableWidth, 7);
     doc.text(label, totalsLabelX - 2, y + 4.8, { align: "right" });
     doc.text(value, colX[5] + cols[5].width - 2, y + 4.8, { align: "right" });
     y += 7;
   }
-  doc.setFont("helvetica", "normal");
   y += 8;
 
   // --- Offer validity ---
   ensureSpace(8);
-  doc.setFontSize(10);
   doc.text(`Offer Validity: ${String(input.validityDays).padStart(2, "0")} days`, marginX, y);
+  doc.setFont("helvetica", "normal");
   y += 8;
 
   // --- Payment terms ---
   ensureSpace(10);
   doc.setFont("helvetica", "bold");
   doc.text("Payment Terms & Conditions", marginX, y);
-  y += 5;
-  doc.setFont("helvetica", "normal");
+  y += 5.5;
+  doc.setFont("helvetica", "italic");
   for (const line of input.paymentTerms.split("\n").filter((l) => l.trim())) {
     ensureSpace(5);
     doc.text(`•  ${line.trim()}`, marginX, y);
-    y += 5;
+    y += 4.8;
   }
+  doc.setFont("helvetica", "normal");
   y += 3;
 
   // --- Notes ---
   ensureSpace(10);
   doc.setFont("helvetica", "bold");
   doc.text("Notes:", marginX, y);
-  y += 5;
+  y += 5.5;
   doc.setFont("helvetica", "normal");
   NOTES.forEach((n, i) => {
     ensureSpace(5);
     doc.text(`${i + 1}) ${n}`, marginX, y);
-    y += 5;
+    y += 4.8;
   });
   y += 3;
 
@@ -293,13 +312,13 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   ensureSpace(10);
   doc.setFont("helvetica", "bold");
   doc.text("General Terms and Conditions", marginX, y);
-  y += 5;
+  y += 5.5;
   doc.setFont("helvetica", "normal");
   TERMS.forEach((t, i) => {
     const lines = doc.splitTextToSize(`${i + 1}) ${t}`, tableWidth);
-    ensureSpace(lines.length * 5 + 1);
+    ensureSpace(lines.length * 4.8 + 1);
     doc.text(lines, marginX, y);
-    y += lines.length * 5;
+    y += lines.length * 4.8;
   });
   y += 10;
 
@@ -307,17 +326,15 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   ensureSpace(24);
   doc.text("Thanks & Regards,", contentRight, y, { align: "right" });
   y += 6;
-  doc.setFont("helvetica", "bold");
   doc.text(input.preparerName, contentRight, y, { align: "right" });
-  doc.setFont("helvetica", "normal");
-  y += 5;
+  y += 4.8;
   if (input.preparerDesignation) {
     doc.text(input.preparerDesignation, contentRight, y, { align: "right" });
-    y += 5;
+    y += 4.8;
   }
   if (input.preparerMobile) {
     doc.text(`Mob: ${input.preparerMobile}`, contentRight, y, { align: "right" });
-    y += 5;
+    y += 4.8;
   }
 
   printFooter();

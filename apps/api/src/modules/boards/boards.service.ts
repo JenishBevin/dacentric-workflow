@@ -524,16 +524,30 @@ export async function setBoardCompleted(boardId: string, completed: boolean, act
   const role = await assertBoardVisible(boardId, actor);
   assertIsBoardOwnerOrAdmin(role, actor);
 
-  if (completed) {
-    const existing = await prisma.board.findUniqueOrThrow({ where: { id: boardId } });
-    if (existing.accountsApprovalStatus === "PENDING") {
-      throw Errors.forbidden("This project is waiting on Accounts approval — it can't be marked Complete until Accounts signs off.");
-    }
+  const existing = await prisma.board.findUniqueOrThrow({ where: { id: boardId }, include: { procurementRecord: true } });
+  if (completed && existing.accountsApprovalStatus === "PENDING") {
+    throw Errors.forbidden("This project is waiting on Accounts approval — it can't be marked Complete until Accounts signs off.");
   }
 
-  const board = await prisma.board.update({
-    where: { id: boardId },
-    data: { isCompleted: completed, completedAt: completed ? new Date() : null },
+  // Project/Task History's "Restore to Project" button calls this same
+  // completed:false path for a Lost (Accounts-rejected) project — undo the
+  // rejection the same way restoring a Lost enquiry undoes its Lost stage:
+  // back to Accounts' queue, procurement reopened, no longer archived.
+  const wasRejected = completed === false && existing.accountsApprovalStatus === "REJECTED";
+
+  const board = await prisma.$transaction(async (tx) => {
+    const updated = await tx.board.update({
+      where: { id: boardId },
+      data: {
+        isCompleted: completed,
+        completedAt: completed ? new Date() : null,
+        ...(wasRejected ? { accountsApprovalStatus: "PENDING", accountsDecisionNote: null, isArchived: false, archivedAt: null } : {}),
+      },
+    });
+    if (wasRejected && existing.procurementRecord) {
+      await tx.procurementRecord.update({ where: { id: existing.procurementRecord.id }, data: { status: "PENDING" } });
+    }
+    return updated;
   });
 
   await writeAudit({
@@ -543,7 +557,7 @@ export async function setBoardCompleted(boardId: string, completed: boolean, act
     entityId: boardId,
     boardId,
     field: "isCompleted",
-    afterValue: { isCompleted: completed },
+    afterValue: { isCompleted: completed, ...(wasRejected ? { accountsApprovalStatus: "PENDING" } : {}) },
   });
 
   return board;
@@ -727,6 +741,10 @@ export async function listProcurementBoards(user: AuthedUser, search?: string) {
     where: {
       ...visibleBoardsWhere(user),
       isDeleted: false,
+      // Accounts-rejected projects archive themselves (see rejectAccountsBoard)
+      // and move to Project/Task History as Lost — they stop showing up as
+      // active procurement work here, though the record itself is kept.
+      isArchived: false,
       procurementRecord: { isNot: null },
       ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
     },

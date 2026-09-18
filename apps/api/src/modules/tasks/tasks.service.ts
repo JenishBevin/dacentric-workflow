@@ -63,6 +63,7 @@ export interface QuotationLineItemInput {
 export interface SaveEstimationQuoteInput {
   currency: string;
   title?: string;
+  quotationRef?: string;
   recipientName?: string;
   recipientCompany?: string;
   recipientLocation?: string;
@@ -70,6 +71,9 @@ export interface SaveEstimationQuoteInput {
   vatRate: number;
   validityDays?: number;
   paymentTerms?: string;
+  preparerName?: string;
+  preparerDesignation?: string;
+  preparerMobile?: string;
 }
 
 /** The "Create Quotation" popup on an Estimation-board task, rendered onto
@@ -96,6 +100,7 @@ export async function saveEstimationQuote(taskId: string, input: SaveEstimationQ
     data: {
       currency: input.currency,
       title: input.title,
+      quotationRef: input.quotationRef,
       recipientName: input.recipientName,
       recipientCompany: input.recipientCompany,
       recipientLocation: input.recipientLocation,
@@ -106,6 +111,9 @@ export async function saveEstimationQuote(taskId: string, input: SaveEstimationQ
       totalAmount,
       validityDays: input.validityDays ?? 7,
       paymentTerms: input.paymentTerms,
+      preparerName: input.preparerName,
+      preparerDesignation: input.preparerDesignation,
+      preparerMobile: input.preparerMobile,
       quotedAt: new Date(),
       quotedById: actor.id,
     },
@@ -329,6 +337,7 @@ function serializeTask(task: any) {
       ? {
           currency: task.estimationRecord.currency,
           title: task.estimationRecord.title,
+          quotationRef: task.estimationRecord.quotationRef,
           recipientName: task.estimationRecord.recipientName,
           recipientCompany: task.estimationRecord.recipientCompany,
           recipientLocation: task.estimationRecord.recipientLocation,
@@ -339,6 +348,9 @@ function serializeTask(task: any) {
           totalAmount: task.estimationRecord.totalAmount,
           validityDays: task.estimationRecord.validityDays,
           paymentTerms: task.estimationRecord.paymentTerms,
+          preparerName: task.estimationRecord.preparerName,
+          preparerDesignation: task.estimationRecord.preparerDesignation,
+          preparerMobile: task.estimationRecord.preparerMobile,
           quotedAt: task.estimationRecord.quotedAt,
         }
       : null,
@@ -393,6 +405,7 @@ const TASK_DETAIL_INCLUDE = {
       estimationId: true,
       currency: true,
       title: true,
+      quotationRef: true,
       recipientName: true,
       recipientCompany: true,
       recipientLocation: true,
@@ -403,6 +416,9 @@ const TASK_DETAIL_INCLUDE = {
       totalAmount: true,
       validityDays: true,
       paymentTerms: true,
+      preparerName: true,
+      preparerDesignation: true,
+      preparerMobile: true,
       quotedAt: true,
     },
   },

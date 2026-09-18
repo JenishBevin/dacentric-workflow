@@ -29,7 +29,8 @@ export interface HistoryRow {
  * Project/Task History — a unified, filterable ledger of every Project
  * (Board) and every Enquiry (Task on the Enquiry List board) the caller can
  * see, each carrying its current status:
- *   - Projects: COMPLETED once manually marked done, otherwise IN_PROGRESS.
+ *   - Projects: LOST once Accounts rejects it (see rejectAccountsBoard),
+ *     COMPLETED once manually marked done, otherwise IN_PROGRESS.
  *     Individual tasks on a project never appear here on their own —
  *     Section per user's design, only the whole project moves to history.
  *   - Enquiries: LOST once moved to the "Lost" stage, COMPLETED if it
@@ -43,17 +44,28 @@ export async function getHistory(actor: AuthedUser, filters: HistoryFilters): Pr
   if (!filters.type || filters.type === "PROJECT") {
     const projects = await prisma.board.findMany({
       where: { ...boardWhere, name: { notIn: ["Enquiry List", "Estimation"] } },
-      select: { id: true, boardId: true, name: true, isCompleted: true, completedAt: true, createdAt: true, service: { select: { name: true } } },
+      select: {
+        id: true,
+        boardId: true,
+        name: true,
+        isCompleted: true,
+        completedAt: true,
+        createdAt: true,
+        accountsApprovalStatus: true,
+        accountsDecidedAt: true,
+        service: { select: { name: true } },
+      },
     });
     for (const p of projects) {
+      const isLost = p.accountsApprovalStatus === "REJECTED";
       rows.push({
         kind: "PROJECT",
         id: p.id,
         code: p.boardId,
         name: p.name,
         service: p.service?.name ?? null,
-        status: p.isCompleted ? "COMPLETED" : "IN_PROGRESS",
-        eventDate: p.completedAt ?? p.createdAt,
+        status: isLost ? "LOST" : p.isCompleted ? "COMPLETED" : "IN_PROGRESS",
+        eventDate: (isLost ? p.accountsDecidedAt : p.completedAt) ?? p.createdAt,
       });
     }
   }

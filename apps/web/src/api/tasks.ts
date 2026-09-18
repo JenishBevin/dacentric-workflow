@@ -137,6 +137,7 @@ export interface QuotationLineItemInput {
 export interface EstimationQuote {
   currency: string;
   title: string | null;
+  quotationRef: string | null;
   recipientName: string | null;
   recipientCompany: string | null;
   recipientLocation: string | null;
@@ -147,6 +148,9 @@ export interface EstimationQuote {
   totalAmount: number | null;
   validityDays: number | null;
   paymentTerms: string | null;
+  preparerName: string | null;
+  preparerDesignation: string | null;
+  preparerMobile: string | null;
   quotedAt: string | null;
 }
 
@@ -154,6 +158,7 @@ export interface SaveEstimationQuoteInput {
   taskId: string;
   currency: string;
   title?: string;
+  quotationRef?: string;
   recipientName?: string;
   recipientCompany?: string;
   recipientLocation?: string;
@@ -161,6 +166,9 @@ export interface SaveEstimationQuoteInput {
   vatRate: number;
   validityDays?: number;
   paymentTerms?: string;
+  preparerName?: string;
+  preparerDesignation?: string;
+  preparerMobile?: string;
 }
 
 /** The "Create Quotation" popup on an Estimation-board task. */

@@ -126,6 +126,7 @@ export const quotationLineItemSchema = z.object({
 export const saveEstimationQuoteSchema = z.object({
   currency: z.string().min(1).max(10),
   title: z.string().trim().max(200).optional(),
+  quotationRef: z.string().trim().max(100).optional(),
   recipientName: z.string().trim().max(200).optional(),
   recipientCompany: z.string().trim().max(200).optional(),
   recipientLocation: z.string().trim().max(200).optional(),
@@ -133,6 +134,9 @@ export const saveEstimationQuoteSchema = z.object({
   vatRate: z.number().min(0).max(100),
   validityDays: z.number().int().positive().max(365).optional(),
   paymentTerms: z.string().trim().max(2000).optional(),
+  preparerName: z.string().trim().max(200).optional(),
+  preparerDesignation: z.string().trim().max(200).optional(),
+  preparerMobile: z.string().trim().max(50).optional(),
 });
 
 // Only actually required when the task is on Enquiry List (checked in
