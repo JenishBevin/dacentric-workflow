@@ -31,6 +31,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt } from "lucide-react";
 import { format } from "date-fns";
 import clsx from "clsx";
+import { jsPDF } from "jspdf";
 
 interface Props {
   taskId: string | null;
@@ -141,20 +142,60 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
     setQuoteVatRate(currency === "AED" ? "5" : "0");
   }
 
+  function downloadQuotationPdf(input: { currency: string; amount: number; vatRate: number; vatAmount: number; totalAmount: number }) {
+    const doc = new jsPDF();
+    const line = (y: number, label: string, value: string, bold = false) => {
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.text(label, 20, y);
+      doc.text(value, 190, y, { align: "right" });
+    };
+
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Quotation", 20, 22);
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Project: ${task?.title ?? ""}`, 20, 34);
+    doc.text(`Task ID: ${task?.taskId ?? ""}`, 20, 41);
+    doc.text(`Date: ${format(new Date(), "d MMM yyyy")}`, 20, 48);
+
+    doc.setDrawColor(226, 232, 240);
+    doc.line(20, 55, 190, 55);
+
+    doc.setFontSize(12);
+    let y = 68;
+    line(y, "Amount", `${input.currency} ${input.amount.toLocaleString()}`);
+    if (input.vatRate > 0) {
+      y += 9;
+      line(y, `VAT (${input.vatRate}%)`, `${input.currency} ${input.vatAmount.toLocaleString()}`);
+    }
+    y += 4;
+    doc.line(20, y, 190, y);
+    y += 10;
+    line(y, "Total", `${input.currency} ${input.totalAmount.toLocaleString()}`, true);
+
+    const fileSafeTitle = (task?.title ?? "quotation").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    doc.save(`quotation-${fileSafeTitle}.pdf`);
+  }
+
   async function submitQuotation() {
     if (!taskId) return;
     const amount = Number(quoteAmount);
-    const vatRate = Number(quoteVatRate);
+    const vatRate = Number.isNaN(Number(quoteVatRate)) ? 0 : Number(quoteVatRate);
     if (!quoteAmount.trim() || Number.isNaN(amount) || amount < 0) {
       push({ variant: "error", title: "Enter a valid amount." });
       return;
     }
+    const vatAmount = Math.round(amount * (vatRate / 100) * 100) / 100;
+    const totalAmount = Math.round((amount + vatAmount) * 100) / 100;
     try {
-      await saveQuote.mutateAsync({ taskId, currency: quoteCurrency, amount, vatRate: Number.isNaN(vatRate) ? 0 : vatRate });
-      push({ variant: "success", title: "Quotation saved." });
+      await saveQuote.mutateAsync({ taskId, currency: quoteCurrency, amount, vatRate });
+      downloadQuotationPdf({ currency: quoteCurrency, amount, vatRate, vatAmount, totalAmount });
+      push({ variant: "success", title: "Quotation downloaded.", description: "Upload the PDF to this task's Attachments below." });
       setQuotationOpen(false);
     } catch (err) {
-      push({ variant: "error", title: "Could not save quotation", description: extractApiError(err).message });
+      push({ variant: "error", title: "Could not create quotation", description: extractApiError(err).message });
     }
   }
 
@@ -459,35 +500,14 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
             </div>
           </section>
 
-          {task.board?.name === "Estimation" && (
-            <section className="rounded-lg border border-slate-200 p-3">
-              <div className="flex items-center justify-between">
-                <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-                  <Receipt className="h-4 w-4 text-slate-400" /> Quotation
-                </p>
-                {canEdit && (
-                  <Button variant="outline" size="sm" onClick={openQuotation}>
-                    {task.quotation ? "Edit Quotation" : "Create Quotation"}
-                  </Button>
-                )}
-              </div>
-              {task.quotation ? (
-                <p className="mt-2 text-sm text-slate-700">
-                  {task.quotation.currency} {task.quotation.amount.toLocaleString()}
-                  {task.quotation.vatRate > 0 && (
-                    <span className="text-slate-500">
-                      {" "}
-                      + {task.quotation.vatRate}% VAT ({task.quotation.currency} {(task.quotation.vatAmount ?? 0).toLocaleString()})
-                    </span>
-                  )}
-                  {" = "}
-                  <span className="font-semibold">
-                    {task.quotation.currency} {(task.quotation.totalAmount ?? task.quotation.amount).toLocaleString()}
-                  </span>
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-slate-400">No quotation yet.</p>
-              )}
+          {task.board?.name === "Estimation" && canEdit && (
+            <section className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                <Receipt className="h-4 w-4 text-slate-400" /> Quotation
+              </p>
+              <Button variant="outline" size="sm" onClick={openQuotation}>
+                Create Quotation
+              </Button>
             </section>
           )}
 
@@ -866,7 +886,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         </div>
       </Modal>
 
-      <Modal open={quotationOpen} onClose={() => setQuotationOpen(false)} title={task?.quotation ? "Edit Quotation" : "Create Quotation"}>
+      <Modal open={quotationOpen} onClose={() => setQuotationOpen(false)} title="Create Quotation" description="Fill in the amount and download it as a PDF — then attach that file below.">
+
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -909,7 +930,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
               Cancel
             </Button>
             <Button onClick={submitQuotation} loading={saveQuote.isPending}>
-              Save Quotation
+              Download PDF
             </Button>
           </div>
         </div>
