@@ -8,6 +8,7 @@ import * as tasksService from "./tasks.service";
 import * as checklistService from "./checklist.service";
 import * as commentsService from "./comments.service";
 import * as attachmentsService from "./attachments.service";
+import * as secretAttachmentsService from "./secret-attachments.service";
 import * as watchersService from "./watchers.service";
 import * as tagsService from "../tags/tags.service";
 import * as approvalsService from "../approvals/approvals.service";
@@ -271,6 +272,36 @@ tasksRouter.delete(
   "/:taskId/attachments/:attachmentId",
   asyncHandler(async (req, res) => {
     await attachmentsService.deleteAttachment(req.params.taskId, req.params.attachmentId, req.user!);
+    return ok(res, { message: "Attachment removed." });
+  })
+);
+
+// --- Secret Attachments (Estimation only — Super Admin/Accounts/Procurement/Management) ---
+tasksRouter.get(
+  "/:taskId/secret-attachments",
+  asyncHandler(async (req, res) => ok(res, await secretAttachmentsService.listSecretAttachments(req.params.taskId, req.user!)))
+);
+tasksRouter.post(
+  "/:taskId/secret-attachments",
+  upload.single("file"),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw Errors.badRequest("No file was uploaded.");
+    return created(res, await secretAttachmentsService.uploadSecretAttachment(req.params.taskId, req.file, req.user!));
+  })
+);
+tasksRouter.get(
+  "/:taskId/secret-attachments/:attachmentId/download",
+  asyncHandler(async (req, res) => {
+    const { attachment, buffer } = await secretAttachmentsService.downloadSecretAttachment(req.params.taskId, req.params.attachmentId, req.user!);
+    res.setHeader("Content-Type", attachment.mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename="${attachment.fileName}"`);
+    res.send(buffer);
+  })
+);
+tasksRouter.delete(
+  "/:taskId/secret-attachments/:attachmentId",
+  asyncHandler(async (req, res) => {
+    await secretAttachmentsService.deleteSecretAttachment(req.params.taskId, req.params.attachmentId, req.user!);
     return ok(res, { message: "Attachment removed." });
   })
 );

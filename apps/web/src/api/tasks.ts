@@ -290,6 +290,35 @@ export function useDownloadAttachmentUrl(taskId: string, attachmentId: string) {
   return `${api.defaults.baseURL}/tasks/${taskId}/attachments/${attachmentId}/download`;
 }
 
+// --- Secret Attachments (Estimation only — Super Admin/Accounts/Procurement/Management) ---
+export function useTaskSecretAttachments(taskId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ["task-secret-attachments", taskId],
+    queryFn: async () => (await api.get(`/tasks/${taskId}/secret-attachments`)).data.data,
+    enabled: !!taskId && enabled,
+  });
+}
+
+export function useUploadSecretAttachment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return api.post(`/tasks/${taskId}/secret-attachments`, form, { headers: { "Content-Type": "multipart/form-data" } });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["task-secret-attachments", taskId] }),
+  });
+}
+
+export function useDeleteSecretAttachment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (attachmentId: string) => api.delete(`/tasks/${taskId}/secret-attachments/${attachmentId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["task-secret-attachments", taskId] }),
+  });
+}
+
 export interface ImportEnquiriesResult {
   created: number;
   skipped: Array<{ row: number; reason: string }>;

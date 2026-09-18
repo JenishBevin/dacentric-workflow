@@ -164,6 +164,7 @@ model User {
   auditLogs            AuditLog[]
   checklistOwnerOf     ChecklistItem[]      @relation("ChecklistItemOwner")
   uploadedAttachments  TaskAttachment[]
+  uploadedSecretAttachments SecretTaskAttachment[]
   approvalsAsApprover  TaskApproval[]       @relation("ApprovalApprover")
   approvalsDecided     TaskApproval[]       @relation("ApprovalDecidedBy")
   workSessions         WorkSession[]
@@ -757,6 +758,7 @@ model Task {
   watchers         TaskWatcher[]
   checklistItems   ChecklistItem[]
   attachments      TaskAttachment[]
+  secretAttachments SecretTaskAttachment[]
   tags             TagOnTask[]
   comments         Comment[]
   linkedRecord     TaskLinkedRecord?
@@ -829,6 +831,27 @@ model TaskAttachment {
   uploadedBy   User     @relation(fields: [uploadedById], references: [id])
   scanStatus   String   @default("CLEAN") // PENDING | CLEAN | REJECTED (storage-scan abstraction)
   createdAt    DateTime @default(now())
+
+  @@index([taskId])
+}
+
+// Estimation-only, restricted-visibility attachments (see attachments.service.ts
+// vs. secret-attachments.service.ts) — only Super Admin, Accounts, Procurement
+// and Management roles can see this list exists at all; a separate table
+// (rather than an isSecret flag on TaskAttachment) keeps that guarantee out of
+// reach of a filter someone forgets to add to the normal attachments list.
+model SecretTaskAttachment {
+  id            String   @id @default(uuid())
+  taskId        String
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileName      String
+  storageKey    String
+  mimeType      String
+  fileSizeBytes Int
+  uploadedById  String
+  uploadedBy    User     @relation(fields: [uploadedById], references: [id])
+  scanStatus    String   @default("CLEAN")
+  createdAt     DateTime @default(now())
 
   @@index([taskId])
 }

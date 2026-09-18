@@ -22,6 +22,12 @@ export function isSuperAdmin(user: CurrentUser | null | undefined): boolean {
   return !!user?.roles.includes("SUPER_ADMIN");
 }
 
+/** Mirrors ALLOWED_ROLES in secret-attachments.service.ts — hiding the section
+ * here is just UX; the API re-checks and 404s the routes for anyone else. */
+export function canSeeSecretAttachments(user: CurrentUser | null | undefined): boolean {
+  return !!user?.roles.some((r) => r === "SUPER_ADMIN" || r === "ACCOUNTS" || r === "PROCUREMENT" || r === "MANAGEMENT");
+}
+
 const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: "Super Admin",
   SYSTEM_ADMIN: "System Admin",

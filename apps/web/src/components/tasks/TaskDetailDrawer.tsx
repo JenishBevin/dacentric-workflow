@@ -17,6 +17,7 @@ import { PeoplePicker } from "./PeoplePicker";
 import { ChecklistSection } from "./ChecklistSection";
 import { CommentsSection } from "./CommentsSection";
 import { AttachmentsSection } from "./AttachmentsSection";
+import { SecretAttachmentsSection } from "./SecretAttachmentsSection";
 import { DependenciesSection } from "./DependenciesSection";
 import { ActivitySection } from "./ActivitySection";
 import { PriorityBadge, ApprovalStatusBadge } from "../workflow/badges";
@@ -25,7 +26,7 @@ import { useBoardDetail } from "../../api/boards";
 import { useTags, useCreateTag } from "../../api/misc";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
-import { can, isAdmin } from "../../lib/permissions";
+import { can, isAdmin, canSeeSecretAttachments } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt } from "lucide-react";
@@ -677,6 +678,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
           <section>
             <AttachmentsSection taskId={task.id} canDelete={canCollab} />
           </section>
+
+          {task.board?.name === "Estimation" && canSeeSecretAttachments(user) && <SecretAttachmentsSection taskId={task.id} />}
 
           <section>
             <ActivitySection taskId={task.id} />
