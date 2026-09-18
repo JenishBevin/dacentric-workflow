@@ -127,21 +127,48 @@ export function useAwardTask() {
   });
 }
 
+export interface QuotationLineItemInput {
+  description: string;
+  qty: number;
+  unit: string;
+  unitPrice: number;
+}
+
 export interface EstimationQuote {
   currency: string;
-  amount: number;
+  title: string | null;
+  recipientName: string | null;
+  recipientCompany: string | null;
+  recipientLocation: string | null;
+  lineItems: QuotationLineItemInput[];
+  subtotal: number;
   vatRate: number;
   vatAmount: number | null;
   totalAmount: number | null;
+  validityDays: number | null;
+  paymentTerms: string | null;
   quotedAt: string | null;
+}
+
+export interface SaveEstimationQuoteInput {
+  taskId: string;
+  currency: string;
+  title?: string;
+  recipientName?: string;
+  recipientCompany?: string;
+  recipientLocation?: string;
+  lineItems: QuotationLineItemInput[];
+  vatRate: number;
+  validityDays?: number;
+  paymentTerms?: string;
 }
 
 /** The "Create Quotation" popup on an Estimation-board task. */
 export function useSaveEstimationQuote() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ taskId, currency, amount, vatRate }: { taskId: string; currency: string; amount: number; vatRate: number }) =>
-      (await api.put<{ data: EstimationQuote }>(`/tasks/${taskId}/quotation`, { currency, amount, vatRate })).data.data,
+    mutationFn: async ({ taskId, ...body }: SaveEstimationQuoteInput) =>
+      (await api.put<{ data: EstimationQuote }>(`/tasks/${taskId}/quotation`, body)).data.data,
     onSuccess: (_result, { taskId }) => qc.invalidateQueries({ queryKey: ["task", taskId] }),
   });
 }

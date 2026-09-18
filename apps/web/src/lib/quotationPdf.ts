@@ -1,0 +1,327 @@
+import { jsPDF } from "jspdf";
+import { format } from "date-fns";
+import qplusIcon from "../assets/qplus-icon.png";
+
+// Fixed company letterhead details — never entered per-quotation, matches
+// the company's standard "Proposal For Supply and Installation of ..." PDF.
+const COMPANY = {
+  addressLines: ["Office No. 203,", "Dar Al Wuheida Building,", "Hor Al Anz East, Dubai, UAE.", "P.O Box-16615"],
+  mobile: "+971 4 393 1110",
+  email: "info@qplus-ts.com",
+  website: "www.qplus-ts.com",
+};
+
+const NOTES = [
+  "Material Price May Varies According to the Current Market Condition.",
+  "Work Permit and Gate Pass to be Provided.",
+  "Any Civil, Electrical and Cable Pulling work is not included in the Quotation.",
+];
+
+const TERMS = [
+  "Any additional work apart from the above proposal will be extra cost.",
+  "The work will be started only after a formal contract /LPO and advance payment.",
+  "All items and quantities are subject to remeasurable as per the quoted price and rates.",
+  "Completion Time : To be mutually agreed",
+  "All kind of Authority Approvals are not in our scope .",
+  "Delays in statutory / local authority / govt departments are not contractors responsibility",
+  "All fees / deposits towards all authorities are to be paid in advance by Client.",
+  "Safe storage for keeping our materials to be provided",
+  "Electricity / Water / Hoisting facilities etc to be provided free of cost",
+  "Any approval, drawings, documentation is not included in this scope.",
+];
+
+export const DEFAULT_PAYMENT_TERMS = "90% Advance Payment on Order Confirmation.\n10% Payment Upon Work Completion.";
+
+export interface QuotationLineItem {
+  description: string;
+  qty: number;
+  unit: string;
+  unitPrice: number;
+}
+
+export interface QuotationPdfInput {
+  refId: string; // e.g. "QPTS-2026-0006", shown as "Ref. QPTS/QN/2026-0006"
+  projectName: string; // task title, shown as "PROJECT : X"
+  title: string; // "Proposal For Supply and Installation of Server"
+  recipientName: string;
+  recipientCompany: string;
+  recipientLocation: string;
+  currency: string;
+  lineItems: QuotationLineItem[];
+  vatRate: number;
+  subtotal: number;
+  vatAmount: number;
+  totalAmount: number;
+  validityDays: number;
+  paymentTerms: string;
+  preparerName: string;
+  preparerDesignation: string;
+  preparerMobile: string;
+}
+
+async function toDataUrl(url: string): Promise<string> {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function money(n: number) {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Renders the company's fixed proposal letterhead and downloads it as a PDF —
+ * layout/sections/boilerplate all match the standard template; only the
+ * fields on QuotationPdfInput vary per quotation. */
+export async function generateQuotationPdf(input: QuotationPdfInput) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pageWidth = 210;
+  const marginX = 15;
+  const contentRight = pageWidth - marginX;
+  let y = 15;
+
+  function ensureSpace(needed: number) {
+    if (y + needed > 282) {
+      printFooter();
+      doc.addPage();
+      y = 15;
+    }
+  }
+
+  function printFooter() {
+    doc.setDrawColor(203, 213, 225);
+    doc.line(marginX, 288, contentRight, 288);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Contact ${COMPANY.mobile}`, marginX, 293);
+    doc.text(`Email: ${COMPANY.email}`, pageWidth / 2, 293, { align: "center" });
+    doc.text(COMPANY.website, contentRight, 293, { align: "right" });
+    doc.setTextColor(0, 0, 0);
+  }
+
+  // --- Header: logo left, company address block right ---
+  try {
+    const logoDataUrl = await toDataUrl(qplusIcon);
+    doc.addImage(logoDataUrl, "PNG", marginX, y, 16, 16.3);
+  } catch {
+    // Non-fatal — proceed without the logo rather than blocking the download.
+  }
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(71, 85, 105);
+  let addrY = y + 2;
+  for (const line of COMPANY.addressLines) {
+    doc.text(line, contentRight, addrY, { align: "right" });
+    addrY += 4;
+  }
+  doc.text(`Mob: ${COMPANY.mobile}`, contentRight, addrY, { align: "right" });
+  addrY += 4;
+  doc.text(`Email: ${COMPANY.email}`, contentRight, addrY, { align: "right" });
+  addrY += 4;
+  doc.text(COMPANY.website, contentRight, addrY, { align: "right" });
+  doc.setTextColor(0, 0, 0);
+
+  y = Math.max(y + 20, addrY + 6);
+
+  doc.setFontSize(10);
+  doc.text(`Date: ${format(new Date(), "d MMMM yyyy")}`, contentRight, y, { align: "right" });
+  y += 9;
+
+  // --- Recipient ---
+  doc.text("To,", marginX, y);
+  y += 5;
+  if (input.recipientName) {
+    doc.text(input.recipientName, marginX, y);
+    y += 5;
+  }
+  if (input.recipientCompany) {
+    doc.text(input.recipientCompany, marginX, y);
+    y += 5;
+  }
+  if (input.recipientLocation) {
+    doc.text(input.recipientLocation, marginX, y);
+    y += 5;
+  }
+  y += 4;
+
+  // --- Title / project / ref ---
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text(input.title, pageWidth / 2, y, { align: "center" });
+  y += 8;
+
+  doc.setFontSize(10);
+  doc.text(`PROJECT : ${input.projectName.toUpperCase()}`, pageWidth / 2, y, { align: "center" });
+  y += 5;
+  doc.text(`Ref. ${input.refId.replace(/^QPTS-/, "QPTS/QN/").replace(/-(\d+)$/, "-$1")}`, pageWidth / 2, y, { align: "center" });
+  y += 6;
+
+  doc.setDrawColor(203, 213, 225);
+  doc.line(marginX, y, contentRight, y);
+  y += 5;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text(`Contact ${COMPANY.mobile}`, marginX, y);
+  doc.text(`Email: ${COMPANY.email}`, pageWidth / 2, y, { align: "center" });
+  doc.text(COMPANY.website, contentRight, y, { align: "right" });
+  y += 7;
+
+  // --- Boilerplate intro ---
+  doc.setFontSize(10);
+  doc.text(`Sub : ${input.title}`, marginX, y);
+  y += 6;
+  const intro = [
+    "Thank you very much for your enquiry.",
+    "Please find below our most competitive offer for your requirement.",
+    "We hope our offer is in line with your requirements and looking forward to hear from you soon.",
+  ];
+  for (const line of intro) {
+    doc.text(line, marginX, y);
+    y += 5;
+  }
+  y += 3;
+
+  // --- Item table ---
+  const cols = [
+    { key: "sl", label: "SL.No", width: 10 },
+    { key: "desc", label: "ITEM DESCRIPTION", width: 90 },
+    { key: "qty", label: "QTY", width: 14 },
+    { key: "unit", label: "UNIT", width: 16 },
+    { key: "unitPrice", label: `UNIT PRICE\n(in ${input.currency})`, width: 24 },
+    { key: "amount", label: `AMOUNT\n(in ${input.currency})`, width: 26 },
+  ];
+  const tableWidth = cols.reduce((s, c) => s + c.width, 0);
+  const colX: number[] = [];
+  let cx = marginX;
+  for (const c of cols) {
+    colX.push(cx);
+    cx += c.width;
+  }
+
+  function drawTableHeader() {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setFillColor(241, 245, 249);
+    doc.rect(marginX, y, tableWidth, 9, "F");
+    cols.forEach((c, i) => {
+      const lines = c.label.split("\n");
+      lines.forEach((l, li) => doc.text(l, colX[i] + c.width / 2, y + 4 + li * 3.2, { align: "center" }));
+    });
+    y += 9;
+    doc.setFont("helvetica", "normal");
+  }
+
+  ensureSpace(20);
+  drawTableHeader();
+
+  input.lineItems.forEach((item, idx) => {
+    const descLines = doc.splitTextToSize(item.description, cols[1].width - 4);
+    const rowHeight = Math.max(7, descLines.length * 4 + 3);
+    ensureSpace(rowHeight + 2);
+    const rowTop = y;
+    doc.setFontSize(8.5);
+    doc.text(String(idx + 1), colX[0] + cols[0].width / 2, rowTop + 4.5, { align: "center" });
+    doc.text(descLines, colX[1] + 1.5, rowTop + 4.5);
+    doc.text(String(item.qty), colX[2] + cols[2].width / 2, rowTop + 4.5, { align: "center" });
+    doc.text(item.unit, colX[3] + cols[3].width / 2, rowTop + 4.5, { align: "center" });
+    doc.text(money(item.unitPrice), colX[4] + cols[4].width - 2, rowTop + 4.5, { align: "right" });
+    doc.text(money(item.qty * item.unitPrice), colX[5] + cols[5].width - 2, rowTop + 4.5, { align: "right" });
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(marginX, rowTop, tableWidth, rowHeight);
+    y = rowTop + rowHeight;
+  });
+
+  // --- Totals ---
+  ensureSpace(24);
+  const totalsLabelX = colX[4];
+  const totalsRows: [string, string][] = [
+    ["Total in " + input.currency, money(input.subtotal)],
+    [`VAT ${input.vatRate}%`, money(input.vatAmount)],
+    ["Gross Total in " + input.currency, money(input.totalAmount)],
+  ];
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  for (const [label, value] of totalsRows) {
+    doc.rect(marginX, y, tableWidth, 7);
+    doc.text(label, totalsLabelX - 2, y + 4.8, { align: "right" });
+    doc.text(value, colX[5] + cols[5].width - 2, y + 4.8, { align: "right" });
+    y += 7;
+  }
+  doc.setFont("helvetica", "normal");
+  y += 8;
+
+  // --- Offer validity ---
+  ensureSpace(8);
+  doc.setFontSize(10);
+  doc.text(`Offer Validity: ${String(input.validityDays).padStart(2, "0")} days`, marginX, y);
+  y += 8;
+
+  // --- Payment terms ---
+  ensureSpace(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("Payment Terms & Conditions", marginX, y);
+  y += 5;
+  doc.setFont("helvetica", "normal");
+  for (const line of input.paymentTerms.split("\n").filter((l) => l.trim())) {
+    ensureSpace(5);
+    doc.text(`•  ${line.trim()}`, marginX, y);
+    y += 5;
+  }
+  y += 3;
+
+  // --- Notes ---
+  ensureSpace(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("Notes:", marginX, y);
+  y += 5;
+  doc.setFont("helvetica", "normal");
+  NOTES.forEach((n, i) => {
+    ensureSpace(5);
+    doc.text(`${i + 1}) ${n}`, marginX, y);
+    y += 5;
+  });
+  y += 3;
+
+  // --- General terms ---
+  ensureSpace(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("General Terms and Conditions", marginX, y);
+  y += 5;
+  doc.setFont("helvetica", "normal");
+  TERMS.forEach((t, i) => {
+    const lines = doc.splitTextToSize(`${i + 1}) ${t}`, tableWidth);
+    ensureSpace(lines.length * 5 + 1);
+    doc.text(lines, marginX, y);
+    y += lines.length * 5;
+  });
+  y += 10;
+
+  // --- Signature ---
+  ensureSpace(24);
+  doc.text("Thanks & Regards,", contentRight, y, { align: "right" });
+  y += 6;
+  doc.setFont("helvetica", "bold");
+  doc.text(input.preparerName, contentRight, y, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  y += 5;
+  if (input.preparerDesignation) {
+    doc.text(input.preparerDesignation, contentRight, y, { align: "right" });
+    y += 5;
+  }
+  if (input.preparerMobile) {
+    doc.text(`Mob: ${input.preparerMobile}`, contentRight, y, { align: "right" });
+    y += 5;
+  }
+
+  printFooter();
+
+  const fileSafe = input.projectName.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  doc.save(`quotation-${fileSafe}.pdf`);
+}

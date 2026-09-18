@@ -77,7 +77,7 @@ export interface CurrentUser {
   roles: RoleCode[];
   moduleAccess: ModuleCode[];
   permissions: Record<string, PermissionScope>;
-  employee: { id: string; fullName: string; departmentId: string | null } | null;
+  employee: { id: string; fullName: string; departmentId: string | null; jobTitle: string | null } | null;
   hasAvatar: boolean;
   avatarUpdatedAt: string | null;
 }
@@ -277,10 +277,17 @@ export interface TaskSummary {
   enquiryId?: string | null;
   quotation?: {
     currency: string;
-    amount: number;
+    title: string | null;
+    recipientName: string | null;
+    recipientCompany: string | null;
+    recipientLocation: string | null;
+    lineItems: { description: string; qty: number; unit: string; unitPrice: number }[];
+    subtotal: number;
     vatRate: number;
     vatAmount: number | null;
     totalAmount: number | null;
+    validityDays: number | null;
+    paymentTerms: string | null;
     quotedAt: string | null;
   } | null;
   requiresApproval: boolean;

@@ -29,10 +29,22 @@ import { useToast } from "../../context/ToastContext";
 import { can, isAdmin, canSeeSecretAttachments } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt } from "lucide-react";
+import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt, Plus } from "lucide-react";
 import { format } from "date-fns";
 import clsx from "clsx";
-import { jsPDF } from "jspdf";
+import { useCustomerDetail } from "../../api/customers";
+import { generateQuotationPdf, DEFAULT_PAYMENT_TERMS } from "../../lib/quotationPdf";
+
+interface QuoteLineItemForm {
+  description: string;
+  qty: string;
+  unit: string;
+  unitPrice: string;
+}
+
+function emptyLineItem(): QuoteLineItemForm {
+  return { description: "", qty: "1", unit: "Nos", unitPrice: "" };
+}
 
 interface Props {
   taskId: string | null;
@@ -82,9 +94,18 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const [accountsRejectReason, setAccountsRejectReason] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [quotationOpen, setQuotationOpen] = useState(false);
+  const [quoteTitle, setQuoteTitle] = useState("");
+  const [quoteRecipientName, setQuoteRecipientName] = useState("");
+  const [quoteRecipientCompany, setQuoteRecipientCompany] = useState("");
+  const [quoteRecipientLocation, setQuoteRecipientLocation] = useState("");
   const [quoteCurrency, setQuoteCurrency] = useState("AED");
-  const [quoteAmount, setQuoteAmount] = useState("");
   const [quoteVatRate, setQuoteVatRate] = useState("5");
+  const [quoteValidityDays, setQuoteValidityDays] = useState("7");
+  const [quotePaymentTerms, setQuotePaymentTerms] = useState(DEFAULT_PAYMENT_TERMS);
+  const [quotePreparerMobile, setQuotePreparerMobile] = useState("");
+  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItemForm[]>([emptyLineItem()]);
+  const [quoteGenerating, setQuoteGenerating] = useState(false);
+  const { data: quoteCustomer } = useCustomerDetail(task?.customerId ?? undefined);
 
   useEffect(() => {
     if (task) {
@@ -127,14 +148,31 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
 
   function openQuotation() {
     if (task?.quotation) {
+      setQuoteTitle(task.quotation.title ?? "");
+      setQuoteRecipientName(task.quotation.recipientName ?? "");
+      setQuoteRecipientCompany(task.quotation.recipientCompany ?? "");
+      setQuoteRecipientLocation(task.quotation.recipientLocation ?? "");
       setQuoteCurrency(task.quotation.currency);
-      setQuoteAmount(String(task.quotation.amount));
       setQuoteVatRate(String(task.quotation.vatRate));
+      setQuoteValidityDays(String(task.quotation.validityDays ?? 7));
+      setQuotePaymentTerms(task.quotation.paymentTerms ?? DEFAULT_PAYMENT_TERMS);
+      setQuoteLineItems(
+        task.quotation.lineItems.length
+          ? task.quotation.lineItems.map((li) => ({ description: li.description, qty: String(li.qty), unit: li.unit, unitPrice: String(li.unitPrice) }))
+          : [emptyLineItem()]
+      );
     } else {
+      setQuoteTitle("");
+      setQuoteRecipientName(quoteCustomer?.mainContactName ?? "");
+      setQuoteRecipientCompany(quoteCustomer?.name ?? "");
+      setQuoteRecipientLocation(quoteCustomer?.city || quoteCustomer?.address || "");
       setQuoteCurrency("AED");
-      setQuoteAmount("");
       setQuoteVatRate("5");
+      setQuoteValidityDays("7");
+      setQuotePaymentTerms(DEFAULT_PAYMENT_TERMS);
+      setQuoteLineItems([emptyLineItem()]);
     }
+    setQuotePreparerMobile("");
     setQuotationOpen(true);
   }
 
@@ -143,60 +181,77 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
     setQuoteVatRate(currency === "AED" ? "5" : "0");
   }
 
-  function downloadQuotationPdf(input: { currency: string; amount: number; vatRate: number; vatAmount: number; totalAmount: number }) {
-    const doc = new jsPDF();
-    const line = (y: number, label: string, value: string, bold = false) => {
-      doc.setFont("helvetica", bold ? "bold" : "normal");
-      doc.text(label, 20, y);
-      doc.text(value, 190, y, { align: "right" });
-    };
-
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("Quotation", 20, 22);
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Project: ${task?.title ?? ""}`, 20, 34);
-    doc.text(`Task ID: ${task?.taskId ?? ""}`, 20, 41);
-    doc.text(`Date: ${format(new Date(), "d MMM yyyy")}`, 20, 48);
-
-    doc.setDrawColor(226, 232, 240);
-    doc.line(20, 55, 190, 55);
-
-    doc.setFontSize(12);
-    let y = 68;
-    line(y, "Amount", `${input.currency} ${input.amount.toLocaleString()}`);
-    if (input.vatRate > 0) {
-      y += 9;
-      line(y, `VAT (${input.vatRate}%)`, `${input.currency} ${input.vatAmount.toLocaleString()}`);
-    }
-    y += 4;
-    doc.line(20, y, 190, y);
-    y += 10;
-    line(y, "Total", `${input.currency} ${input.totalAmount.toLocaleString()}`, true);
-
-    const fileSafeTitle = (task?.title ?? "quotation").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-    doc.save(`quotation-${fileSafeTitle}.pdf`);
+  function updateLineItem(index: number, patch: Partial<QuoteLineItemForm>) {
+    setQuoteLineItems((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
+
+  function addLineItem() {
+    setQuoteLineItems((rows) => [...rows, emptyLineItem()]);
+  }
+
+  function removeLineItem(index: number) {
+    setQuoteLineItems((rows) => (rows.length > 1 ? rows.filter((_, i) => i !== index) : rows));
+  }
+
+  const parsedLineItems = quoteLineItems
+    .map((row) => ({ description: row.description.trim(), qty: Number(row.qty), unit: row.unit.trim() || "Nos", unitPrice: Number(row.unitPrice) }))
+    .filter((row) => row.description && Number.isFinite(row.qty) && row.qty > 0 && Number.isFinite(row.unitPrice) && row.unitPrice >= 0);
+
+  const quoteSubtotal = parsedLineItems.reduce((sum, i) => sum + i.qty * i.unitPrice, 0);
+  const quoteVatAmount = (quoteSubtotal * (Number(quoteVatRate) || 0)) / 100;
+  const quoteTotal = quoteSubtotal + quoteVatAmount;
 
   async function submitQuotation() {
     if (!taskId) return;
-    const amount = Number(quoteAmount);
-    const vatRate = Number.isNaN(Number(quoteVatRate)) ? 0 : Number(quoteVatRate);
-    if (!quoteAmount.trim() || Number.isNaN(amount) || amount < 0) {
-      push({ variant: "error", title: "Enter a valid amount." });
+    if (!quoteTitle.trim()) {
+      push({ variant: "error", title: "Enter a title for the proposal." });
       return;
     }
-    const vatAmount = Math.round(amount * (vatRate / 100) * 100) / 100;
-    const totalAmount = Math.round((amount + vatAmount) * 100) / 100;
+    if (parsedLineItems.length === 0) {
+      push({ variant: "error", title: "Add at least one line item with a description, quantity and unit price." });
+      return;
+    }
+    const vatRate = Number.isNaN(Number(quoteVatRate)) ? 0 : Number(quoteVatRate);
+    const validityDays = Number.isNaN(Number(quoteValidityDays)) || Number(quoteValidityDays) <= 0 ? 7 : Number(quoteValidityDays);
+    setQuoteGenerating(true);
     try {
-      await saveQuote.mutateAsync({ taskId, currency: quoteCurrency, amount, vatRate });
-      downloadQuotationPdf({ currency: quoteCurrency, amount, vatRate, vatAmount, totalAmount });
+      const saved = await saveQuote.mutateAsync({
+        taskId,
+        currency: quoteCurrency,
+        title: quoteTitle.trim(),
+        recipientName: quoteRecipientName.trim() || undefined,
+        recipientCompany: quoteRecipientCompany.trim() || undefined,
+        recipientLocation: quoteRecipientLocation.trim() || undefined,
+        lineItems: parsedLineItems,
+        vatRate,
+        validityDays,
+        paymentTerms: quotePaymentTerms.trim() || undefined,
+      });
+      await generateQuotationPdf({
+        refId: task?.estimationId ?? "QPTS",
+        projectName: task?.title ?? "",
+        title: quoteTitle.trim(),
+        recipientName: quoteRecipientName.trim(),
+        recipientCompany: quoteRecipientCompany.trim(),
+        recipientLocation: quoteRecipientLocation.trim(),
+        currency: quoteCurrency,
+        lineItems: parsedLineItems,
+        vatRate,
+        subtotal: saved.subtotal,
+        vatAmount: saved.vatAmount ?? 0,
+        totalAmount: saved.totalAmount ?? 0,
+        validityDays,
+        paymentTerms: quotePaymentTerms.trim() || DEFAULT_PAYMENT_TERMS,
+        preparerName: user?.name ?? "",
+        preparerDesignation: user?.employee?.jobTitle ?? "",
+        preparerMobile: quotePreparerMobile.trim(),
+      });
       push({ variant: "success", title: "Quotation downloaded.", description: "Upload the PDF to this task's Attachments below." });
       setQuotationOpen(false);
     } catch (err) {
       push({ variant: "error", title: "Could not create quotation", description: extractApiError(err).message });
+    } finally {
+      setQuoteGenerating(false);
     }
   }
 
@@ -889,10 +944,85 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         </div>
       </Modal>
 
-      <Modal open={quotationOpen} onClose={() => setQuotationOpen(false)} title="Create Quotation" description="Fill in the amount and download it as a PDF — then attach that file below.">
+      <Modal
+        open={quotationOpen}
+        onClose={() => setQuotationOpen(false)}
+        title="Create Quotation"
+        description="Fills the company's standard proposal template — download the PDF, then attach it below."
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <Label required>Title</Label>
+            <Input placeholder="e.g. Proposal For Supply and Installation of Server" value={quoteTitle} onChange={(e) => setQuoteTitle(e.target.value)} />
+          </div>
 
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label>Recipient name</Label>
+              <Input placeholder="Mr. Dilip" value={quoteRecipientName} onChange={(e) => setQuoteRecipientName(e.target.value)} />
+            </div>
+            <div>
+              <Label>Recipient company</Label>
+              <Input placeholder="Telal Resort" value={quoteRecipientCompany} onChange={(e) => setQuoteRecipientCompany(e.target.value)} />
+            </div>
+            <div>
+              <Label>Location</Label>
+              <Input placeholder="Al Ain" value={quoteRecipientLocation} onChange={(e) => setQuoteRecipientLocation(e.target.value)} />
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <Label required>Line items</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
+                <Plus className="h-3.5 w-3.5" /> Add item
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {quoteLineItems.map((row, i) => (
+                <div key={i} className="grid grid-cols-12 gap-1.5 rounded-lg border border-slate-200 p-2">
+                  <textarea
+                    rows={2}
+                    placeholder="Item description"
+                    value={row.description}
+                    onChange={(e) => updateLineItem(i, { description: e.target.value })}
+                    className="col-span-7 rounded-md border border-slate-300 px-2 py-1 text-sm focus-visible:focus-ring"
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="Qty"
+                    value={row.qty}
+                    onChange={(e) => updateLineItem(i, { qty: e.target.value })}
+                    className="col-span-1"
+                  />
+                  <Input placeholder="Unit" value={row.unit} onChange={(e) => updateLineItem(i, { unit: e.target.value })} className="col-span-1" />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Unit price"
+                    value={row.unitPrice}
+                    onChange={(e) => updateLineItem(i, { unitPrice: e.target.value })}
+                    className="col-span-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeLineItem(i)}
+                    disabled={quoteLineItems.length === 1}
+                    className="col-span-1 flex items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                    aria-label="Remove item"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <Label>Currency</Label>
               <Select value={quoteCurrency} onChange={(e) => handleQuoteCurrencyChange(e.target.value)}>
@@ -904,35 +1034,62 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
               </Select>
             </div>
             <div>
-              <Label required>Amount</Label>
-              <Input type="number" min="0" step="0.01" value={quoteAmount} onChange={(e) => setQuoteAmount(e.target.value)} />
+              <Label>VAT %</Label>
+              <Input type="number" min="0" max="100" step="0.01" value={quoteVatRate} onChange={(e) => setQuoteVatRate(e.target.value)} />
+            </div>
+            <div>
+              <Label>Offer validity (days)</Label>
+              <Input type="number" min="1" step="1" value={quoteValidityDays} onChange={(e) => setQuoteValidityDays(e.target.value)} />
             </div>
           </div>
+
           <div>
-            <Label>VAT %</Label>
-            <Input type="number" min="0" max="100" step="0.01" value={quoteVatRate} onChange={(e) => setQuoteVatRate(e.target.value)} />
-            <p className="mt-1 text-[11px] text-slate-400">Defaults to 5% for AED, 0% for every other currency — editable either way.</p>
+            <Label>Payment terms</Label>
+            <textarea
+              rows={2}
+              value={quotePaymentTerms}
+              onChange={(e) => setQuotePaymentTerms(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus-visible:focus-ring"
+            />
+            <p className="mt-1 text-[11px] text-slate-400">One line per bullet point.</p>
           </div>
-          {quoteAmount.trim() && !Number.isNaN(Number(quoteAmount)) && (
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label>Prepared by</Label>
+              <p className="mt-1.5 text-sm text-slate-700">{user?.name}</p>
+            </div>
+            <div>
+              <Label>Designation</Label>
+              <p className="mt-1.5 text-sm text-slate-700">{user?.employee?.jobTitle || "—"}</p>
+            </div>
+            <div>
+              <Label>Mobile</Label>
+              <Input placeholder="+971 5xxxxxxxx" value={quotePreparerMobile} onChange={(e) => setQuotePreparerMobile(e.target.value)} />
+            </div>
+          </div>
+
+          {parsedLineItems.length > 0 && (
             <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-              {quoteCurrency} {Number(quoteAmount).toLocaleString()}
+              {quoteCurrency} {quoteSubtotal.toLocaleString()}
               {Number(quoteVatRate) > 0 && (
                 <>
                   {" "}
-                  + {quoteVatRate}% VAT ({quoteCurrency} {((Number(quoteAmount) * Number(quoteVatRate)) / 100).toLocaleString()})
+                  + {quoteVatRate}% VAT ({quoteCurrency} {quoteVatAmount.toLocaleString()})
                 </>
               )}
               {" = "}
               <span className="font-semibold">
-                {quoteCurrency} {(Number(quoteAmount) + (Number(quoteAmount) * (Number(quoteVatRate) || 0)) / 100).toLocaleString()}
+                {quoteCurrency} {quoteTotal.toLocaleString()}
               </span>
             </p>
           )}
+
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setQuotationOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={submitQuotation} loading={saveQuote.isPending}>
+            <Button onClick={submitQuotation} loading={saveQuote.isPending || quoteGenerating}>
               Download PDF
             </Button>
           </div>

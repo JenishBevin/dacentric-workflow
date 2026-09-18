@@ -53,16 +53,30 @@ async function ensureEstimationRecord(tx: any, taskId: string) {
   return tx.estimationRecord.create({ data: { taskId, year, sequence, estimationId: formatEstimationId(year, sequence) } });
 }
 
-export interface SaveEstimationQuoteInput {
-  currency: string;
-  amount: number;
-  vatRate: number;
+export interface QuotationLineItemInput {
+  description: string;
+  qty: number;
+  unit: string;
+  unitPrice: number;
 }
 
-/** The "Create Quotation" popup on an Estimation-board task — multi-currency
- * (default AED, per NewTaskDrawer/frontend), with VAT computed server-side
- * from whatever rate the client sends (5% is only a suggested default for
- * AED, applied client-side, not hard-coded here). */
+export interface SaveEstimationQuoteInput {
+  currency: string;
+  title?: string;
+  recipientName?: string;
+  recipientCompany?: string;
+  recipientLocation?: string;
+  lineItems: QuotationLineItemInput[];
+  vatRate: number;
+  validityDays?: number;
+  paymentTerms?: string;
+}
+
+/** The "Create Quotation" popup on an Estimation-board task, rendered onto
+ * the company's fixed letterhead template client-side — multi-currency
+ * (default AED, per the frontend), with VAT computed server-side from
+ * whatever rate the client sends (5% is only a suggested default for AED,
+ * applied client-side, not hard-coded here). */
 export async function saveEstimationQuote(taskId: string, input: SaveEstimationQuoteInput, actor: AuthedUser) {
   const ctx = await loadTaskWithAccess(taskId, actor);
   assertCanEditTask(ctx);
@@ -73,17 +87,25 @@ export async function saveEstimationQuote(taskId: string, input: SaveEstimationQ
 
   const estimationRecord = await ensureEstimationRecord(prisma, taskId);
 
-  const vatAmount = Math.round(input.amount * (input.vatRate / 100) * 100) / 100;
-  const totalAmount = Math.round((input.amount + vatAmount) * 100) / 100;
+  const subtotal = Math.round(input.lineItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0) * 100) / 100;
+  const vatAmount = Math.round(subtotal * (input.vatRate / 100) * 100) / 100;
+  const totalAmount = Math.round((subtotal + vatAmount) * 100) / 100;
 
   const updated = await prisma.estimationRecord.update({
     where: { id: estimationRecord.id },
     data: {
       currency: input.currency,
-      amount: input.amount,
+      title: input.title,
+      recipientName: input.recipientName,
+      recipientCompany: input.recipientCompany,
+      recipientLocation: input.recipientLocation,
+      lineItems: input.lineItems as any,
+      subtotal,
       vatRate: input.vatRate,
       vatAmount,
       totalAmount,
+      validityDays: input.validityDays ?? 7,
+      paymentTerms: input.paymentTerms,
       quotedAt: new Date(),
       quotedById: actor.id,
     },
@@ -96,7 +118,7 @@ export async function saveEstimationQuote(taskId: string, input: SaveEstimationQ
     entityId: updated.id,
     boardId: ctx.task.boardId,
     field: "quotation",
-    afterValue: { currency: updated.currency, amount: updated.amount, vatRate: updated.vatRate, vatAmount: updated.vatAmount, totalAmount: updated.totalAmount },
+    afterValue: { currency: updated.currency, subtotal: updated.subtotal, vatRate: updated.vatRate, vatAmount: updated.vatAmount, totalAmount: updated.totalAmount },
   });
 
   return updated;
@@ -303,13 +325,20 @@ function serializeTask(task: any) {
     isCompleted: task.isCompleted,
     isHighlighted: task.isHighlighted,
     estimationId: task.estimationRecord?.estimationId ?? null,
-    quotation: task.estimationRecord?.amount != null
+    quotation: task.estimationRecord?.subtotal != null
       ? {
           currency: task.estimationRecord.currency,
-          amount: task.estimationRecord.amount,
+          title: task.estimationRecord.title,
+          recipientName: task.estimationRecord.recipientName,
+          recipientCompany: task.estimationRecord.recipientCompany,
+          recipientLocation: task.estimationRecord.recipientLocation,
+          lineItems: (task.estimationRecord.lineItems as any) ?? [],
+          subtotal: task.estimationRecord.subtotal,
           vatRate: task.estimationRecord.vatRate,
           vatAmount: task.estimationRecord.vatAmount,
           totalAmount: task.estimationRecord.totalAmount,
+          validityDays: task.estimationRecord.validityDays,
+          paymentTerms: task.estimationRecord.paymentTerms,
           quotedAt: task.estimationRecord.quotedAt,
         }
       : null,
@@ -359,7 +388,24 @@ const TASK_DETAIL_INCLUDE = {
   linkedRecord: { include: { linkedRecord: true } },
   blockingLinks: { include: { targetTask: true } },
   _count: { select: { attachments: true, comments: true } },
-  estimationRecord: { select: { estimationId: true, currency: true, amount: true, vatRate: true, vatAmount: true, totalAmount: true, quotedAt: true } },
+  estimationRecord: {
+    select: {
+      estimationId: true,
+      currency: true,
+      title: true,
+      recipientName: true,
+      recipientCompany: true,
+      recipientLocation: true,
+      lineItems: true,
+      subtotal: true,
+      vatRate: true,
+      vatAmount: true,
+      totalAmount: true,
+      validityDays: true,
+      paymentTerms: true,
+      quotedAt: true,
+    },
+  },
   enquiryRecord: { select: { enquiryId: true } },
 };
 

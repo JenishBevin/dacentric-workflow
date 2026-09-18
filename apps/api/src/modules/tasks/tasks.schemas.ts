@@ -116,10 +116,23 @@ export const rejectApprovalSchema = z.object({
   reason: z.string().min(1, "A rejection reason is required."),
 });
 
+export const quotationLineItemSchema = z.object({
+  description: z.string().trim().min(1).max(2000),
+  qty: z.number().positive(),
+  unit: z.string().trim().min(1).max(20),
+  unitPrice: z.number().nonnegative(),
+});
+
 export const saveEstimationQuoteSchema = z.object({
   currency: z.string().min(1).max(10),
-  amount: z.number().nonnegative(),
+  title: z.string().trim().max(200).optional(),
+  recipientName: z.string().trim().max(200).optional(),
+  recipientCompany: z.string().trim().max(200).optional(),
+  recipientLocation: z.string().trim().max(200).optional(),
+  lineItems: z.array(quotationLineItemSchema).min(1),
   vatRate: z.number().min(0).max(100),
+  validityDays: z.number().int().positive().max(365).optional(),
+  paymentTerms: z.string().trim().max(2000).optional(),
 });
 
 // Only actually required when the task is on Enquiry List (checked in

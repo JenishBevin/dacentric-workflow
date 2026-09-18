@@ -1065,16 +1065,25 @@ model EstimationRecord {
   createdAt    DateTime @default(now())
 
   // Quotation — filled in from the Estimation task's "Create Quotation"
-  // popup. VAT is auto-applied at 5% for AED and left at 0% for every other
-  // currency by default, but quotedById can still override vatRate by hand.
-  currency    String    @default("AED")
-  amount      Float?
-  vatRate     Float     @default(0)
-  vatAmount   Float?
-  totalAmount Float?
-  quotedAt    DateTime?
-  quotedById  String?
-  quotedBy    User?     @relation("EstimationQuotedBy", fields: [quotedById], references: [id])
+  // popup, rendered onto the company's fixed letterhead template (see
+  // quotation-pdf.ts) rather than a bare amount. VAT is auto-applied at 5%
+  // for AED and left at 0% for every other currency by default, but
+  // quotedById can still override vatRate by hand.
+  currency          String    @default("AED")
+  title             String? // e.g. "Proposal For Supply and Installation of Server" — the letterhead heading
+  recipientName     String? // "To," contact — auto-filled from the linked Customer, editable
+  recipientCompany  String?
+  recipientLocation String?
+  lineItems         Json? // [{ description, qty, unit, unitPrice }] — Amount per row is qty * unitPrice, computed at render time
+  subtotal          Float? // sum of lineItems amounts, pre-VAT
+  vatRate           Float     @default(0)
+  vatAmount         Float?
+  totalAmount       Float?
+  validityDays      Int?      @default(7)
+  paymentTerms      String? // defaults to the standard 90/10 split, editable
+  quotedAt          DateTime?
+  quotedById        String?
+  quotedBy          User?     @relation("EstimationQuotedBy", fields: [quotedById], references: [id])
 }
 
 // Same idea as EstimationRecord, for tasks on the Enquiry List board —
