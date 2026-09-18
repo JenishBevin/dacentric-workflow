@@ -3,8 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
-import clsx from "clsx";
-import { ArrowRight, BarChart3, Eye, Lock, Mail, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { ArrowRight, BarChart3, Lock, Mail, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { Button, Input, PasswordInput, Label } from "../../components/ui/primitives";
 import { useAuth } from "../../context/AuthContext";
 import { extractApiError } from "../../lib/apiClient";
@@ -28,7 +27,6 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState(false);
   const {
     register,
     handleSubmit,
@@ -95,19 +93,8 @@ export default function LoginPage() {
             <p className="text-xs text-slate-300">Unified Business Module Platform</p>
           </div>
 
-          <div
-            className={clsx(
-              "relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.07] shadow-2xl backdrop-blur-xl",
-              !revealed && "cursor-pointer"
-            )}
-            onClick={() => setRevealed(true)}
-          >
-            <div
-              className={clsx(
-                "p-6 transition-all duration-500 ease-out sm:p-8",
-                revealed ? "scale-100 opacity-100 blur-0" : "pointer-events-none scale-[0.97] select-none opacity-70 blur-md"
-              )}
-            >
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.07] shadow-2xl backdrop-blur-xl">
+            <div className="p-6 sm:p-8">
               <h2 className="text-xl font-semibold text-white">Sign in</h2>
               <p className="mt-1 text-sm text-slate-300">Access your account to continue</p>
 
@@ -166,15 +153,6 @@ export default function LoginPage() {
                 Accounts are provisioned by an Administrator. There is no self-registration.
               </p>
             </div>
-
-            {!revealed && (
-              <div className="absolute inset-0 flex animate-pulse flex-col items-center justify-center gap-2 bg-slate-900/20">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white">
-                  <Eye className="h-5 w-5" />
-                </div>
-                <p className="text-sm font-medium text-white">Click to sign in</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
