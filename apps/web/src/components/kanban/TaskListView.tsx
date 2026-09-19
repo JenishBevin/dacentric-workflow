@@ -7,9 +7,8 @@ import { BoardStage, TaskSummary } from "../../lib/types";
 import clsx from "clsx";
 
 /** Flat, stage-grouped alternative to the Kanban board — same tasks, same
- * data, just rows instead of columns. Currently only wired up for the
- * Enquiry List view (see BoardKanbanPage's `boardIdProp` check), not every
- * project board. */
+ * data, just rows instead of columns. Used as the "List" view toggle for
+ * every board (Enquiry List, Estimation, Projects, ...), not just one. */
 export const TaskListView: React.FC<{
   stages: BoardStage[];
   tasksByStage: Record<string, TaskSummary[]>;
@@ -41,12 +40,16 @@ export const TaskListView: React.FC<{
                   onClick={() => onOpenTask(task)}
                   onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpenTask(task)}
                   className={clsx(
-                    "flex w-full flex-wrap items-center gap-3 px-3 py-2.5 text-left sm:flex-nowrap",
+                    // Below sm: title and badges are two separate stacked
+                    // rows (flex-col). At sm+: the badges row becomes
+                    // `contents` so its children rejoin this flex row
+                    // directly, restoring the original single-line layout.
+                    "flex w-full flex-col gap-2 px-3 py-2.5 text-left sm:flex-row sm:flex-nowrap sm:items-center sm:gap-3",
                     idx !== 0 && "border-t border-slate-100",
                     task.isHighlighted && "bg-amber-50"
                   )}
                 >
-                  <span className="min-w-0 flex-1">
+                  <span className="min-w-0 sm:flex-1">
                     <span className="mr-1.5 text-xs text-slate-400">{task.taskId}</span>
                     {task.enquiryId && <span className="mr-1.5 text-xs text-brand-500">{task.enquiryId}</span>}
                     {task.estimationId && <span className="mr-1.5 text-xs text-indigo-500">{task.estimationId}</span>}
@@ -66,15 +69,17 @@ export const TaskListView: React.FC<{
                       </Link>
                     )}
                   </span>
-                  {task.assignees.length > 0 && (
-                    <Badge tone="slate">
-                      {task.assignees[0].name}
-                      {task.assignees.length > 1 ? ` +${task.assignees.length - 1}` : ""}
-                    </Badge>
-                  )}
-                  <PriorityBadge priority={task.priority} />
-                  <ChecklistProgress done={task.checklistProgress.done} total={task.checklistProgress.total} />
-                  <DueDateBadge dueDate={task.dueDate} status={task.dueDateStatus} />
+                  <div className="flex flex-wrap items-center gap-2 sm:contents">
+                    {task.assignees.length > 0 && (
+                      <Badge tone="slate">
+                        {task.assignees[0].name}
+                        {task.assignees.length > 1 ? ` +${task.assignees.length - 1}` : ""}
+                      </Badge>
+                    )}
+                    <PriorityBadge priority={task.priority} />
+                    <ChecklistProgress done={task.checklistProgress.done} total={task.checklistProgress.total} />
+                    <DueDateBadge dueDate={task.dueDate} status={task.dueDateStatus} />
+                  </div>
                 </div>
               ))}
             </div>
