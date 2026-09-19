@@ -38,7 +38,11 @@ export const AppLayout: React.FC = () => {
       <Sidebar mobileOpen={mobileMenuOpen} onCloseMobile={() => setMobileMenuOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onOpenMobileMenu={() => setMobileMenuOpen(true)} />
-        <main className="flex-1 overflow-y-auto pb-16 sm:pb-0">
+        {/* pb-16 clears MobileBottomNav below sm; sm:pb-20 clears the
+            floating ChatWidget FAB (h-14 @ bottom-4 ≈ 72px tall) so a
+            page's last row — e.g. Audit Trail's pagination — never ends up
+            hidden underneath it. */}
+        <main className="flex-1 overflow-y-auto pb-16 sm:pb-20">
           <div className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6">
             {/* Local Suspense boundary: only the page content re-suspends on
                 route change, so the sidebar/header never unmount-and-flash. */}

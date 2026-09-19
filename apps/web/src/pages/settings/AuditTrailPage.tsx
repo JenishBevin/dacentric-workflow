@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { format } from "date-fns";
 import { Download, History, ChevronLeft, ChevronRight } from "lucide-react";
-import { useAuditLog } from "../../api/misc";
+import { useAuditLog, useEmployeeDirectory } from "../../api/misc";
 import { downloadExport } from "../../api/misc";
 import { Input, Select, Button, Skeleton, ErrorState, EmptyState, Badge, Label } from "../../components/ui/primitives";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
-import { AuditLogItem } from "../../lib/types";
+import { AuditLogItem, EmployeeDirectoryEntry } from "../../lib/types";
 
 const ACTIONS = ["CREATE", "EDIT", "DELETE", "MOVE", "ASSIGN", "APPROVE", "REJECT"];
 const PAGE_SIZE = 25;
@@ -17,6 +17,9 @@ export default function AuditTrailPage() {
   const [filters, setFilters] = useState<{ dateFrom?: string; dateTo?: string; action?: string; userId?: string; boardId?: string; taskId?: string }>({});
   const [page, setPage] = useState(1);
   const { data, isLoading, isError, refetch } = useAuditLog({ ...filters, page, pageSize: PAGE_SIZE });
+  // Ungated directory endpoint (unlike /users, which needs Manage Users) —
+  // anyone who can see this page at all can populate the User filter.
+  const { data: employees } = useEmployeeDirectory();
 
   const items: AuditLogItem[] = data?.data ?? [];
   const total: number = data?.meta?.total ?? 0;
@@ -46,7 +49,7 @@ export default function AuditTrailPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-5">
         <div>
           <Label className="!mb-0.5 !text-xs">From</Label>
           <Input type="date" onChange={(e) => setFilter("dateFrom", e.target.value)} className="!py-1.5 !text-xs" />
@@ -62,6 +65,17 @@ export default function AuditTrailPage() {
             {ACTIONS.map((a) => (
               <option key={a} value={a}>
                 {a}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <Label className="!mb-0.5 !text-xs">User</Label>
+          <Select onChange={(e) => setFilter("userId", e.target.value)} className="!py-1.5 !text-xs">
+            <option value="">All users</option>
+            {employees?.map((e: EmployeeDirectoryEntry) => (
+              <option key={e.userId} value={e.userId}>
+                {e.name}
               </option>
             ))}
           </Select>
