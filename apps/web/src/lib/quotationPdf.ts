@@ -16,10 +16,13 @@ const COMPANY = {
   website: "www.qplus-ts.com",
 };
 
-const LOGO_ASPECT = 1344 / 1239; // height / width, from the source PNG — never distort this
-// The reference PDF places its own logo at 57.3pt tall (~20.2mm) — sized
-// ours to the same on-page height rather than an arbitrary guess.
-const LOGO_HEIGHT_MM = 20.2;
+// height / width, from the source PNG's actual pixel dimensions (3374x1697)
+// — re-measure this if the logo file is ever swapped, or it'll silently
+// stretch/squash the replacement. Never hardcode a size without this ratio.
+const LOGO_ASPECT = 1697 / 3374;
+// The reference PDF places its own (also wide, horizontal-lockup) logo at
+// ~68.7mm wide — sized ours to the same on-page width rather than a guess.
+const LOGO_WIDTH_MM = 68.7;
 
 // Page-1 vertical rhythm, in mm from the top of the page — lifted directly
 // off the reference PDF's text positions (converted from its bottom-up PDF
@@ -145,8 +148,8 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   // --- Header: logo left, company address block right ---
   try {
     const logoDataUrl = await toDataUrl(qplusLogo);
-    const logoH = LOGO_HEIGHT_MM;
-    const logoW = logoH / LOGO_ASPECT;
+    const logoW = LOGO_WIDTH_MM;
+    const logoH = logoW * LOGO_ASPECT;
     doc.addImage(logoDataUrl, "PNG", marginX, y, logoW, logoH, undefined, "NONE");
   } catch {
     // Non-fatal — proceed without the logo rather than blocking the download.
