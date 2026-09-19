@@ -313,15 +313,20 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   doc.setFont("helvetica", "normal");
   y += 8;
 
-  // --- Payment terms (no heading, no bullets — just the plain lines) ---
+  // --- Payment terms — heading is fixed/printed by code (underlined, like
+  // Notes/General Terms below); the field itself only ever holds the body
+  // lines, no heading or bullet characters baked into its stored text ---
   ensureSpace(10);
-  doc.setFont("helvetica", "italic");
+  doc.setFont("helvetica", "bold");
+  doc.text("Payment Terms & Conditions", marginX, y);
+  underlineHeading("Payment Terms & Conditions", marginX, y);
+  y += 5.5;
+  doc.setFont("helvetica", "normal");
   for (const line of input.paymentTerms.split("\n").filter((l) => l.trim())) {
     ensureSpace(5);
     doc.text(line.trim(), marginX, y);
     y += 4.8;
   }
-  doc.setFont("helvetica", "normal");
   y += 3;
 
   // --- Notes ---
