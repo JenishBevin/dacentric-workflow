@@ -15,7 +15,7 @@ export async function addChecklistItem(taskId: string, text: string, ownerId: st
     data: { taskId, text, ownerId, position: (maxPos._max.position ?? -1) + 1 },
   });
 
-  await writeAudit({ actor, action: AuditAction.CREATE, entityType: "ChecklistItem", entityId: item.id, boardId: ctx.task.boardId, afterValue: { text, ownerId } });
+  await writeAudit({ actor, action: AuditAction.CREATE, entityType: "ChecklistItem", entityId: item.id, boardId: ctx.task.boardId, taskId, afterValue: { text, ownerId } });
 
   if (ownerId) {
     await notify({ userId: ownerId, event: NotificationEvent.CHECKLIST_ASSIGNED, title: `You were assigned a checklist item on ${ctx.task.taskId}`, taskId, boardId: ctx.task.boardId });
@@ -45,7 +45,7 @@ export async function updateChecklistItem(
     },
   });
 
-  await writeAudit({ actor, action: AuditAction.EDIT, entityType: "ChecklistItem", entityId: itemId, boardId: ctx.task.boardId, beforeValue: before, afterValue: input });
+  await writeAudit({ actor, action: AuditAction.EDIT, entityType: "ChecklistItem", entityId: itemId, boardId: ctx.task.boardId, taskId, beforeValue: before, afterValue: input });
 
   if (input.ownerId && input.ownerId !== before.ownerId) {
     await notify({ userId: input.ownerId, event: NotificationEvent.CHECKLIST_ASSIGNED, title: `You were assigned a checklist item on ${ctx.task.taskId}`, taskId, boardId: ctx.task.boardId });
@@ -58,5 +58,5 @@ export async function deleteChecklistItem(taskId: string, itemId: string, actor:
   const ctx = await loadTaskWithAccess(taskId, actor);
   assertCanCollaborate(ctx);
   const item = await prisma.checklistItem.delete({ where: { id: itemId } });
-  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "ChecklistItem", entityId: itemId, boardId: ctx.task.boardId, beforeValue: item });
+  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "ChecklistItem", entityId: itemId, boardId: ctx.task.boardId, taskId, beforeValue: item });
 }

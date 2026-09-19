@@ -8,6 +8,12 @@ export interface AuditEntryInput {
   entityType: string;
   entityId?: string;
   boardId?: string;
+  // Set this on sub-entity actions (Comment/TaskAttachment/ChecklistItem/
+  // TaskWatcher/TaskDependency) so the task's Activity Log can find them —
+  // it only queries entityType:"Task" or this field, never entityType alone
+  // for anything else. Leave unset for actions that shouldn't surface there
+  // (e.g. SecretTaskAttachment, which is deliberately hidden from it).
+  taskId?: string;
   field?: string;
   beforeValue?: unknown;
   afterValue?: unknown;
@@ -30,6 +36,7 @@ export async function writeAudit(entry: AuditEntryInput): Promise<void> {
       entityType: entry.entityType,
       entityId: entry.entityId,
       boardId: entry.boardId,
+      taskId: entry.taskId,
       field: entry.field,
       beforeValue: entry.beforeValue === undefined ? undefined : (entry.beforeValue as any),
       afterValue: entry.afterValue === undefined ? undefined : (entry.afterValue as any),

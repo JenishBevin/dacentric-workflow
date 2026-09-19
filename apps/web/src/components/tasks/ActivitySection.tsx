@@ -6,6 +6,7 @@ import { AuditLogItem } from "../../lib/types";
 
 const ACTION_LABEL: Record<string, string> = {
   CREATE: "created",
+  EDIT: "updated",
   UPDATE: "updated",
   DELETE: "deleted",
   MOVE: "moved",
@@ -38,6 +39,28 @@ function formatValue(value: unknown): string {
 
 function describe(entry: AuditLogItem): string {
   const verb = ACTION_LABEL[entry.action] ?? entry.action.toLowerCase();
+  const after = entry.afterValue as Record<string, unknown> | undefined;
+  const before = entry.beforeValue as Record<string, unknown> | undefined;
+
+  // Sub-entity actions (comments/attachments/checklist/watchers/dependencies)
+  // don't carry a `field`, so describe them from their entityType instead.
+  switch (entry.entityType) {
+    case "Comment":
+      return "added a comment";
+    case "TaskAttachment":
+      return entry.action === "DELETE" ? `removed attachment "${before?.fileName ?? ""}"` : `uploaded attachment "${after?.fileName ?? ""}"`;
+    case "ChecklistItem":
+      if (entry.action === "DELETE") return `removed checklist item "${(before?.text as string) ?? ""}"`;
+      if (entry.action === "CREATE") return `added checklist item "${(after?.text as string) ?? ""}"`;
+      if (after?.isComplete === true) return "completed a checklist item";
+      if (after?.isComplete === false) return "reopened a checklist item";
+      return "updated a checklist item";
+    case "TaskWatcher":
+      return entry.action === "DELETE" ? "stopped watching" : "started watching";
+    case "TaskDependency":
+      return entry.action === "DELETE" ? "removed a dependency" : "added a dependency";
+  }
+
   if (entry.field) {
     const label = FIELD_LABEL[entry.field] ?? entry.field;
     return `${verb} ${label}: ${formatValue(entry.beforeValue)} → ${formatValue(entry.afterValue)}`;

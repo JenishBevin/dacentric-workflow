@@ -181,7 +181,10 @@ export function useSaveEstimationQuote() {
   return useMutation({
     mutationFn: async ({ taskId, ...body }: SaveEstimationQuoteInput) =>
       (await api.put<{ data: EstimationQuote }>(`/tasks/${taskId}/quotation`, body)).data.data,
-    onSuccess: (_result, { taskId }) => qc.invalidateQueries({ queryKey: ["task", taskId] }),
+    onSuccess: (_result, { taskId }) => {
+      qc.invalidateQueries({ queryKey: ["task", taskId] });
+      qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
+    },
   });
 }
 
@@ -276,7 +279,10 @@ export function useDuplicateTask() {
 
 export function useChecklistMutations(taskId: string) {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["task", taskId] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["task", taskId] });
+    qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
+  };
   const add = useMutation({ mutationFn: async (payload: { text: string; ownerId?: string }) => api.post(`/tasks/${taskId}/checklist`, payload), onSuccess: invalidate });
   const update = useMutation({
     mutationFn: async ({ itemId, ...payload }: { itemId: string; text?: string; isComplete?: boolean; ownerId?: string | null }) =>
@@ -310,6 +316,7 @@ export function useUploadAttachment(taskId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["task-attachments", taskId] });
       qc.invalidateQueries({ queryKey: ["task", taskId] });
+      qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
     },
   });
 }
@@ -321,6 +328,7 @@ export function useDeleteAttachment(taskId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["task-attachments", taskId] });
       qc.invalidateQueries({ queryKey: ["task", taskId] });
+      qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
     },
   });
 }
@@ -378,7 +386,10 @@ export function useImportEnquiries() {
 
 export function useWatcherMutations(taskId: string) {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["task", taskId] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["task", taskId] });
+    qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
+  };
   const add = useMutation({ mutationFn: async (userId: string) => api.post(`/tasks/${taskId}/watchers`, { userId }), onSuccess: invalidate });
   const remove = useMutation({ mutationFn: async (userId: string) => api.delete(`/tasks/${taskId}/watchers/${userId}`), onSuccess: invalidate });
   return { add, remove };
@@ -386,7 +397,10 @@ export function useWatcherMutations(taskId: string) {
 
 export function useDependencyMutations(taskId: string) {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["task", taskId] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["task", taskId] });
+    qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
+  };
   const add = useMutation({ mutationFn: async (payload: { type: string; taskId: string }) => api.post(`/tasks/${taskId}/dependencies`, payload), onSuccess: invalidate });
   const remove = useMutation({ mutationFn: async (dependencyId: string) => api.delete(`/tasks/${taskId}/dependencies/${dependencyId}`), onSuccess: invalidate });
   return { add, remove };
@@ -396,7 +410,10 @@ export function useSetTaskTags(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (tagIds: string[]) => api.put(`/tasks/${taskId}/tags`, { tagIds }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["task", taskId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["task", taskId] });
+      qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
+    },
   });
 }
 

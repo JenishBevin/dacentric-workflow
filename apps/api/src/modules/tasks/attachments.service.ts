@@ -38,6 +38,7 @@ export async function uploadAttachment(taskId: string, file: Express.Multer.File
     entityType: "TaskAttachment",
     entityId: attachment.id,
     boardId: ctx.task.boardId,
+    taskId,
     afterValue: { fileName: file.originalname, sizeBytes: file.size },
   });
 
@@ -82,5 +83,5 @@ export async function deleteAttachment(taskId: string, attachmentId: string, act
   await getStorageAdapter().remove(attachment.storageKey);
   await prisma.taskAttachment.delete({ where: { id: attachmentId } });
 
-  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "TaskAttachment", entityId: attachmentId, boardId: ctx.task.boardId, beforeValue: { fileName: attachment.fileName } });
+  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "TaskAttachment", entityId: attachmentId, boardId: ctx.task.boardId, taskId, beforeValue: { fileName: attachment.fileName } });
 }

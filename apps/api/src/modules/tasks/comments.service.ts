@@ -18,7 +18,7 @@ export async function addComment(taskId: string, body: string, mentionedUserIds:
     data: { taskId, authorId: actor.id, body, mentionedUserIds: validMentions },
   });
 
-  await writeAudit({ actor, action: AuditAction.CREATE, entityType: "Comment", entityId: comment.id, boardId: ctx.task.boardId, afterValue: { body } });
+  await writeAudit({ actor, action: AuditAction.CREATE, entityType: "Comment", entityId: comment.id, boardId: ctx.task.boardId, taskId, afterValue: { body } });
 
   const watchers = await prisma.taskWatcher.findMany({ where: { taskId } });
   const notifyIds = new Set([...validMentions, ...watchers.map((w) => w.userId)]);

@@ -977,6 +977,13 @@ model AuditLog {
   entityType  String       // "Board" | "Task" | "User" | "Role" | ...
   entityId    String?
   boardId     String?
+  // Set on sub-entity actions (Comment/TaskAttachment/ChecklistItem/
+  // TaskWatcher/TaskDependency) so the task's Activity Log can find them —
+  // those rows' own entityType/entityId point at the sub-entity, not the
+  // task, so entityType:"Task" alone would never surface them. Deliberately
+  // left unset for SecretTaskAttachment actions — they stay out of the
+  // general Activity Log on purpose (see secret-attachments.service.ts).
+  taskId      String?
   field       String?
   beforeValue Json?
   afterValue  Json?
@@ -985,6 +992,7 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([boardId])
+  @@index([taskId])
   @@index([userId])
   @@index([createdAt])
 }

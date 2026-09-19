@@ -24,7 +24,7 @@ export async function addWatcher(taskId: string, userId: string, actor: AuthedUs
     create: { taskId, userId },
     update: {},
   });
-  await writeAudit({ actor, action: AuditAction.CREATE, entityType: "TaskWatcher", entityId: watcher.id, boardId: ctx.task.boardId, afterValue: { userId } });
+  await writeAudit({ actor, action: AuditAction.CREATE, entityType: "TaskWatcher", entityId: watcher.id, boardId: ctx.task.boardId, taskId, afterValue: { userId } });
   return watcher;
 }
 
@@ -32,5 +32,5 @@ export async function removeWatcher(taskId: string, userId: string, actor: Authe
   const ctx = await loadTaskWithAccess(taskId, actor);
   assertCanCollaborate(ctx);
   await prisma.taskWatcher.delete({ where: { taskId_userId: { taskId, userId } } });
-  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "TaskWatcher", entityId: taskId, boardId: ctx.task.boardId, afterValue: { userId } });
+  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "TaskWatcher", entityId: taskId, boardId: ctx.task.boardId, taskId, afterValue: { userId } });
 }

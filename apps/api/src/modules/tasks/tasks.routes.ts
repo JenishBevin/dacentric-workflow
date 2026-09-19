@@ -31,8 +31,9 @@ import {
 } from "./tasks.schemas";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma";
-import { PermissionKey } from "@dacentric/types";
+import { PermissionKey, AuditAction } from "@dacentric/types";
 import { Errors } from "../../common/errors";
+import { writeAudit } from "../../common/audit";
 
 export const tasksRouter = Router();
 tasksRouter.use(authenticate);
@@ -322,16 +323,33 @@ tasksRouter.post(
   validate(dependencySchema),
   asyncHandler(async (req, res) => {
     const { type, taskId: targetTaskId } = (req as any).validatedBody;
-    await loadTaskWithAccess(req.params.taskId, req.user!);
+    const ctx = await loadTaskWithAccess(req.params.taskId, req.user!);
     await tasksService.addDependencyInternal(req.params.taskId, type, targetTaskId);
+    await writeAudit({
+      actor: req.user!,
+      action: AuditAction.CREATE,
+      entityType: "TaskDependency",
+      boardId: ctx.task.boardId,
+      taskId: req.params.taskId,
+      afterValue: { type, targetTaskId },
+    });
     return created(res, await tasksService.getTaskDetail(req.params.taskId, req.user!));
   })
 );
 tasksRouter.delete(
   "/:taskId/dependencies/:dependencyId",
   asyncHandler(async (req, res) => {
-    await loadTaskWithAccess(req.params.taskId, req.user!);
-    await prisma.taskDependency.delete({ where: { id: req.params.dependencyId } });
+    const ctx = await loadTaskWithAccess(req.params.taskId, req.user!);
+    const dependency = await prisma.taskDependency.delete({ where: { id: req.params.dependencyId } });
+    await writeAudit({
+      actor: req.user!,
+      action: AuditAction.DELETE,
+      entityType: "TaskDependency",
+      entityId: req.params.dependencyId,
+      boardId: ctx.task.boardId,
+      taskId: req.params.taskId,
+      beforeValue: { type: dependency.type, targetTaskId: dependency.targetTaskId },
+    });
     return ok(res, { message: "Dependency removed." });
   })
 );
@@ -367,8 +385,14 @@ tasksRouter.get(
   "/:taskId/activity",
   asyncHandler(async (req, res) => {
     await loadTaskWithAccess(req.params.taskId, req.user!);
+    // Direct task edits/moves/awards use entityType:"Task"; comments,
+    // attachments, checklist items, watchers and dependencies each audit
+    // under their own entityType (their row's id, not the task's), tagged
+    // with taskId instead — both are needed to show the full picture.
+    // SecretTaskAttachment entries never set taskId, so they never surface
+    // here even though the underlying audit rows exist (by design).
     const logs = await prisma.auditLog.findMany({
-      where: { entityType: "Task", entityId: req.params.taskId },
+      where: { OR: [{ entityType: "Task", entityId: req.params.taskId }, { taskId: req.params.taskId }] },
       orderBy: { createdAt: "desc" },
     });
     return ok(res, logs);
