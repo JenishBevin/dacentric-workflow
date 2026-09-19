@@ -33,7 +33,7 @@ import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown,
 import { format } from "date-fns";
 import clsx from "clsx";
 import { useCustomerDetail } from "../../api/customers";
-import { generateQuotationPdf, DEFAULT_PAYMENT_TERMS } from "../../lib/quotationPdf";
+import { generateQuotationPdf, DEFAULT_PAYMENT_TERMS, DEFAULT_NOTES, DEFAULT_GENERAL_TERMS } from "../../lib/quotationPdf";
 
 interface QuoteLineItemForm {
   description: string;
@@ -109,6 +109,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const [quoteVatRate, setQuoteVatRate] = useState("5");
   const [quoteValidityDays, setQuoteValidityDays] = useState("7");
   const [quotePaymentTerms, setQuotePaymentTerms] = useState(DEFAULT_PAYMENT_TERMS);
+  const [quoteNotes, setQuoteNotes] = useState(DEFAULT_NOTES);
+  const [quoteGeneralTerms, setQuoteGeneralTerms] = useState(DEFAULT_GENERAL_TERMS);
   const [quotePreparerName, setQuotePreparerName] = useState("");
   const [quotePreparerDesignation, setQuotePreparerDesignation] = useState("");
   const [quotePreparerMobile, setQuotePreparerMobile] = useState("");
@@ -166,6 +168,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
       setQuoteVatRate(String(task.quotation.vatRate));
       setQuoteValidityDays(String(task.quotation.validityDays ?? 7));
       setQuotePaymentTerms(task.quotation.paymentTerms ?? DEFAULT_PAYMENT_TERMS);
+      setQuoteNotes(task.quotation.notes ?? DEFAULT_NOTES);
+      setQuoteGeneralTerms(task.quotation.generalTerms ?? DEFAULT_GENERAL_TERMS);
       setQuotePreparerName(task.quotation.preparerName ?? user?.name ?? "");
       setQuotePreparerDesignation(task.quotation.preparerDesignation ?? user?.employee?.jobTitle ?? "");
       setQuotePreparerMobile(task.quotation.preparerMobile ?? "");
@@ -184,6 +188,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
       setQuoteVatRate("5");
       setQuoteValidityDays("7");
       setQuotePaymentTerms(DEFAULT_PAYMENT_TERMS);
+      setQuoteNotes(DEFAULT_NOTES);
+      setQuoteGeneralTerms(DEFAULT_GENERAL_TERMS);
       setQuotePreparerName(user?.name ?? "");
       setQuotePreparerDesignation(user?.employee?.jobTitle ?? "");
       setQuotePreparerMobile("");
@@ -244,6 +250,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         vatRate,
         validityDays,
         paymentTerms: quotePaymentTerms.trim() || undefined,
+        notes: quoteNotes.trim() || undefined,
+        generalTerms: quoteGeneralTerms.trim() || undefined,
         preparerName: quotePreparerName.trim() || undefined,
         preparerDesignation: quotePreparerDesignation.trim() || undefined,
         preparerMobile: quotePreparerMobile.trim() || undefined,
@@ -263,6 +271,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         totalAmount: saved.totalAmount ?? 0,
         validityDays,
         paymentTerms: quotePaymentTerms.trim() || DEFAULT_PAYMENT_TERMS,
+        notes: quoteNotes.trim() || DEFAULT_NOTES,
+        generalTerms: quoteGeneralTerms.trim() || DEFAULT_GENERAL_TERMS,
         preparerName: quotePreparerName.trim(),
         preparerDesignation: quotePreparerDesignation.trim(),
         preparerMobile: quotePreparerMobile.trim(),
@@ -1092,7 +1102,29 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
               onChange={(e) => setQuotePaymentTerms(e.target.value)}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus-visible:focus-ring"
             />
-            <p className="mt-1 text-[11px] text-slate-400">One line per bullet point.</p>
+            <p className="mt-1 text-[11px] text-slate-400">One line per item.</p>
+          </div>
+
+          <div>
+            <Label>Notes</Label>
+            <textarea
+              rows={3}
+              value={quoteNotes}
+              onChange={(e) => setQuoteNotes(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus-visible:focus-ring"
+            />
+            <p className="mt-1 text-[11px] text-slate-400">One line per item — numbered automatically.</p>
+          </div>
+
+          <div>
+            <Label>General Terms and Conditions</Label>
+            <textarea
+              rows={5}
+              value={quoteGeneralTerms}
+              onChange={(e) => setQuoteGeneralTerms(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus-visible:focus-ring"
+            />
+            <p className="mt-1 text-[11px] text-slate-400">One line per item — numbered automatically.</p>
           </div>
 
           <div>

@@ -289,6 +289,8 @@ export interface TaskSummary {
     totalAmount: number | null;
     validityDays: number | null;
     paymentTerms: string | null;
+    notes: string | null;
+    generalTerms: string | null;
     preparerName: string | null;
     preparerDesignation: string | null;
     preparerMobile: string | null;

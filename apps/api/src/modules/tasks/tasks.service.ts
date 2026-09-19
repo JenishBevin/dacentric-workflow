@@ -71,6 +71,8 @@ export interface SaveEstimationQuoteInput {
   vatRate: number;
   validityDays?: number;
   paymentTerms?: string;
+  notes?: string;
+  generalTerms?: string;
   preparerName?: string;
   preparerDesignation?: string;
   preparerMobile?: string;
@@ -111,6 +113,8 @@ export async function saveEstimationQuote(taskId: string, input: SaveEstimationQ
       totalAmount,
       validityDays: input.validityDays ?? 7,
       paymentTerms: input.paymentTerms,
+      notes: input.notes,
+      generalTerms: input.generalTerms,
       preparerName: input.preparerName,
       preparerDesignation: input.preparerDesignation,
       preparerMobile: input.preparerMobile,
@@ -348,6 +352,8 @@ function serializeTask(task: any) {
           totalAmount: task.estimationRecord.totalAmount,
           validityDays: task.estimationRecord.validityDays,
           paymentTerms: task.estimationRecord.paymentTerms,
+          notes: task.estimationRecord.notes,
+          generalTerms: task.estimationRecord.generalTerms,
           preparerName: task.estimationRecord.preparerName,
           preparerDesignation: task.estimationRecord.preparerDesignation,
           preparerMobile: task.estimationRecord.preparerMobile,
@@ -416,6 +422,8 @@ const TASK_DETAIL_INCLUDE = {
       totalAmount: true,
       validityDays: true,
       paymentTerms: true,
+      notes: true,
+      generalTerms: true,
       preparerName: true,
       preparerDesignation: true,
       preparerMobile: true,

@@ -1082,6 +1082,8 @@ model EstimationRecord {
   totalAmount       Float?
   validityDays      Int?      @default(7)
   paymentTerms      String? // defaults to the standard 90/10 split, editable
+  notes             String? // defaults to the standard 3-line boilerplate, editable — one item per line, auto-numbered on render
+  generalTerms      String? // defaults to the standard 10-line boilerplate, editable — one item per line, auto-numbered on render
   // Signature block ("Thanks & Regards,") — defaults from the preparer's own
   // account client-side, but editable since anyone with edit rights can
   // create the quotation on someone else's behalf.

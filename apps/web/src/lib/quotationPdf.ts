@@ -4,10 +4,11 @@ import qplusLogo from "../assets/QPlus.png";
 
 // Fixed company letterhead details — never entered per-quotation, matches
 // the company's standard "Proposal For Supply and Installation of ..." PDF.
-// Font sizes below were measured directly off that reference PDF (via
-// pdfjs-dist text-run transforms), not eyeballed — page 1 is the cover
-// (letterhead/recipient/title/ref), page 2+ is the quotation body, which the
-// reference document renders almost entirely at 8.2pt.
+// Font sizes AND page-1 line positions below were measured directly off
+// that reference PDF (via pdfjs-dist text-run transforms / operator list),
+// not eyeballed — page 1 is the cover (letterhead/recipient/title/ref),
+// which the reference keeps alone on its own page; page 2+ is the
+// quotation body, rendered almost entirely at 8.2pt.
 const COMPANY = {
   addressLines: ["Office No. 203,", "Dar Al Wuheida Building,", "Hor Al Anz East, Dubai, UAE.", "P.O Box-16615"],
   mobile: "+971 4 393 1110",
@@ -15,15 +16,35 @@ const COMPANY = {
   website: "www.qplus-ts.com",
 };
 
-const LOGO_ASPECT = 1344 / 1239; // height / width, from the source PNG
+const LOGO_ASPECT = 1344 / 1239; // height / width, from the source PNG — never distort this
+// The reference PDF places its own logo at 57.3pt tall (~20.2mm) — sized
+// ours to the same on-page height rather than an arbitrary guess.
+const LOGO_HEIGHT_MM = 20.2;
 
-const NOTES = [
+// Page-1 vertical rhythm, in mm from the top of the page — lifted directly
+// off the reference PDF's text positions (converted from its bottom-up PDF
+// points), not estimated. Title/PROJECT/Ref sit at fixed spots regardless of
+// how many recipient lines are present, same as the reference.
+const PAGE1_Y = {
+  addressStart: 16.9,
+  addressLineGap: 3.6,
+  date: 48.65,
+  to: 71.93,
+  recipientGaps: [6.7, 7.06, 6.7], // To->Name, Name->Company, Company->Location
+  title: 147.42,
+  project: 180.23,
+  ref: 214.45,
+};
+
+export const DEFAULT_PAYMENT_TERMS = "90% Advance Payment on Order Confirmation.\n10% Payment Upon Work Completion.";
+
+export const DEFAULT_NOTES = [
   "Material Price May Varies According to the Current Market Condition.",
   "Work Permit and Gate Pass to be Provided.",
   "Any Civil, Electrical and Cable Pulling work is not included in the Quotation.",
-];
+].join("\n");
 
-const TERMS = [
+export const DEFAULT_GENERAL_TERMS = [
   "Any additional work apart from the above proposal will be extra cost.",
   "The work will be started only after a formal contract /LPO and advance payment.",
   "All items and quantities are subject to remeasurable as per the quoted price and rates.",
@@ -34,9 +55,7 @@ const TERMS = [
   "Safe storage for keeping our materials to be provided",
   "Electricity / Water / Hoisting facilities etc to be provided free of cost",
   "Any approval, drawings, documentation is not included in this scope.",
-];
-
-export const DEFAULT_PAYMENT_TERMS = "90% Advance Payment on Order Confirmation.\n10% Payment Upon Work Completion.";
+].join("\n");
 
 export interface QuotationLineItem {
   description: string;
@@ -60,6 +79,8 @@ export interface QuotationPdfInput {
   totalAmount: number;
   validityDays: number;
   paymentTerms: string;
+  notes: string;
+  generalTerms: string;
   preparerName: string;
   preparerDesignation: string;
   preparerMobile: string;
@@ -81,8 +102,9 @@ function money(n: number) {
 }
 
 /** Renders the company's fixed proposal letterhead and downloads it as a PDF —
- * layout/sections/boilerplate/font sizes all match the standard template;
- * only the fields on QuotationPdfInput vary per quotation. */
+ * layout/sections/boilerplate/font sizes/line spacing/grid borders all match
+ * the standard template; only the fields on QuotationPdfInput vary per
+ * quotation. */
 export async function generateQuotationPdf(input: QuotationPdfInput) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = 210;
@@ -110,12 +132,22 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
     doc.setTextColor(0, 0, 0);
   }
 
+  // Short underline beneath a section heading, matching the reference PDF's
+  // own underlined headings — width follows the heading text, not a fixed bar.
+  function underlineHeading(text: string, x: number, baselineY: number) {
+    const w = doc.getTextWidth(text);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.15);
+    doc.line(x, baselineY + 0.8, x + w, baselineY + 0.8);
+  }
+
   // ============================= PAGE 1 — cover =============================
   // --- Header: logo left, company address block right ---
   try {
     const logoDataUrl = await toDataUrl(qplusLogo);
-    const logoW = 18;
-    doc.addImage(logoDataUrl, "PNG", marginX, y, logoW, logoW * LOGO_ASPECT);
+    const logoH = LOGO_HEIGHT_MM;
+    const logoW = logoH / LOGO_ASPECT;
+    doc.addImage(logoDataUrl, "PNG", marginX, y, logoW, logoH, undefined, "NONE");
   } catch {
     // Non-fatal — proceed without the logo rather than blocking the download.
   }
@@ -123,55 +155,39 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   doc.setFontSize(6.8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(71, 85, 105);
-  let addrY = y + 2;
+  let addrY = PAGE1_Y.addressStart;
   for (const line of COMPANY.addressLines) {
     doc.text(line, contentRight, addrY, { align: "right" });
-    addrY += 3.6;
+    addrY += PAGE1_Y.addressLineGap;
   }
   doc.text(`Mob: ${COMPANY.mobile}`, contentRight, addrY, { align: "right" });
-  addrY += 3.6;
+  addrY += PAGE1_Y.addressLineGap;
   doc.text(`Email: ${COMPANY.email}`, contentRight, addrY, { align: "right" });
-  addrY += 3.6;
+  addrY += PAGE1_Y.addressLineGap;
   doc.text(COMPANY.website, contentRight, addrY, { align: "right" });
   doc.setTextColor(0, 0, 0);
 
-  y = Math.max(y + 26, addrY + 10);
-
   doc.setFontSize(9.5);
-  doc.text(`Date: ${format(new Date(), "d MMMM yyyy")}`, contentRight, y, { align: "right" });
-  y += 14;
+  doc.text(`Date: ${format(new Date(), "d MMMM yyyy")}`, contentRight, PAGE1_Y.date, { align: "right" });
 
   // --- Recipient ---
   doc.setFontSize(12.2);
+  y = PAGE1_Y.to;
   doc.text("To,", marginX, y);
-  y += 6.5;
-  if (input.recipientName) {
-    doc.text(input.recipientName, marginX, y);
-    y += 6.5;
-  }
-  if (input.recipientCompany) {
-    doc.text(input.recipientCompany, marginX, y);
-    y += 6.5;
-  }
-  if (input.recipientLocation) {
-    doc.text(input.recipientLocation, marginX, y);
-    y += 6.5;
-  }
+  const recipientLines = [input.recipientName, input.recipientCompany, input.recipientLocation].filter(Boolean);
+  recipientLines.forEach((line, i) => {
+    y += PAGE1_Y.recipientGaps[i] ?? PAGE1_Y.recipientGaps[PAGE1_Y.recipientGaps.length - 1];
+    doc.text(line, marginX, y);
+  });
 
-  // --- Title / project / ref — vertically centered in the remaining cover space ---
-  const coverBottom = 260;
-  const blockHeight = 10 + 8 + 8;
-  y = Math.max(y + 20, (coverBottom - blockHeight) / 2 + blockHeight / 2);
-
+  // --- Title / project / ref — fixed positions, same as the reference ---
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16.3);
-  doc.text(input.title, pageWidth / 2, y, { align: "center" });
-  y += 10;
+  doc.text(input.title, pageWidth / 2, PAGE1_Y.title, { align: "center" });
 
   doc.setFontSize(13.6);
-  doc.text(`PROJECT : ${input.projectName.toUpperCase()}`, pageWidth / 2, y, { align: "center" });
-  y += 8;
-  doc.text(`Ref. ${input.refId}`, pageWidth / 2, y, { align: "center" });
+  doc.text(`PROJECT : ${input.projectName.toUpperCase()}`, pageWidth / 2, PAGE1_Y.project, { align: "center" });
+  doc.text(`Ref. ${input.refId}`, pageWidth / 2, PAGE1_Y.ref, { align: "center" });
   doc.setFont("helvetica", "normal");
 
   printFooter();
@@ -200,7 +216,8 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   }
   y += 3;
 
-  // --- Item table ---
+  // --- Item table (full grid — outer border, column dividers, row dividers,
+  // matching the reference PDF's actual vector lines) ---
   const cols = [
     { key: "sl", label: "SL.No", width: 10 },
     { key: "desc", label: "ITEM DESCRIPTION", width: 90 },
@@ -216,6 +233,17 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
     colX.push(cx);
     cx += c.width;
   }
+  const colEdges = [...colX, marginX + tableWidth];
+
+  function drawRowGrid(rowTop: number, rowHeight: number) {
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.15);
+    doc.line(marginX, rowTop, marginX + tableWidth, rowTop);
+    doc.line(marginX, rowTop + rowHeight, marginX + tableWidth, rowTop + rowHeight);
+    for (const edge of colEdges) {
+      doc.line(edge, rowTop, edge, rowTop + rowHeight);
+    }
+  }
 
   function drawTableHeader() {
     doc.setFont("helvetica", "bold");
@@ -226,6 +254,7 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
       const lines = c.label.split("\n");
       lines.forEach((l, li) => doc.text(l, colX[i] + c.width / 2, y + 4 + li * 3.2, { align: "center" }));
     });
+    drawRowGrid(y, 9);
     y += 9;
     doc.setFont("helvetica", "normal");
   }
@@ -252,14 +281,14 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
     doc.text(item.unit, colX[3] + cols[3].width / 2, rowTop + 4.5, { align: "center" });
     doc.text(money(item.unitPrice), colX[4] + cols[4].width - 2, rowTop + 4.5, { align: "right" });
     doc.text(money(item.qty * item.unitPrice), colX[5] + cols[5].width - 2, rowTop + 4.5, { align: "right" });
-    doc.setDrawColor(226, 232, 240);
-    doc.rect(marginX, rowTop, tableWidth, rowHeight);
+    drawRowGrid(rowTop, rowHeight);
     y = rowTop + rowHeight;
   });
 
-  // --- Totals ---
+  // --- Totals (single divider between the label and value zone, matching
+  // the reference's own two-rect-per-row layout) ---
   ensureSpace(24);
-  const totalsLabelX = colX[4];
+  const totalsDividerX = colX[4];
   const totalsRows: [string, string][] = [
     ["Total in " + input.currency, money(input.subtotal)],
     [`VAT ${input.vatRate}%`, money(input.vatAmount)],
@@ -268,8 +297,11 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(BODY_SIZE);
   for (const [label, value] of totalsRows) {
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.15);
     doc.rect(marginX, y, tableWidth, 7);
-    doc.text(label, totalsLabelX - 2, y + 4.8, { align: "right" });
+    doc.line(totalsDividerX, y, totalsDividerX, y + 7);
+    doc.text(label, totalsDividerX - 2, y + 4.8, { align: "right" });
     doc.text(value, colX[5] + cols[5].width - 2, y + 4.8, { align: "right" });
     y += 7;
   }
@@ -281,15 +313,12 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   doc.setFont("helvetica", "normal");
   y += 8;
 
-  // --- Payment terms ---
+  // --- Payment terms (no heading, no bullets — just the plain lines) ---
   ensureSpace(10);
-  doc.setFont("helvetica", "bold");
-  doc.text("Payment Terms & Conditions", marginX, y);
-  y += 5.5;
   doc.setFont("helvetica", "italic");
   for (const line of input.paymentTerms.split("\n").filter((l) => l.trim())) {
     ensureSpace(5);
-    doc.text(`•  ${line.trim()}`, marginX, y);
+    doc.text(line.trim(), marginX, y);
     y += 4.8;
   }
   doc.setFont("helvetica", "normal");
@@ -299,27 +328,35 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   ensureSpace(10);
   doc.setFont("helvetica", "bold");
   doc.text("Notes:", marginX, y);
+  underlineHeading("Notes:", marginX, y);
   y += 5.5;
   doc.setFont("helvetica", "normal");
-  NOTES.forEach((n, i) => {
-    ensureSpace(5);
-    doc.text(`${i + 1}) ${n}`, marginX, y);
-    y += 4.8;
-  });
+  input.notes
+    .split("\n")
+    .filter((l) => l.trim())
+    .forEach((n, i) => {
+      ensureSpace(5);
+      doc.text(`${i + 1}) ${n.trim()}`, marginX, y);
+      y += 4.8;
+    });
   y += 3;
 
   // --- General terms ---
   ensureSpace(10);
   doc.setFont("helvetica", "bold");
   doc.text("General Terms and Conditions", marginX, y);
+  underlineHeading("General Terms and Conditions", marginX, y);
   y += 5.5;
   doc.setFont("helvetica", "normal");
-  TERMS.forEach((t, i) => {
-    const lines = doc.splitTextToSize(`${i + 1}) ${t}`, tableWidth);
-    ensureSpace(lines.length * 4.8 + 1);
-    doc.text(lines, marginX, y);
-    y += lines.length * 4.8;
-  });
+  input.generalTerms
+    .split("\n")
+    .filter((l) => l.trim())
+    .forEach((t, i) => {
+      const lines = doc.splitTextToSize(`${i + 1}) ${t.trim()}`, tableWidth);
+      ensureSpace(lines.length * 4.8 + 1);
+      doc.text(lines, marginX, y);
+      y += lines.length * 4.8;
+    });
   y += 10;
 
   // --- Signature ---

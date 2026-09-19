@@ -134,6 +134,8 @@ export const saveEstimationQuoteSchema = z.object({
   vatRate: z.number().min(0).max(100),
   validityDays: z.number().int().positive().max(365).optional(),
   paymentTerms: z.string().trim().max(2000).optional(),
+  notes: z.string().trim().max(4000).optional(),
+  generalTerms: z.string().trim().max(4000).optional(),
   preparerName: z.string().trim().max(200).optional(),
   preparerDesignation: z.string().trim().max(200).optional(),
   preparerMobile: z.string().trim().max(50).optional(),

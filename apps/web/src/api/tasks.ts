@@ -148,6 +148,8 @@ export interface EstimationQuote {
   totalAmount: number | null;
   validityDays: number | null;
   paymentTerms: string | null;
+  notes: string | null;
+  generalTerms: string | null;
   preparerName: string | null;
   preparerDesignation: string | null;
   preparerMobile: string | null;
@@ -166,6 +168,8 @@ export interface SaveEstimationQuoteInput {
   vatRate: number;
   validityDays?: number;
   paymentTerms?: string;
+  notes?: string;
+  generalTerms?: string;
   preparerName?: string;
   preparerDesignation?: string;
   preparerMobile?: string;
