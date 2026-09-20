@@ -12,7 +12,7 @@ export function invitationEmail(name: string, activationUrl: string) {
 
 export function passwordResetEmail(name: string, resetUrl: string) {
   return {
-    subject: "Reset your DaCentric password",
+    subject: "Reset your Onerra Password",
     html: `<p>Hi ${name},</p>
       <p>We received a request to reset your password.</p>
       <p><a href="${resetUrl}">Reset your password</a></p>
