@@ -431,7 +431,7 @@ export default function HomePage() {
           <PillNav onHomeClick={scrollToTop} />
           <a
             href="#contact"
-            className="shrink-0 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:brightness-110"
+            className="shrink-0 rounded-full bg-gradient-to-r from-[#0a7e6d] to-[#0d9488] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 transition hover:brightness-110"
           >
             Get in Touch
           </a>
