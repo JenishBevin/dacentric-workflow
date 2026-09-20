@@ -1,7 +1,7 @@
 {
-  "name": "QPlus",
-  "short_name": "QPlus",
-  "description": "QPlus — Unified Business Module Platform",
+  "name": "Onerra",
+  "short_name": "Onerra",
+  "description": "Onerra — employee sign-in shortcut",
   "start_url": "/login-portal-uae2026",
   "scope": "/",
   "display": "standalone",
