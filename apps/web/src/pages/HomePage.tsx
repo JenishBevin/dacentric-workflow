@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   BarChart3,
+  Check,
+  ChevronDown,
   Cloud,
   Cpu,
   Globe2,
@@ -13,10 +15,15 @@ import {
   Users,
   Workflow,
 } from "lucide-react";
-import onerraLogoFull from "../assets/onerra-logo-full.png";
+import { api } from "../lib/apiClient";
+import { extractApiError } from "../lib/apiClient";
+import onerraLogoFullLight from "../assets/onerra-logo-full-light.png";
 import onerraLogoIcon from "../assets/onerra-logo-icon.png";
 import onerraScreenshotBoard from "../assets/onerra-screenshot-board.png";
 import onerraScreenshotTask from "../assets/onerra-screenshot-task.png";
+import onerraScreenshotNewTask from "../assets/onerra-screenshot-newtask.png";
+import onerraScreenshotMobileBoard from "../assets/onerra-screenshot-mobile-board.png";
+import onerraScreenshotMobileTask from "../assets/onerra-screenshot-mobile-task.png";
 import dubaiSkyline from "../assets/dubai-skyline-sunset.jpg";
 
 const SERVICES = [
@@ -52,6 +59,8 @@ const SERVICES = [
   },
 ];
 
+const SERVICE_OPTIONS = SERVICES.map((s) => s.title);
+
 const SOFTWARE_FEATURES = ["Workflow & Project Management", "CRM & Customer Tracking", "HRMS & Employee Management", "ERP & Inventory Control"];
 
 const WHY_US = [
@@ -60,28 +69,243 @@ const WHY_US = [
   { title: "Long-Term Support", description: "We stay involved after launch — support, updates, and improvements as your business grows." },
 ];
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+const SCREENSHOTS = [
+  { src: onerraScreenshotBoard, alt: "Onerra project board" },
+  { src: onerraScreenshotTask, alt: "Onerra task detail view" },
+  { src: onerraScreenshotNewTask, alt: "Onerra create task form" },
+  { src: onerraScreenshotMobileBoard, alt: "Onerra on mobile — project board" },
+  { src: onerraScreenshotMobileTask, alt: "Onerra on mobile — task detail" },
+];
+
+const NAV_ITEMS = [
+  { label: "Home", href: "#top" },
+  { label: "About", href: "#about" },
+  { label: "Services", href: "#services" },
+  { label: "Software", href: "#software" },
+  { label: "Contact", href: "#contact" },
+];
+
+/** Floating pill nav with a sliding highlight that follows the hovered item
+ *  (https://dribbble.com/shots/24920157-Navbar-Interaction) — the pill's
+ *  position/width are measured from the actual hovered link's DOM rect so it
+ *  glides smoothly to any item regardless of its label length. */
+function PillNav({ onHomeClick }: { onHomeClick: (e: React.MouseEvent) => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [hoverStyle, setHoverStyle] = useState<{ left: number; width: number; opacity: number }>({
+    left: 0,
+    width: 0,
+    opacity: 0,
+  });
+
+  function handleEnter(e: React.MouseEvent<HTMLAnchorElement>) {
+    const container = containerRef.current;
+    if (!container) return;
+    const itemRect = e.currentTarget.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    setHoverStyle({ left: itemRect.left - containerRect.left, width: itemRect.width, opacity: 1 });
+  }
+
+  function handleLeave() {
+    setHoverStyle((s) => ({ ...s, opacity: 0 }));
+  }
+
   return (
-    <a
-      href={href}
-      className="group relative text-sm font-medium text-slate-200 transition hover:text-white"
+    <div
+      ref={containerRef}
+      onMouseLeave={handleLeave}
+      className="relative hidden items-center gap-1 rounded-full bg-white/5 p-1 sm:flex"
     >
-      {children}
-      <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-amber-400 transition-all duration-300 group-hover:w-full" />
-    </a>
+      <span
+        className="absolute inset-y-1 rounded-full bg-white/10 transition-all duration-300 ease-out"
+        style={{ left: hoverStyle.left, width: hoverStyle.width, opacity: hoverStyle.opacity }}
+      />
+      {NAV_ITEMS.map(({ label, href }) => (
+        <a
+          key={label}
+          href={href}
+          onClick={label === "Home" ? onHomeClick : undefined}
+          onMouseEnter={handleEnter}
+          className="relative z-10 rounded-full px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:text-white"
+        >
+          {label}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function ScreenshotCarousel() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setIndex((i) => (i + 1) % SCREENSHOTS.length), 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="relative">
+      <div className="relative flex h-[420px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm sm:h-[460px]">
+        {SCREENSHOTS.map((shot, i) => (
+          <img
+            key={shot.src}
+            src={shot.src}
+            alt={shot.alt}
+            className="absolute max-h-[90%] max-w-[92%] rounded-lg object-contain shadow-2xl transition-opacity duration-700 ease-in-out"
+            style={{ opacity: i === index ? 1 : 0 }}
+          />
+        ))}
+      </div>
+      <div className="mt-4 flex items-center justify-center gap-2">
+        {SCREENSHOTS.map((shot, i) => (
+          <button
+            key={shot.src}
+            type="button"
+            aria-label={`Show screenshot ${i + 1}`}
+            onClick={() => setIndex(i)}
+            className={`h-1.5 rounded-full transition-all ${i === index ? "w-6 bg-amber-400" : "w-1.5 bg-white/25 hover:bg-white/40"}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ServicesMultiSelect({
+  selected,
+  onChange,
+  other,
+  onOtherChange,
+}: {
+  selected: string[];
+  onChange: (next: string[]) => void;
+  other: string;
+  onOtherChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [otherChecked, setOtherChecked] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  function toggle(service: string) {
+    onChange(selected.includes(service) ? selected.filter((s) => s !== service) : [...selected, service]);
+  }
+
+  const summary = [...selected, ...(otherChecked && other ? [other] : otherChecked ? ["Other"] : [])];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-left text-sm text-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+      >
+        <span className={summary.length ? "text-white" : "text-slate-400"}>
+          {summary.length ? summary.join(", ") : "Select the services you're looking for"}
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1.5 w-full rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+          {SERVICE_OPTIONS.map((service) => (
+            <label
+              key={service}
+              className="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <span
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                  selected.includes(service) ? "border-blue-500 bg-blue-500" : "border-slate-300"
+                }`}
+              >
+                {selected.includes(service) && <Check className="h-3 w-3 text-white" />}
+              </span>
+              <input type="checkbox" className="hidden" checked={selected.includes(service)} onChange={() => toggle(service)} />
+              {service}
+            </label>
+          ))}
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50">
+            <span
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                otherChecked ? "border-blue-500 bg-blue-500" : "border-slate-300"
+              }`}
+            >
+              {otherChecked && <Check className="h-3 w-3 text-white" />}
+            </span>
+            <input
+              type="checkbox"
+              className="hidden"
+              checked={otherChecked}
+              onChange={() => {
+                setOtherChecked((c) => !c);
+                if (otherChecked) onOtherChange("");
+              }}
+            />
+            Other
+          </label>
+          {otherChecked && (
+            <input
+              autoFocus
+              value={other}
+              onChange={(e) => onOtherChange(e.target.value)}
+              placeholder="Tell us what you need…"
+              className="mt-1 w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm text-slate-900 focus:border-blue-400 focus:outline-none"
+            />
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
 function ContactForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [services, setServices] = useState<string[]>([]);
+  const [otherService, setOtherService] = useState("");
   const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const subject = encodeURIComponent(`Website enquiry from ${name || "a visitor"}`);
-    const body = encodeURIComponent(`${message}\n\n— ${name} (${email})`);
-    window.location.href = `mailto:info@dac-onerra.com?subject=${subject}&body=${body}`;
+    setStatus("sending");
+    setError(null);
+    try {
+      await api.post("/contact", { name, email, phone, services, otherService, message });
+      setStatus("sent");
+      setName("");
+      setEmail("");
+      setPhone("");
+      setServices([]);
+      setOtherService("");
+      setMessage("");
+    } catch (err) {
+      setStatus("error");
+      setError(extractApiError(err).message);
+    }
+  }
+
+  if (status === "sent") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-10 text-center backdrop-blur-sm">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15">
+          <Check className="h-6 w-6 text-emerald-400" />
+        </div>
+        <h3 className="text-lg font-semibold text-white">Message sent</h3>
+        <p className="text-sm text-slate-300">Thanks for reaching out — we'll get back to you shortly.</p>
+        <button type="button" onClick={() => setStatus("idle")} className="mt-2 text-sm font-medium text-blue-300 hover:text-blue-200">
+          Send another message
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -109,6 +333,22 @@ function ContactForm() {
           />
         </div>
       </div>
+
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-slate-300">Contact Number</label>
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="+971 5X XXX XXXX"
+          className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-slate-300">Service you're looking for</label>
+        <ServicesMultiSelect selected={services} onChange={setServices} other={otherService} onOtherChange={setOtherService} />
+      </div>
+
       <div>
         <label className="mb-1.5 block text-xs font-medium text-slate-300">Message</label>
         <textarea
@@ -120,21 +360,86 @@ function ContactForm() {
           className="w-full resize-none rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
         />
       </div>
+
+      {status === "error" && (
+        <div role="alert" className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+          {error ?? "Something went wrong. Please try again."}
+        </div>
+      )}
+
       <button
         type="submit"
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:brightness-110 sm:w-auto"
+        disabled={status === "sending"}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:brightness-110 disabled:opacity-60 sm:w-auto"
       >
-        Send Message <ArrowRight className="h-4 w-4" />
+        {status === "sending" ? "Sending…" : "Send Message"} <ArrowRight className="h-4 w-4" />
       </button>
     </form>
   );
 }
 
 export default function HomePage() {
+  const [navHidden, setNavHidden] = useState(false);
+
+  useEffect(() => {
+    const prev = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = "smooth";
+    return () => {
+      document.documentElement.style.scrollBehavior = prev;
+    };
+  }, []);
+
+  // Hides the floating nav on scroll-down, brings it back on scroll-up — a
+  // small threshold avoids it flickering on trackpad micro-jitter, and it
+  // always stays visible near the very top of the page.
+  useEffect(() => {
+    let lastY = window.scrollY;
+    function onScroll() {
+      const y = window.scrollY;
+      if (y < 80) {
+        setNavHidden(false);
+      } else if (y - lastY > 8) {
+        setNavHidden(true);
+      } else if (lastY - y > 8) {
+        setNavHidden(false);
+      }
+      lastY = y;
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  function scrollToTop(e: React.MouseEvent) {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Hero + nav */}
-      <div className="relative overflow-hidden bg-[#0b1330]">
+      <div id="top" />
+      {/* Floating pill nav (no full-width bar) — logo/CTA sit outside the pill,
+          nav links + sliding hover highlight live inside it */}
+      <header
+        className={`fixed inset-x-0 top-4 z-50 px-4 transition-transform duration-300 ease-out sm:px-6 ${
+          navHidden ? "-translate-y-24" : "translate-y-0"
+        }`}
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 rounded-full border border-white/10 bg-[#0b1330]/90 px-3 py-2 shadow-2xl shadow-black/20 backdrop-blur-md">
+          <a href="#top" onClick={scrollToTop} className="flex shrink-0 items-center pl-2">
+            <img src={onerraLogoFullLight} alt="Onerra" className="h-7 w-auto object-contain sm:h-8" />
+          </a>
+          <PillNav onHomeClick={scrollToTop} />
+          <a
+            href="#contact"
+            className="shrink-0 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:brightness-110"
+          >
+            Get in Touch
+          </a>
+        </div>
+      </header>
+
+      {/* Hero — padded to clear the floating header */}
+      <div className="relative overflow-hidden bg-[#0b1330] pt-24">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b1330] via-[#111c4e] to-[#1c2f7f]" />
         <div
           className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-30"
@@ -143,55 +448,34 @@ export default function HomePage() {
         <div className="pointer-events-none absolute -left-28 -top-28 h-80 w-80 rounded-full bg-blue-600/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-32 right-10 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
 
-        <div className="relative z-10">
-          <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
-            <a href="/" className="flex items-center">
-              <img src={onerraLogoFull} alt="Onerra" className="h-9 w-auto object-contain sm:h-10" />
+        <div className="relative z-10 mx-auto max-w-6xl px-4 pb-24 pt-12 text-center sm:px-6 sm:pt-20">
+          <p className="text-sm font-medium tracking-wide text-blue-300">IT Solutions & Software Services</p>
+          <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl">
+            Technology That Runs Your Business, Not the Other Way Around
+          </h1>
+          <p className="mx-auto mt-5 max-w-2xl text-base text-slate-300 sm:text-lg">
+            Onerra designs and builds enterprise software, workflow automation, and IT infrastructure for businesses that
+            want systems built around how they actually work.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <a
+              href="#services"
+              className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-lg transition hover:brightness-95"
+            >
+              Explore Services <ArrowRight className="h-4 w-4" />
             </a>
-            <div className="hidden items-center gap-8 sm:flex">
-              <NavLink href="/">Home</NavLink>
-              <NavLink href="#services">Services</NavLink>
-              <NavLink href="#about">About</NavLink>
-              <NavLink href="#software">Software</NavLink>
-              <NavLink href="#contact">Contact</NavLink>
-            </div>
             <a
               href="#contact"
-              className="rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:brightness-110"
+              className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/10"
             >
               Get in Touch
             </a>
-          </nav>
-
-          <div className="mx-auto max-w-6xl px-4 pb-24 pt-12 text-center sm:px-6 sm:pt-20">
-            <p className="text-sm font-medium tracking-wide text-blue-300">IT Solutions & Software Services</p>
-            <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl">
-              Technology That Runs Your Business, Not the Other Way Around
-            </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-base text-slate-300 sm:text-lg">
-              Onerra designs and builds enterprise software, workflow automation, and IT infrastructure for businesses that
-              want systems built around how they actually work.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <a
-                href="#services"
-                className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-lg transition hover:brightness-95"
-              >
-                Explore Services <ArrowRight className="h-4 w-4" />
-              </a>
-              <a
-                href="#contact"
-                className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/10"
-              >
-                Get in Touch
-              </a>
-            </div>
           </div>
         </div>
       </div>
 
       {/* About */}
-      <section id="about" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+      <section id="about" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">About Onerra</p>
@@ -225,7 +509,7 @@ export default function HomePage() {
       </section>
 
       {/* Services */}
-      <section id="services" className="bg-slate-50 py-20">
+      <section id="services" className="scroll-mt-20 bg-slate-50 py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="mx-auto max-w-2xl text-center">
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">Services</p>
@@ -246,7 +530,7 @@ export default function HomePage() {
       </section>
 
       {/* Software spotlight — Onerra, no sign-in link */}
-      <section id="software" className="relative overflow-hidden bg-[#0b1330] py-20">
+      <section id="software" className="relative scroll-mt-20 overflow-hidden bg-[#0b1330] py-20">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b1330] via-[#111c4e] to-[#1c2f7f]" />
         <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
           <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
@@ -260,7 +544,7 @@ export default function HomePage() {
               <p className="mt-4 text-slate-300">
                 Onerra is our in-house business management platform — built to bring workflow tracking, customer
                 relationships, HR, and operations together in one place. It's a working example of the kind of software we
-                build for our clients.
+                build for our clients, on desktop and mobile alike.
               </p>
               <div className="mt-6 grid grid-cols-2 gap-3">
                 {SOFTWARE_FEATURES.map((label) => (
@@ -271,24 +555,13 @@ export default function HomePage() {
                 ))}
               </div>
             </div>
-            <div className="relative">
-              <img
-                src={onerraScreenshotBoard}
-                alt="Onerra project board screenshot"
-                className="w-full rounded-xl border border-white/10 shadow-2xl"
-              />
-              <img
-                src={onerraScreenshotTask}
-                alt="Onerra task detail screenshot"
-                className="absolute -bottom-10 -right-6 hidden w-2/3 rounded-xl border border-white/10 shadow-2xl sm:block"
-              />
-            </div>
+            <ScreenshotCarousel />
           </div>
         </div>
       </section>
 
       {/* Why us */}
-      <section className="mx-auto max-w-6xl px-4 py-20 pt-28 sm:px-6 sm:pt-20">
+      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">Why Onerra</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">A partner that stays involved</h2>
@@ -304,7 +577,7 @@ export default function HomePage() {
       </section>
 
       {/* Contact / footer */}
-      <section id="contact" className="relative overflow-hidden bg-[#0b1330] py-20">
+      <section id="contact" className="relative scroll-mt-20 overflow-hidden bg-[#0b1330] py-20">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b1330] via-[#111c4e] to-[#1c2f7f]" />
         <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
           <div className="mx-auto max-w-2xl text-center">
@@ -335,8 +608,9 @@ export default function HomePage() {
               >
                 <Phone className="h-4 w-4 shrink-0 text-blue-400" /> India: +91 88073 77688
               </a>
-              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm text-slate-200">
-                <MapPin className="h-4 w-4 shrink-0 text-blue-400" /> United Arab Emirates
+              <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm text-slate-200">
+                <MapPin className="h-4 w-4 shrink-0 text-blue-400" />
+                <span>Office 203, Dar Al Wuheida Building, Al Doha St, Hor Al Anz East, Deira, Dubai, UAE</span>
               </div>
             </div>
           </div>
