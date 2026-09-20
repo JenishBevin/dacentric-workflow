@@ -422,63 +422,62 @@ export default function HomePage() {
           navHidden ? "-translate-y-24" : "translate-y-0"
         }`}
       >
-        <div
-          className={`mx-auto max-w-6xl overflow-hidden border border-white/10 bg-[#0b1330]/90 shadow-2xl shadow-black/20 backdrop-blur-md transition-[border-radius] duration-300 ${
-            mobileMenuOpen ? "rounded-3xl" : "rounded-full"
-          }`}
-        >
-          <div className="flex items-center justify-between gap-4 px-3 py-2">
-            <a href="#top" onClick={scrollToTop} className="flex shrink-0 items-center pl-2">
-              <img src={onerraLogoFullLight} alt="Onerra" className="h-7 w-auto object-contain sm:h-8" />
-            </a>
-            <PillNav onHomeClick={scrollToTop} />
-            <a
-              href="#contact"
-              className="hidden shrink-0 rounded-full bg-gradient-to-r from-[#0a7e6d] to-[#0d9488] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 transition hover:brightness-110 sm:inline-flex"
-            >
-              Get in Touch
-            </a>
-            <button
-              type="button"
-              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-              onClick={() => setMobileMenuOpen((o) => !o)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white sm:hidden"
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+        <div className="relative mx-auto max-w-6xl">
+          <div className="overflow-hidden rounded-full border border-white/10 bg-[#0b1330]/90 shadow-2xl shadow-black/20 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-4 px-3 py-2">
+              <a href="#top" onClick={scrollToTop} className="flex shrink-0 items-center pl-2">
+                <img src={onerraLogoFullLight} alt="Onerra" className="h-7 w-auto object-contain sm:h-8" />
+              </a>
+              <PillNav onHomeClick={scrollToTop} />
+              <a
+                href="#contact"
+                className="hidden shrink-0 rounded-full bg-gradient-to-r from-[#0a7e6d] to-[#0d9488] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 transition hover:brightness-110 sm:inline-flex"
+              >
+                Get in Touch
+              </a>
+              <button
+                type="button"
+                aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+                onClick={() => setMobileMenuOpen((o) => !o)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white sm:hidden"
+              >
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
 
-          {/* Mobile-only dropdown — always mounted (grid-rows animates open/close
-              smoothly; a conditionally-mounted div just pops in/out with no
-              transition, which is what caused the earlier glitch) */}
+          {/* Mobile-only dropdown — a separate floating panel (not affecting the
+              pill's own layout/height) animated with transform+opacity only, so
+              it's GPU-composited and never triggers a layout recalc. The earlier
+              grid-template-rows approach animated a layout property, which is
+              what caused the lag on mobile. Always mounted so the transition
+              actually plays instead of the panel just popping in/out. */}
           <div
-            className={`grid transition-[grid-template-rows] duration-300 ease-out sm:hidden ${
-              mobileMenuOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            className={`absolute inset-x-0 top-full mt-2 origin-top rounded-3xl border border-white/10 bg-[#0b1330]/95 shadow-2xl shadow-black/20 backdrop-blur-md transition-[opacity,transform] duration-200 ease-out sm:hidden ${
+              mobileMenuOpen ? "translate-y-0 scale-y-100 opacity-100" : "pointer-events-none -translate-y-1 scale-y-95 opacity-0"
             }`}
           >
-            <div className="overflow-hidden">
-              <div className="flex flex-col gap-1 border-t border-white/10 px-3 pb-3 pt-2">
-                {NAV_ITEMS.map(({ label, href }) => (
-                  <a
-                    key={label}
-                    href={href}
-                    onClick={(e) => {
-                      setMobileMenuOpen(false);
-                      if (label === "Home") scrollToTop(e);
-                    }}
-                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10 hover:text-white"
-                  >
-                    {label}
-                  </a>
-                ))}
+            <div className="flex flex-col gap-1 p-3">
+              {NAV_ITEMS.map(({ label, href }) => (
                 <a
-                  href="#contact"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="mt-1 rounded-full bg-gradient-to-r from-[#0a7e6d] to-[#0d9488] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-emerald-900/30"
+                  key={label}
+                  href={href}
+                  onClick={(e) => {
+                    setMobileMenuOpen(false);
+                    if (label === "Home") scrollToTop(e);
+                  }}
+                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10 hover:text-white"
                 >
-                  Get in Touch
+                  {label}
                 </a>
-              </div>
+              ))}
+              <a
+                href="#contact"
+                onClick={() => setMobileMenuOpen(false)}
+                className="mt-1 rounded-full bg-gradient-to-r from-[#0a7e6d] to-[#0d9488] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-emerald-900/30"
+              >
+                Get in Touch
+              </a>
             </div>
           </div>
         </div>
