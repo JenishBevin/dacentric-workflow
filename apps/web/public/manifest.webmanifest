@@ -1,7 +1,7 @@
 {
-  "name": "QPlus Workflow",
-  "short_name": "QPlus",
-  "description": "QPlus Technical Service LLC — Unified Business Module Platform",
+  "name": "Onerra",
+  "short_name": "Onerra",
+  "description": "Onerra — IT Solutions & Software Services",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
