@@ -423,7 +423,7 @@ export default function HomePage() {
         }`}
       >
         <div
-          className={`mx-auto max-w-6xl overflow-hidden border border-white/10 bg-[#0b1330]/90 shadow-2xl shadow-black/20 backdrop-blur-md transition-[border-radius] duration-200 ${
+          className={`mx-auto max-w-6xl overflow-hidden border border-white/10 bg-[#0b1330]/90 shadow-2xl shadow-black/20 backdrop-blur-md transition-[border-radius] duration-300 ${
             mobileMenuOpen ? "rounded-3xl" : "rounded-full"
           }`}
         >
@@ -448,31 +448,39 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* Mobile-only dropdown — the pill nav above only ever shows on sm+ */}
-          {mobileMenuOpen && (
-            <div className="flex flex-col gap-1 border-t border-white/10 px-3 pb-3 pt-2 sm:hidden">
-              {NAV_ITEMS.map(({ label, href }) => (
+          {/* Mobile-only dropdown — always mounted (grid-rows animates open/close
+              smoothly; a conditionally-mounted div just pops in/out with no
+              transition, which is what caused the earlier glitch) */}
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-out sm:hidden ${
+              mobileMenuOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="flex flex-col gap-1 border-t border-white/10 px-3 pb-3 pt-2">
+                {NAV_ITEMS.map(({ label, href }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    onClick={(e) => {
+                      setMobileMenuOpen(false);
+                      if (label === "Home") scrollToTop(e);
+                    }}
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10 hover:text-white"
+                  >
+                    {label}
+                  </a>
+                ))}
                 <a
-                  key={label}
-                  href={href}
-                  onClick={(e) => {
-                    setMobileMenuOpen(false);
-                    if (label === "Home") scrollToTop(e);
-                  }}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10 hover:text-white"
+                  href="#contact"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="mt-1 rounded-full bg-gradient-to-r from-[#0a7e6d] to-[#0d9488] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-emerald-900/30"
                 >
-                  {label}
+                  Get in Touch
                 </a>
-              ))}
-              <a
-                href="#contact"
-                onClick={() => setMobileMenuOpen(false)}
-                className="mt-1 rounded-full bg-gradient-to-r from-[#0a7e6d] to-[#0d9488] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-emerald-900/30"
-              >
-                Get in Touch
-              </a>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </header>
 
