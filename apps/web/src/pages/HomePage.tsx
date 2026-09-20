@@ -480,13 +480,13 @@ export default function HomePage() {
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">About Onerra</p>
             <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">A product of DaCentric Technologies</h2>
-            <p className="mt-4 text-slate-600">
+            <p className="mt-4 text-justify text-slate-600">
               Onerra is built and maintained by <span className="font-medium text-slate-800">DaCentric Technologies</span>, a
               software and IT infrastructure company headquartered in the UAE, serving businesses across the MEA region and
               India. DaCentric combines global technology expertise with local market knowledge to help enterprises adopt
               secure, scalable digital solutions with confidence.
             </p>
-            <p className="mt-4 text-slate-600">
+            <p className="mt-4 text-justify text-slate-600">
               DaCentric's work spans enterprise systems, workflow automation, AI-driven solutions, and IT infrastructure —
               built on long-term partnerships grounded in transparency, integrity, and collaboration. Onerra is a direct
               product of that same engineering team.
@@ -541,7 +541,7 @@ export default function HomePage() {
                 <h2 className="text-3xl font-bold tracking-tight text-white">Onerra</h2>
               </div>
               <p className="mt-2 text-sm font-medium tracking-wide text-blue-300">Unified Business Module Platform</p>
-              <p className="mt-4 text-slate-300">
+              <p className="mt-4 text-justify text-slate-300">
                 Onerra is our in-house business management platform — built to bring workflow tracking, customer
                 relationships, HR, and operations together in one place. It's a working example of the kind of software we
                 build for our clients, on desktop and mobile alike.
