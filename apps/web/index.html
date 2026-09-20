@@ -6,8 +6,15 @@
     <title>Onerra</title>
 
     <!-- PWA: lets "Add to Home Screen" (iOS Safari / Android Chrome) install
-         a real app icon that launches full-screen, no browser chrome. -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+         a real app icon that launches full-screen, no browser chrome.
+         Installing from the login page should launch straight back into
+         the login page (for employees); installing from anywhere else
+         should launch the public Onerra home page. Since this is one SPA
+         with one index.html, that's done by swapping the manifest link
+         (and iOS's own title meta, which ignores the manifest) based on
+         the URL this page was loaded at — before the browser evaluates
+         installability, so it must run synchronously, here, not in React. -->
+    <link id="app-manifest" rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0f172a" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
@@ -17,7 +24,14 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Onerra" />
+    <meta id="apple-app-title" name="apple-mobile-web-app-title" content="Onerra" />
+    <script>
+      if (location.pathname.startsWith("/login-portal-uae2026")) {
+        document.getElementById("app-manifest").setAttribute("href", "/manifest-employee.webmanifest");
+        document.getElementById("apple-app-title").setAttribute("content", "QPlus");
+        document.title = "QPlus";
+      }
+    </script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
