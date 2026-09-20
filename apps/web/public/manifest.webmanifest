@@ -2,7 +2,7 @@
   "name": "Onerra",
   "short_name": "Onerra",
   "description": "Onerra — IT Solutions & Software Services",
-  "start_url": "/dashboard",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
