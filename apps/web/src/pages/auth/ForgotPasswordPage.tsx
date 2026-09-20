@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
       {sent ? (
         <div className="space-y-4 text-sm text-slate-300">
           <p>If that email is registered, a reset link is on its way. It expires in 2 hours.</p>
-          <Link to="/login" className="font-medium text-blue-300 hover:text-blue-200">
+          <Link to="/login-portal-uae2026" className="font-medium text-blue-300 hover:text-blue-200">
             Back to sign in
           </Link>
         </div>
@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
           <Button type="submit" className="w-full" loading={isSubmitting}>
             Send reset link
           </Button>
-          <Link to="/login" className="block text-center text-xs font-medium text-slate-300 hover:text-white">
+          <Link to="/login-portal-uae2026" className="block text-center text-xs font-medium text-slate-300 hover:text-white">
             Back to sign in
           </Link>
         </form>

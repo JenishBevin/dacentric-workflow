@@ -51,7 +51,7 @@ function PageFallback() {
 function RequireAuth({ children }: { children: React.ReactElement }) {
   const { user, loading } = useAuth();
   if (loading) return <PageFallback />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login-portal-uae2026" replace />;
   return children;
 }
 
@@ -59,7 +59,7 @@ export default function App() {
   return (
     <Suspense fallback={<PageFallback />}>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login-portal-uae2026" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/activate" element={<ActivateAccountPage />} />

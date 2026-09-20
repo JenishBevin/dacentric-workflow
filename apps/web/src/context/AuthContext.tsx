@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     registerUnauthorizedHandler(() => {
       setUser(null);
-      navigate("/login", { replace: true });
+      navigate("/login-portal-uae2026", { replace: true });
     });
     fetchMe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setStoredToken(null);
       setUser(null);
-      navigate("/login", { replace: true });
+      navigate("/login-portal-uae2026", { replace: true });
     }
   }, [navigate]);
 

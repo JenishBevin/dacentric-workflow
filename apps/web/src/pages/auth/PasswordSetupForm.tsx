@@ -40,7 +40,7 @@ export const PasswordSetupForm: React.FC<{ endpoint: "/auth/activate" | "/auth/r
     try {
       await api.post(endpoint, { token, password: values.password });
       setDone(true);
-      setTimeout(() => navigate("/login"), 2000);
+      setTimeout(() => navigate("/login-portal-uae2026"), 2000);
     } catch (err) {
       setServerError(extractApiError(err).message);
     }
