@@ -19,11 +19,8 @@ import { api } from "../lib/apiClient";
 import { extractApiError } from "../lib/apiClient";
 import onerraLogoFullLight from "../assets/onerra-logo-full-light.png";
 import onerraLogoIcon from "../assets/onerra-logo-icon.png";
-import onerraScreenshotBoard from "../assets/onerra-screenshot-board.png";
-import onerraScreenshotTask from "../assets/onerra-screenshot-task.png";
-import onerraScreenshotNewTask from "../assets/onerra-screenshot-newtask.png";
-import onerraScreenshotMobileBoard from "../assets/onerra-screenshot-mobile-board.png";
-import onerraScreenshotMobileTask from "../assets/onerra-screenshot-mobile-task.png";
+import onerraMarketingDashboard from "../assets/onerra-marketing-dashboard.webp";
+import onerraMarketingTeamWorkload from "../assets/onerra-marketing-teamworkload.webp";
 import dubaiSkyline from "../assets/dubai-skyline-sunset.jpg";
 
 const SERVICES = [
@@ -70,11 +67,8 @@ const WHY_US = [
 ];
 
 const SCREENSHOTS = [
-  { src: onerraScreenshotBoard, alt: "Onerra project board" },
-  { src: onerraScreenshotTask, alt: "Onerra task detail view" },
-  { src: onerraScreenshotNewTask, alt: "Onerra create task form" },
-  { src: onerraScreenshotMobileBoard, alt: "Onerra on mobile — project board" },
-  { src: onerraScreenshotMobileTask, alt: "Onerra on mobile — task detail" },
+  { src: onerraMarketingDashboard, alt: "Onerra dashboard overview" },
+  { src: onerraMarketingTeamWorkload, alt: "Onerra team workload view" },
 ];
 
 const NAV_ITEMS = [
