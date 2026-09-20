@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ArrowRight,
   BarChart3,
@@ -7,12 +7,16 @@ import {
   Globe2,
   Mail,
   MapPin,
+  Phone,
   Server,
   ShieldCheck,
   Users,
   Workflow,
 } from "lucide-react";
-import qplusIcon from "../assets/qplus-icon.png";
+import onerraLogoFull from "../assets/onerra-logo-full.png";
+import onerraLogoIcon from "../assets/onerra-logo-icon.png";
+import onerraScreenshotBoard from "../assets/onerra-screenshot-board.png";
+import onerraScreenshotTask from "../assets/onerra-screenshot-task.png";
 import dubaiSkyline from "../assets/dubai-skyline-sunset.jpg";
 
 const SERVICES = [
@@ -58,9 +62,71 @@ const WHY_US = [
 
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} className="text-sm font-medium text-slate-200 transition hover:text-white">
+    <a
+      href={href}
+      className="group relative text-sm font-medium text-slate-200 transition hover:text-white"
+    >
       {children}
+      <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-amber-400 transition-all duration-300 group-hover:w-full" />
     </a>
+  );
+}
+
+function ContactForm() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const subject = encodeURIComponent(`Website enquiry from ${name || "a visitor"}`);
+    const body = encodeURIComponent(`${message}\n\n— ${name} (${email})`);
+    window.location.href = `mailto:info@dac-onerra.com?subject=${subject}&body=${body}`;
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur-sm sm:p-8">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-slate-300">Name</label>
+          <input
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your name"
+            className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-slate-300">Email</label>
+          <input
+            required
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+            className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-slate-300">Message</label>
+        <textarea
+          required
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={4}
+          placeholder="Tell us about your project…"
+          className="w-full resize-none rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        />
+      </div>
+      <button
+        type="submit"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:brightness-110 sm:w-auto"
+      >
+        Send Message <ArrowRight className="h-4 w-4" />
+      </button>
+    </form>
   );
 }
 
@@ -79,11 +145,11 @@ export default function HomePage() {
 
         <div className="relative z-10">
           <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
-            <div className="flex items-center gap-2">
-              <img src={qplusIcon} alt="" className="h-8 w-8 object-contain" />
-              <span className="text-lg font-bold tracking-tight text-white">Onerra</span>
-            </div>
+            <a href="/" className="flex items-center">
+              <img src={onerraLogoFull} alt="Onerra" className="h-9 w-auto object-contain sm:h-10" />
+            </a>
             <div className="hidden items-center gap-8 sm:flex">
+              <NavLink href="/">Home</NavLink>
               <NavLink href="#services">Services</NavLink>
               <NavLink href="#about">About</NavLink>
               <NavLink href="#software">Software</NavLink>
@@ -129,15 +195,17 @@ export default function HomePage() {
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">About Onerra</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">An IT services company built by builders</h2>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">A product of DaCentric Technologies</h2>
             <p className="mt-4 text-slate-600">
-              Onerra provides software development, workflow automation, and IT infrastructure services to businesses looking
-              to modernize how they operate. Rather than fitting clients into off-the-shelf tools, we design systems around
-              the way each business actually runs.
+              Onerra is built and maintained by <span className="font-medium text-slate-800">DaCentric Technologies</span>, a
+              software and IT infrastructure company headquartered in the UAE, serving businesses across the MEA region and
+              India. DaCentric combines global technology expertise with local market knowledge to help enterprises adopt
+              secure, scalable digital solutions with confidence.
             </p>
             <p className="mt-4 text-slate-600">
-              We also build and run our own software in production every day — which means the systems we deliver are
-              shaped by real operational experience, not just theory.
+              DaCentric's work spans enterprise systems, workflow automation, AI-driven solutions, and IT infrastructure —
+              built on long-term partnerships grounded in transparency, integrity, and collaboration. Onerra is a direct
+              product of that same engineering team.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -177,7 +245,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Software spotlight — QPlus, no sign-in link */}
+      {/* Software spotlight — Onerra, no sign-in link */}
       <section id="software" className="relative overflow-hidden bg-[#0b1330] py-20">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b1330] via-[#111c4e] to-[#1c2f7f]" />
         <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
@@ -185,32 +253,42 @@ export default function HomePage() {
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-amber-400">Our Software</p>
               <div className="mt-2 flex items-center gap-3">
-                <img src={qplusIcon} alt="" className="h-10 w-10 object-contain" />
-                <h2 className="text-3xl font-bold tracking-tight text-white">
-                  Q<span className="text-amber-400">Plus</span>
-                </h2>
+                <img src={onerraLogoIcon} alt="" className="h-10 w-10 rounded-xl object-contain" />
+                <h2 className="text-3xl font-bold tracking-tight text-white">Onerra</h2>
               </div>
               <p className="mt-2 text-sm font-medium tracking-wide text-blue-300">Unified Business Module Platform</p>
               <p className="mt-4 text-slate-300">
-                QPlus is our in-house business management platform — built to bring workflow tracking, customer
+                Onerra is our in-house business management platform — built to bring workflow tracking, customer
                 relationships, HR, and operations together in one place. It's a working example of the kind of software we
                 build for our clients.
               </p>
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                {SOFTWARE_FEATURES.map((label) => (
+                  <div key={label} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
+                    <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                    <span className="text-sm font-medium text-slate-200">{label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {SOFTWARE_FEATURES.map((label) => (
-                <div key={label} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
-                  <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
-                  <span className="text-sm font-medium text-slate-200">{label}</span>
-                </div>
-              ))}
+            <div className="relative">
+              <img
+                src={onerraScreenshotBoard}
+                alt="Onerra project board screenshot"
+                className="w-full rounded-xl border border-white/10 shadow-2xl"
+              />
+              <img
+                src={onerraScreenshotTask}
+                alt="Onerra task detail screenshot"
+                className="absolute -bottom-10 -right-6 hidden w-2/3 rounded-xl border border-white/10 shadow-2xl sm:block"
+              />
             </div>
           </div>
         </div>
       </section>
 
       {/* Why us */}
-      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+      <section className="mx-auto max-w-6xl px-4 py-20 pt-28 sm:px-6 sm:pt-20">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">Why Onerra</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">A partner that stays involved</h2>
@@ -226,32 +304,47 @@ export default function HomePage() {
       </section>
 
       {/* Contact / footer */}
-      <footer id="contact" className="bg-[#0b1330] py-16 text-slate-300">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="grid gap-10 sm:grid-cols-2">
-            <div>
-              <div className="flex items-center gap-2">
-                <img src={qplusIcon} alt="" className="h-7 w-7 object-contain" />
-                <span className="text-lg font-bold text-white">Onerra</span>
-              </div>
-              <p className="mt-3 max-w-sm text-sm text-slate-400">
-                IT services and software development for businesses that want systems built around how they work.
-              </p>
-            </div>
-            <div className="sm:text-right">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Get in Touch</h3>
-              <a href="mailto:info@dac-onerra.com" className="mt-3 flex items-center gap-2 text-sm text-slate-200 hover:text-white sm:justify-end">
-                <Mail className="h-4 w-4 text-blue-400" /> info@dac-onerra.com
-              </a>
-              <div className="mt-2 flex items-center gap-2 text-sm text-slate-400 sm:justify-end">
-                <MapPin className="h-4 w-4 text-blue-400" /> United Arab Emirates
-              </div>
-            </div>
+      <section id="contact" className="relative overflow-hidden bg-[#0b1330] py-20">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b1330] via-[#111c4e] to-[#1c2f7f]" />
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="text-sm font-semibold uppercase tracking-wide text-amber-400">Get in Touch</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-white">Let's talk about your project</h2>
+            <p className="mt-3 text-slate-300">Send us a message and we'll get back to you shortly.</p>
           </div>
-          <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-slate-500">
-            © {new Date().getFullYear()} Onerra. All rights reserved.
+
+          <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_1fr] lg:items-start">
+            <ContactForm />
+
+            <div className="space-y-3">
+              <a
+                href="mailto:info@dac-onerra.com"
+                className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm text-slate-200 transition hover:bg-white/10"
+              >
+                <Mail className="h-4 w-4 shrink-0 text-blue-400" /> info@dac-onerra.com
+              </a>
+              <a
+                href="tel:+97142397959"
+                className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm text-slate-200 transition hover:bg-white/10"
+              >
+                <Phone className="h-4 w-4 shrink-0 text-blue-400" /> UAE: +971 4 239 7959
+              </a>
+              <a
+                href="tel:+918807377688"
+                className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm text-slate-200 transition hover:bg-white/10"
+              >
+                <Phone className="h-4 w-4 shrink-0 text-blue-400" /> India: +91 88073 77688
+              </a>
+              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm text-slate-200">
+                <MapPin className="h-4 w-4 shrink-0 text-blue-400" /> United Arab Emirates
+              </div>
+            </div>
           </div>
         </div>
+      </section>
+
+      <footer className="bg-[#080e26] py-6 text-center text-xs text-slate-500">
+        © {new Date().getFullYear()} DaCentric Technologies. All rights reserved.
       </footer>
     </div>
   );
