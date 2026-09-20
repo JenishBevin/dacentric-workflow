@@ -43,7 +43,7 @@ export const env = {
     port: num("SMTP_PORT", 587),
     user: process.env.SMTP_USER ?? "",
     password: process.env.SMTP_PASSWORD ?? "",
-    from: process.env.SMTP_FROM ?? "DaCentric Platform <no-reply@dacentric.example>",
+    from: process.env.SMTP_FROM ?? "Onerra <no-reply@dac-onerra.com>",
   },
   sendgrid: {
     apiKey: process.env.SENDGRID_API_KEY ?? "",

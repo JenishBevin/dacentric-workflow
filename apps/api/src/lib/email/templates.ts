@@ -1,8 +1,8 @@
 export function invitationEmail(name: string, activationUrl: string) {
   return {
-    subject: "You're invited to the DaCentric platform",
+    subject: "You're invited to the Onerra platform",
     html: `<p>Hi ${name},</p>
-      <p>An administrator has created an account for you on the DaCentric platform
+      <p>An administrator has created an account for you on the Onerra platform
       (CRM, ERP, HRMS and Workflow — one login for all of them).</p>
       <p><a href="${activationUrl}">Activate your account and set a password</a></p>
       <p>This link expires in 72 hours. If it expires, ask your administrator to resend the invite.</p>`,
@@ -23,7 +23,7 @@ export function passwordResetEmail(name: string, resetUrl: string) {
 
 export function accountLockedEmail(name: string, minutes: number) {
   return {
-    subject: "Your DaCentric account has been locked",
+    subject: "Your Onerra account has been locked",
     html: `<p>Hi ${name},</p>
       <p>Your account was locked for ${minutes} minutes after five consecutive failed sign-in
       attempts. If this wasn't you, please contact your administrator.</p>`,
@@ -33,7 +33,7 @@ export function accountLockedEmail(name: string, minutes: number) {
 
 export function notificationDigestEmail(name: string, title: string, body: string, link: string) {
   return {
-    subject: `[DaCentric Workflow] ${title}`,
+    subject: `[Onerra] ${title}`,
     html: `<p>Hi ${name},</p><p>${body}</p><p><a href="${link}">Open in Workflow</a></p>`,
     text: `${body} — ${link}`,
   };
