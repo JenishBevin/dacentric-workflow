@@ -79,12 +79,51 @@ class CompositeEmailAdapter implements EmailAdapter {
   }
 }
 
+/** Sends via SendGrid's HTTPS API instead of raw SMTP — needed because many
+ *  cloud hosts' outbound IPs are blocked by mailbox SMTP servers (GoDaddy's
+ *  smtpout.secureserver.net rejected connections from Railway entirely, on
+ *  both 587 and 465, until this was added). No SDK dependency: SendGrid's
+ *  v3 mail/send endpoint is a single plain fetch call. */
+class SendGridEmailAdapter implements EmailAdapter {
+  async send(message: EmailMessage): Promise<void> {
+    const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.sendgrid.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: message.to }] }],
+        from: parseFromHeader(env.sendgrid.from),
+        subject: message.subject,
+        content: [
+          ...(message.text ? [{ type: "text/plain", value: message.text }] : []),
+          { type: "text/html", value: message.html },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`SendGrid send failed (${res.status}): ${body}`);
+    }
+  }
+}
+
+/** Parses "Name <email@domain>" (also accepted bare) into SendGrid's {name, email} shape. */
+function parseFromHeader(from: string): { name?: string; email: string } {
+  const match = from.match(/^(.*)<(.+)>$/);
+  if (match) return { name: match[1].trim().replace(/^"|"$/g, ""), email: match[2].trim() };
+  return { email: from.trim() };
+}
+
 let adapter: EmailAdapter | null = null;
 
 export function getEmailAdapter(): EmailAdapter {
   if (!adapter) {
     if (env.emailProvider === "both") {
       adapter = new CompositeEmailAdapter([new ConsoleEmailAdapter(), new SmtpEmailAdapter()]);
+    } else if (env.emailProvider === "sendgrid") {
+      adapter = new SendGridEmailAdapter();
     } else {
       adapter = env.emailProvider === "smtp" ? new SmtpEmailAdapter() : new ConsoleEmailAdapter();
     }

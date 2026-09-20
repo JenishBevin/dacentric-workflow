@@ -37,13 +37,17 @@ export const env = {
   loginMaxAttempts: num("LOGIN_MAX_ATTEMPTS", 5),
   loginLockoutMinutes: num("LOGIN_LOCKOUT_MINUTES", 15),
 
-  emailProvider: (process.env.EMAIL_PROVIDER ?? "console") as "console" | "smtp" | "both",
+  emailProvider: (process.env.EMAIL_PROVIDER ?? "console") as "console" | "smtp" | "sendgrid" | "both",
   smtp: {
     host: process.env.SMTP_HOST ?? "",
     port: num("SMTP_PORT", 587),
     user: process.env.SMTP_USER ?? "",
     password: process.env.SMTP_PASSWORD ?? "",
     from: process.env.SMTP_FROM ?? "DaCentric Platform <no-reply@dacentric.example>",
+  },
+  sendgrid: {
+    apiKey: process.env.SENDGRID_API_KEY ?? "",
+    from: process.env.SENDGRID_FROM ?? process.env.SMTP_FROM ?? "Onerra <info@dac-onerra.com>",
   },
 
   storageProvider: (process.env.STORAGE_PROVIDER ?? "local") as "local" | "s3",
