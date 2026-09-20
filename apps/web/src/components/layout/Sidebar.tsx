@@ -150,10 +150,10 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
       {/* On localhost, clicking "Workflow" below already opens this same
           page, making this separate link redundant — kept in production,
           where that module-header click-through doesn't apply. */}
-      {!isStaff && !isLocalhost && <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} visible badge={undefined} onNavigate={onCloseMobile} />}
+      {!isStaff && !isLocalhost && <SidebarLink to="/dashboard" label="Dashboard" icon={LayoutDashboard} visible badge={undefined} onNavigate={onCloseMobile} />}
 
       <div className="flex flex-col gap-1">
-        <ModuleGroup title="Workflow" items={workflowItems} onNavigate={onCloseMobile} dashboardTo="/" />
+        <ModuleGroup title="Workflow" items={workflowItems} onNavigate={onCloseMobile} dashboardTo="/dashboard" />
         <ModuleGroup title="CRM" items={crmItems} onNavigate={onCloseMobile} dashboardTo="/crm" />
         <ModuleGroup title="HRMS" items={hrmsItems} onNavigate={onCloseMobile} dashboardTo="/hrms" />
         <ModuleGroup title="ERP" items={erpItems} onNavigate={onCloseMobile} />

@@ -157,7 +157,7 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
           <Menu className="h-5 w-5" />
         </button>
         <nav aria-label="Breadcrumb" className="hidden min-w-0 shrink-0 items-center gap-1.5 text-sm text-slate-500 xl:flex">
-          <Link to="/" className="hover:text-slate-700">
+          <Link to="/dashboard" className="hover:text-slate-700">
             Home
           </Link>
           {crumbs.map((c, i) => (

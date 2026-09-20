@@ -37,7 +37,7 @@ export default function LoginPage() {
     setServerError(null);
     try {
       await login(values.email, values.password);
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       setServerError(extractApiError(err).message);
     }

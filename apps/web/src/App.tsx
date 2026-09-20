@@ -5,6 +5,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { Spinner } from "./components/ui/primitives";
 import { isLocalhost } from "./lib/isLocalhost";
 
+const HomePage = lazy(() => import("./pages/HomePage"));
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/auth/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/auth/ResetPasswordPage"));
@@ -59,6 +60,7 @@ export default function App() {
   return (
     <Suspense fallback={<PageFallback />}>
       <Routes>
+        <Route path="/" element={<HomePage />} />
         <Route path="/login-portal-uae2026" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -71,7 +73,7 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route path="/" element={<DashboardPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           {/* Per-module dashboards — localhost-only preview, reached by clicking
               a module name in the sidebar (see Sidebar.tsx's ModuleGroup). */}
           {isLocalhost && <Route path="/crm" element={<CrmDashboardPage />} />}
