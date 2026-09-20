@@ -52,7 +52,10 @@ function PageFallback() {
 function RequireAuth({ children }: { children: React.ReactElement }) {
   const { user, loading } = useAuth();
   if (loading) return <PageFallback />;
-  if (!user) return <Navigate to="/login-portal-uae2026" replace />;
+  // Sends logged-out visitors hitting an internal URL directly (e.g. someone
+  // probing /dashboard) to the public home page, not the login page — the
+  // login URL is intentionally hard to guess, so this path must never reveal it.
+  if (!user) return <Navigate to="/" replace />;
   return children;
 }
 
