@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useAuth } from "../../context/AuthContext";
 
 const ITEMS = [
-  { to: "/", label: "Home", icon: LayoutDashboard, end: true },
+  { to: "/dashboard", label: "Home", icon: LayoutDashboard, end: true },
   { to: "/workflow/boards", label: "Projects", icon: Trello, end: false },
   { to: "/workflow/my-tasks", label: "My Tasks", icon: ListChecks, end: false },
   { to: "/workflow/team", label: "Team", icon: Users2, end: false },
