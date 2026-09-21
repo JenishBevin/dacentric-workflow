@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 import qplusLogo from "../assets/QPlus.png";
+import qplusStamp from "../assets/qplus-company-stamp.png";
 
 // Fixed company letterhead details — never entered per-quotation, matches
 // the company's standard "Proposal For Supply and Installation of ..." PDF.
@@ -390,6 +391,7 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   ensureSpace(24);
   doc.text("Thanks & Regards,", contentRight, y, { align: "right" });
   y += 6;
+  const nameY = y; // baseline of the preparer's name — the company stamp overlaps this line
   doc.text(input.preparerName, contentRight, y, { align: "right" });
   y += 4.8;
   if (input.preparerDesignation) {
@@ -399,6 +401,18 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   if (input.preparerMobile) {
     doc.text(`Mob: ${input.preparerMobile}`, contentRight, y, { align: "right" });
     y += 4.8;
+  }
+
+  // Company stamp, placed over the preparer's printed name — same as a
+  // physical seal stamped across a signature on a paper copy.
+  try {
+    const stampDataUrl = await toDataUrl(qplusStamp);
+    const stampSize = 28; // mm — square, source asset is trimmed to a 1:1 aspect
+    const stampCenterX = contentRight - 20;
+    const stampCenterY = nameY - 1.5; // nudge up from the text baseline to its visual center
+    doc.addImage(stampDataUrl, "PNG", stampCenterX - stampSize / 2, stampCenterY - stampSize / 2, stampSize, stampSize, undefined, "NONE");
+  } catch {
+    // Non-fatal — proceed without the stamp rather than blocking the download.
   }
 
   printFooter();
