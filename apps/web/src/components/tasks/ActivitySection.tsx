@@ -63,6 +63,10 @@ function describe(entry: AuditLogItem): string {
 
   if (entry.field) {
     const label = FIELD_LABEL[entry.field] ?? entry.field;
+    // The description is rich-text HTML — showing its raw before/after
+    // markup here would dump full <span style="..."> tags into the log, so
+    // just note that it changed, same as Comment/Attachment entries do.
+    if (entry.field === "description") return `${verb} ${label}`;
     return `${verb} ${label}: ${formatValue(entry.beforeValue)} → ${formatValue(entry.afterValue)}`;
   }
   return verb;
