@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { format } from "date-fns";
 import { History } from "lucide-react";
 import { useTaskActivity } from "../../api/tasks";
 import { AuditLogItem } from "../../lib/types";
+
+const COLLAPSED_COUNT = 4;
 
 const ACTION_LABEL: Record<string, string> = {
   CREATE: "created",
@@ -75,6 +77,10 @@ function describe(entry: AuditLogItem): string {
 /** Section 28: every relevant action generates an activity entry, rendered oldest-action-context-first here (newest on top). */
 export const ActivitySection: React.FC<{ taskId: string }> = ({ taskId }) => {
   const { data: entries, isLoading } = useTaskActivity(taskId);
+  const [expanded, setExpanded] = useState(false);
+
+  const visibleEntries = expanded ? entries : entries?.slice(0, COLLAPSED_COUNT);
+  const remaining = entries ? entries.length - COLLAPSED_COUNT : 0;
 
   return (
     <div className="space-y-2">
@@ -82,9 +88,9 @@ export const ActivitySection: React.FC<{ taskId: string }> = ({ taskId }) => {
       {isLoading && <p className="text-xs text-slate-400">Loading activity…</p>}
       {entries?.length === 0 && <p className="text-xs text-slate-400">No activity recorded yet.</p>}
       <div className="space-y-0">
-        {entries?.map((entry: AuditLogItem, idx: number) => (
+        {visibleEntries?.map((entry: AuditLogItem, idx: number) => (
           <div key={entry.id} className="relative flex gap-3 pb-3 pl-1">
-            {idx !== entries.length - 1 && <span className="absolute left-[7px] top-4 h-full w-px bg-slate-200" />}
+            {idx !== visibleEntries.length - 1 && <span className="absolute left-[7px] top-4 h-full w-px bg-slate-200" />}
             <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-300" />
             <div className="min-w-0 flex-1 text-xs">
               <span className="font-medium text-slate-700">{entry.actorName}</span>{" "}
@@ -94,6 +100,11 @@ export const ActivitySection: React.FC<{ taskId: string }> = ({ taskId }) => {
           </div>
         ))}
       </div>
+      {!expanded && remaining > 0 && (
+        <button type="button" onClick={() => setExpanded(true)} className="text-xs font-medium text-brand-600 hover:text-brand-700">
+          See {remaining} more
+        </button>
+      )}
     </div>
   );
 };
