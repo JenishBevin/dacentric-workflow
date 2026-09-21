@@ -323,8 +323,11 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
       doc.text(value, colX[5] + cols[5].width - 2, y + 4.8, { align: "right" });
       y += 7;
     }
-    y += 8;
   }
+  // Breathing room after the table (or after the totals block, when shown) —
+  // always applied, otherwise the no-price PDF ran the next section straight
+  // into the table's bottom border.
+  y += 8;
 
   // --- Offer validity ---
   ensureSpace(8);

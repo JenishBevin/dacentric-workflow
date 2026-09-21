@@ -223,7 +223,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const quoteVatAmount = (quoteSubtotal * (Number(quoteVatRate) || 0)) / 100;
   const quoteTotal = quoteSubtotal + quoteVatAmount;
 
-  async function submitQuotation(hidePrices = false) {
+  async function submitQuotation(mode: "with" | "without" | "both" = "with") {
     if (!taskId) return;
     if (!quoteTitle.trim()) {
       push({ variant: "error", title: "Enter a title for the proposal." });
@@ -256,7 +256,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         preparerDesignation: quotePreparerDesignation.trim() || undefined,
         preparerMobile: quotePreparerMobile.trim() || undefined,
       });
-      await generateQuotationPdf({
+      const pdfInput = {
         refId: quotationRef,
         projectName: task?.title ?? "",
         title: quoteTitle.trim(),
@@ -276,8 +276,9 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         preparerName: quotePreparerName.trim(),
         preparerDesignation: quotePreparerDesignation.trim(),
         preparerMobile: quotePreparerMobile.trim(),
-        hidePrices,
-      });
+      };
+      if (mode === "with" || mode === "both") await generateQuotationPdf({ ...pdfInput, hidePrices: false });
+      if (mode === "without" || mode === "both") await generateQuotationPdf({ ...pdfInput, hidePrices: true });
       push({ variant: "success", title: "Quotation downloaded.", description: "Upload the PDF to this task's Attachments below." });
       setQuotationOpen(false);
     } catch (err) {
@@ -1167,10 +1168,13 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
             <Button variant="outline" onClick={() => setQuotationOpen(false)}>
               Cancel
             </Button>
-            <Button variant="outline" onClick={() => submitQuotation(true)} loading={saveQuote.isPending || quoteGenerating}>
+            <Button variant="outline" onClick={() => submitQuotation("without")} loading={saveQuote.isPending || quoteGenerating}>
               Download without Price
             </Button>
-            <Button onClick={() => submitQuotation(false)} loading={saveQuote.isPending || quoteGenerating}>
+            <Button variant="outline" onClick={() => submitQuotation("both")} loading={saveQuote.isPending || quoteGenerating}>
+              Download Both
+            </Button>
+            <Button onClick={() => submitQuotation("with")} loading={saveQuote.isPending || quoteGenerating}>
               Download with Price
             </Button>
           </div>
