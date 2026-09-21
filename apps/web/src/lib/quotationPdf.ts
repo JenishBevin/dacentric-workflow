@@ -87,6 +87,10 @@ export interface QuotationPdfInput {
   preparerName: string;
   preparerDesignation: string;
   preparerMobile: string;
+  /** When true, omits Unit Price / Amount columns and the Total/VAT/Gross
+   *  Total block entirely — for sharing scope/quantities without revealing
+   *  commercial figures. */
+  hidePrices?: boolean;
 }
 
 async function toDataUrl(url: string): Promise<string> {
@@ -221,14 +225,21 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
 
   // --- Item table (full grid — outer border, column dividers, row dividers,
   // matching the reference PDF's actual vector lines) ---
-  const cols = [
-    { key: "sl", label: "SL.No", width: 10 },
-    { key: "desc", label: "ITEM DESCRIPTION", width: 90 },
-    { key: "qty", label: "QTY", width: 14 },
-    { key: "unit", label: "UNIT", width: 16 },
-    { key: "unitPrice", label: `UNIT PRICE\n(in ${input.currency})`, width: 24 },
-    { key: "amount", label: `AMOUNT\n(in ${input.currency})`, width: 26 },
-  ];
+  const cols = input.hidePrices
+    ? [
+        { key: "sl", label: "SL.No", width: 10 },
+        { key: "desc", label: "ITEM DESCRIPTION", width: 140 },
+        { key: "qty", label: "QTY", width: 14 },
+        { key: "unit", label: "UNIT", width: 16 },
+      ]
+    : [
+        { key: "sl", label: "SL.No", width: 10 },
+        { key: "desc", label: "ITEM DESCRIPTION", width: 90 },
+        { key: "qty", label: "QTY", width: 14 },
+        { key: "unit", label: "UNIT", width: 16 },
+        { key: "unitPrice", label: `UNIT PRICE\n(in ${input.currency})`, width: 24 },
+        { key: "amount", label: `AMOUNT\n(in ${input.currency})`, width: 26 },
+      ];
   const tableWidth = cols.reduce((s, c) => s + c.width, 0);
   const colX: number[] = [];
   let cx = marginX;
@@ -282,33 +293,38 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
     doc.setFont("helvetica", "normal");
     doc.text(String(item.qty), colX[2] + cols[2].width / 2, rowTop + 4.5, { align: "center" });
     doc.text(item.unit, colX[3] + cols[3].width / 2, rowTop + 4.5, { align: "center" });
-    doc.text(money(item.unitPrice), colX[4] + cols[4].width - 2, rowTop + 4.5, { align: "right" });
-    doc.text(money(item.qty * item.unitPrice), colX[5] + cols[5].width - 2, rowTop + 4.5, { align: "right" });
+    if (!input.hidePrices) {
+      doc.text(money(item.unitPrice), colX[4] + cols[4].width - 2, rowTop + 4.5, { align: "right" });
+      doc.text(money(item.qty * item.unitPrice), colX[5] + cols[5].width - 2, rowTop + 4.5, { align: "right" });
+    }
     drawRowGrid(rowTop, rowHeight);
     y = rowTop + rowHeight;
   });
 
   // --- Totals (single divider between the label and value zone, matching
-  // the reference's own two-rect-per-row layout) ---
-  ensureSpace(24);
-  const totalsDividerX = colX[4];
-  const totalsRows: [string, string][] = [
-    ["Total in " + input.currency, money(input.subtotal)],
-    [`VAT ${input.vatRate}%`, money(input.vatAmount)],
-    ["Gross Total in " + input.currency, money(input.totalAmount)],
-  ];
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(BODY_SIZE);
-  for (const [label, value] of totalsRows) {
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.15);
-    doc.rect(marginX, y, tableWidth, 7);
-    doc.line(totalsDividerX, y, totalsDividerX, y + 7);
-    doc.text(label, totalsDividerX - 2, y + 4.8, { align: "right" });
-    doc.text(value, colX[5] + cols[5].width - 2, y + 4.8, { align: "right" });
-    y += 7;
+  // the reference's own two-rect-per-row layout) — omitted entirely when
+  // prices are hidden, since every row is a price figure. ---
+  if (!input.hidePrices) {
+    ensureSpace(24);
+    const totalsDividerX = colX[4];
+    const totalsRows: [string, string][] = [
+      ["Total in " + input.currency, money(input.subtotal)],
+      [`VAT ${input.vatRate}%`, money(input.vatAmount)],
+      ["Gross Total in " + input.currency, money(input.totalAmount)],
+    ];
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(BODY_SIZE);
+    for (const [label, value] of totalsRows) {
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.15);
+      doc.rect(marginX, y, tableWidth, 7);
+      doc.line(totalsDividerX, y, totalsDividerX, y + 7);
+      doc.text(label, totalsDividerX - 2, y + 4.8, { align: "right" });
+      doc.text(value, colX[5] + cols[5].width - 2, y + 4.8, { align: "right" });
+      y += 7;
+    }
+    y += 8;
   }
-  y += 8;
 
   // --- Offer validity ---
   ensureSpace(8);
@@ -385,5 +401,5 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   printFooter();
 
   const fileSafe = input.projectName.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-  doc.save(`quotation-${fileSafe}.pdf`);
+  doc.save(`quotation-${fileSafe}${input.hidePrices ? "-no-price" : ""}.pdf`);
 }

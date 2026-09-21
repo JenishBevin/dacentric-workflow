@@ -223,7 +223,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
   const quoteVatAmount = (quoteSubtotal * (Number(quoteVatRate) || 0)) / 100;
   const quoteTotal = quoteSubtotal + quoteVatAmount;
 
-  async function submitQuotation() {
+  async function submitQuotation(hidePrices = false) {
     if (!taskId) return;
     if (!quoteTitle.trim()) {
       push({ variant: "error", title: "Enter a title for the proposal." });
@@ -276,6 +276,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         preparerName: quotePreparerName.trim(),
         preparerDesignation: quotePreparerDesignation.trim(),
         preparerMobile: quotePreparerMobile.trim(),
+        hidePrices,
       });
       push({ variant: "success", title: "Quotation downloaded.", description: "Upload the PDF to this task's Attachments below." });
       setQuotationOpen(false);
@@ -1162,12 +1163,15 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
             </p>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setQuotationOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={submitQuotation} loading={saveQuote.isPending || quoteGenerating}>
-              Download PDF
+            <Button variant="outline" onClick={() => submitQuotation(true)} loading={saveQuote.isPending || quoteGenerating}>
+              Download without Price
+            </Button>
+            <Button onClick={() => submitQuotation(false)} loading={saveQuote.isPending || quoteGenerating}>
+              Download with Price
             </Button>
           </div>
         </div>
