@@ -630,8 +630,8 @@ export async function deleteStage(boardId: string, stageId: string, actor: Authe
   const role = await assertBoardVisible(boardId, actor);
   assertCanEditBoard(role);
 
-  const stageCount = await prisma.boardStage.count({ where: { boardId } });
-  if (stageCount <= 1) {
+  const remainingStages = await prisma.boardStage.findMany({ where: { boardId, id: { not: stageId } }, orderBy: { position: "asc" } });
+  if (remainingStages.length === 0) {
     throw Errors.conflict("A board must always retain at least one stage.");
   }
 
@@ -641,6 +641,13 @@ export async function deleteStage(boardId: string, stageId: string, actor: Authe
       `This stage still has ${tasksInStage} task(s). Move them to another stage before deleting it.`
     );
   }
+
+  // Task.stageId is a required FK with no onDelete behavior, so a soft-deleted
+  // task (isDeleted: true, excluded from the count above and invisible in the
+  // UI) still holds a live reference to this stage and would fail the delete
+  // below with an unhandled FK-constraint error. Re-point those first — this
+  // has no visible effect for users, it only satisfies the constraint.
+  await prisma.task.updateMany({ where: { stageId, isDeleted: true }, data: { stageId: remainingStages[0].id } });
 
   const stage = await prisma.boardStage.delete({ where: { id: stageId } });
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "BoardStage", entityId: stageId, boardId, beforeValue: stage });

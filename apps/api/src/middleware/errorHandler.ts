@@ -22,6 +22,9 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   if (anyErr?.code === "P2002") {
     return res.status(409).json({ error: { code: "CONFLICT", message: "A record with these details already exists." } });
   }
+  if (anyErr?.code === "P2003") {
+    return res.status(409).json({ error: { code: "CONFLICT", message: "This is still referenced by other records and can't be deleted." } });
+  }
 
   // eslint-disable-next-line no-console
   console.error("[unhandled error]", err);
