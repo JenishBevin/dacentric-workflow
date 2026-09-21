@@ -263,7 +263,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
         {isEnquiryBoard && (
           <section>
             <Label>Customer</Label>
-            <CustomerPicker value={customer} onChange={setCustomer} placeholder="Search Customer Master by name or ID…" />
+            <CustomerPicker value={customer} onChange={setCustomer} placeholder="Search Customer Master by name or ID…" allowCreate />
             <p className="mt-1 text-[11px] text-slate-400">
               Pulls from CRM — if this customer already exists, pick them instead of retyping their details. Carries forward automatically if this is Qualified to a
               Project.
