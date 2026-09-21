@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma";
 import { AuthedUser } from "../../middleware/authenticate";
 import { visibleBoardsWhere } from "../boards/board-access";
+import { SYSTEM_BOARD_NAMES } from "../boards/boards.service";
 import { computeDueDateStatus } from "../tasks/task-formatting";
 
 export interface DashboardFilters {
@@ -67,11 +68,12 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     prisma.task.count({ where: { ...baseWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfToday } } }),
     prisma.task.count({ where: { ...baseWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfWeek } } }),
     prisma.task.count({ where: { ...baseWhere, isCompleted: true, completedAt: { gte: startOfMonth } } }),
-    // Enquiry List is a distinct feature from "Projects" (its own nav item,
-    // not filed under any Service) — excluded here so this count matches
-    // what the Projects page actually shows, even though its tasks still
-    // count toward every task-based stat above via boardIds.
-    prisma.board.count({ where: { ...boardWhere, isArchived: false, isCompleted: false, name: { notIn: ["Enquiry List", "Estimation"] } } }),
+    // Enquiry List, Estimation, Accounts and each user's Personal Tasks board
+    // are system boards, not "Projects" (none are filed under any Service) —
+    // excluded here so this count matches what the Projects page actually
+    // shows, even though their tasks still count toward every task-based
+    // stat above via boardIds.
+    prisma.board.count({ where: { ...boardWhere, isArchived: false, isCompleted: false, name: { notIn: SYSTEM_BOARD_NAMES } } }),
     prisma.task.groupBy({ by: ["priority"], where: { ...baseWhere, isCompleted: false }, _count: { _all: true } }),
     prisma.task.groupBy({ by: ["stageId"], where: { ...baseWhere }, _count: { _all: true } }),
     prisma.task.count({ where: { ...baseWhere, approvalStatus: "PENDING_APPROVAL" } }),

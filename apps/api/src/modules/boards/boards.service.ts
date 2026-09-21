@@ -276,7 +276,7 @@ async function getOrCreateNamedBoard(
   return board;
 }
 
-const ENQUIRY_BOARD_NAME = "Enquiry List";
+export const ENQUIRY_BOARD_NAME = "Enquiry List";
 const ENQUIRY_STAGES = [
   { name: "New", color: "#60a5fa", isTerminal: false },
   { name: "In Progress", color: "#f59e0b", isTerminal: false },
@@ -348,6 +348,12 @@ const PERSONAL_STAGES = [
   { name: "In Progress", color: "#f59e0b", isTerminal: false },
   { name: "Done", color: "#22c55e", isTerminal: true },
 ];
+
+// Every company-wide or per-user system board that isn't a real "Project" —
+// used to exclude them from Projects-facing counts and listings (Dashboard's
+// Active Projects stat, Project/Task History) the same way the Projects page
+// itself excludes them (by never filing them under a Service).
+export const SYSTEM_BOARD_NAMES = [ENQUIRY_BOARD_NAME, ESTIMATION_BOARD_NAME, ACCOUNTS_BOARD_NAME, PERSONAL_BOARD_NAME];
 
 export async function getOrCreatePersonalBoard(actor: AuthedUser) {
   let board = await prisma.board.findFirst({ where: { name: PERSONAL_BOARD_NAME, createdById: actor.id, isDeleted: false } });

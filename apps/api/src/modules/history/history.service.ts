@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma";
 import { AuthedUser } from "../../middleware/authenticate";
 import { visibleBoardsWhere } from "../boards/board-access";
+import { SYSTEM_BOARD_NAMES } from "../boards/boards.service";
 
 export type HistoryType = "PROJECT" | "TASK";
 export type HistoryStatus = "COMPLETED" | "IN_PROGRESS" | "LOST";
@@ -43,7 +44,7 @@ export async function getHistory(actor: AuthedUser, filters: HistoryFilters): Pr
 
   if (!filters.type || filters.type === "PROJECT") {
     const projects = await prisma.board.findMany({
-      where: { ...boardWhere, name: { notIn: ["Enquiry List", "Estimation"] } },
+      where: { ...boardWhere, name: { notIn: SYSTEM_BOARD_NAMES } },
       select: {
         id: true,
         boardId: true,
