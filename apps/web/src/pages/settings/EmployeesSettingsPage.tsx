@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Plus, Users } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Users } from "lucide-react";
 import {
   useAllEmployees,
   useCreateEmployee,
@@ -43,6 +43,19 @@ export default function EmployeesSettingsPage() {
 
   const [newOpen, setNewOpen] = useState(false);
   const [editEmployee, setEditEmployee] = useState<EmployeeRow | null>(null);
+  const [sort, setSort] = useState<{ key: "name" | "code"; dir: "asc" | "desc" } | null>(null);
+
+  function toggleSort(key: "name" | "code") {
+    setSort((prev) => (prev?.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  }
+
+  const sortedEmployees = useMemo(() => {
+    const rows = (employees as EmployeeRow[] | undefined) ?? [];
+    if (!sort) return rows;
+    const field = sort.key === "name" ? "fullName" : "employeeCode";
+    const sorted = [...rows].sort((a, b) => a[field].localeCompare(b[field], undefined, { numeric: true, sensitivity: "base" }));
+    return sort.dir === "desc" ? sorted.reverse() : sorted;
+  }, [employees, sort]);
 
   return (
     <div className="space-y-4">
@@ -79,8 +92,8 @@ export default function EmployeesSettingsPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-4 py-2.5">Employee</th>
-                <th className="px-4 py-2.5">Code</th>
+                <SortableHeader label="Employee" sortKey="name" sort={sort} onSort={toggleSort} />
+                <SortableHeader label="Code" sortKey="code" sort={sort} onSort={toggleSort} />
                 <th className="px-4 py-2.5">Job Title</th>
                 <th className="px-4 py-2.5">Department / Team</th>
                 <th className="px-4 py-2.5">Linked Login</th>
@@ -89,7 +102,7 @@ export default function EmployeesSettingsPage() {
               </tr>
             </thead>
             <tbody>
-              {(employees as EmployeeRow[]).map((e) => (
+              {sortedEmployees.map((e) => (
                 <tr key={e.id} className="border-b border-slate-100 last:border-0">
                   <td className="px-4 py-2.5">
                     <p className="font-medium text-slate-800">{e.fullName}</p>
@@ -133,6 +146,28 @@ export default function EmployeesSettingsPage() {
     </div>
   );
 }
+
+const SortableHeader: React.FC<{
+  label: string;
+  sortKey: "name" | "code";
+  sort: { key: "name" | "code"; dir: "asc" | "desc" } | null;
+  onSort: (key: "name" | "code") => void;
+}> = ({ label, sortKey, sort, onSort }) => {
+  const active = sort?.key === sortKey;
+  const Icon = active ? (sort!.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <th className="px-4 py-2.5">
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`flex items-center gap-1 uppercase tracking-wide ${active ? "text-slate-700" : "text-slate-500"} hover:text-slate-700`}
+      >
+        {label}
+        <Icon className="h-3.5 w-3.5" />
+      </button>
+    </th>
+  );
+};
 
 function DepartmentTeamPicker({
   departmentId,
