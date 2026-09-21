@@ -32,10 +32,20 @@ const loginLimiter = rateLimit({
   message: { error: { code: "RATE_LIMITED", message: "Too many login attempts. Please slow down." } },
 });
 
+// The web app and API are deployed on different registrable domains
+// (www.dac-onerra.com vs. *.up.railway.app) — a genuinely cross-site setup —
+// so these cookies must be sendable cross-site. SameSite=Lax silently drops
+// them from every XHR/fetch (only top-level navigations get it), which broke
+// token refresh entirely: the access token would expire and the refresh
+// call's cookie just never left the browser, forcing a full re-login. None
+// requires Secure, which env.isProd already guarantees. Local dev stays Lax
+// since http://localhost has no HTTPS to satisfy Secure.
+const CROSS_SITE_SAME_SITE = env.isProd ? "none" : "lax";
+
 function setAuthCookie(res: import("express").Response, token: string) {
   res.cookie("accessToken", token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: CROSS_SITE_SAME_SITE,
     secure: env.isProd,
     maxAge: env.jwtAccessTtlMin * 60 * 1000,
   });
@@ -47,7 +57,7 @@ const REFRESH_COOKIE_PATH = "/api/auth";
 function setRefreshCookie(res: import("express").Response, token: string) {
   res.cookie(REFRESH_COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: CROSS_SITE_SAME_SITE,
     secure: env.isProd,
     path: REFRESH_COOKIE_PATH,
     maxAge: env.jwtRefreshTtlDays * 24 * 60 * 60 * 1000,
