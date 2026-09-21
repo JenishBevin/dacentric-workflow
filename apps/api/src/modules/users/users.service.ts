@@ -407,6 +407,32 @@ export async function updateEmployee(
   return employee;
 }
 
+export async function deleteEmployee(employeeId: string, actor: AuthedUser) {
+  const existing = await prisma.employee.findUnique({ where: { id: employeeId } });
+  if (!existing) throw Errors.notFound("Employee");
+
+  // LeaveRequest.employeeId and ExpenseClaim.employeeId are required FKs
+  // with no onDelete override, so Prisma's default (Cascade) would silently
+  // wipe this employee's leave/claim history along with the record — block
+  // it instead, same as boards.service.ts#deleteStage blocks on live tasks.
+  const [leaveCount, claimCount] = await Promise.all([
+    prisma.leaveRequest.count({ where: { employeeId } }),
+    prisma.expenseClaim.count({ where: { employeeId } }),
+  ]);
+  if (leaveCount > 0 || claimCount > 0) {
+    const parts = [
+      leaveCount > 0 && `${leaveCount} leave request${leaveCount === 1 ? "" : "s"}`,
+      claimCount > 0 && `${claimCount} expense claim${claimCount === 1 ? "" : "s"}`,
+    ].filter(Boolean);
+    throw Errors.conflict(`This employee has ${parts.join(" and ")} on record and can't be deleted. Deactivate the employee instead to preserve their history.`);
+  }
+
+  // A linked login (User.employeeId) is an optional FK, so deleting the
+  // Employee just unlinks it (SetNull) — the account itself is untouched.
+  await prisma.employee.delete({ where: { id: employeeId } });
+  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "Employee", entityId: employeeId, beforeValue: { fullName: existing.fullName, employeeCode: existing.employeeCode } });
+}
+
 export async function createDepartment(name: string, actor: AuthedUser) {
   const existing = await prisma.department.findUnique({ where: { name } });
   if (existing) throw Errors.conflict("A department with this name already exists.");

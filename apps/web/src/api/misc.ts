@@ -84,6 +84,18 @@ export function useUpdateEmployee() {
   });
 }
 
+export function useDeleteEmployee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (employeeId: string) => (await api.delete(`/users/employees/${employeeId}`)).data.data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-employees"] });
+      qc.invalidateQueries({ queryKey: ["unlinked-employees"] });
+      qc.invalidateQueries({ queryKey: ["employees"] });
+    },
+  });
+}
+
 // --- Users (admin) ---
 export function useUsers(filters: { status?: string; search?: string } = {}) {
   return useQuery({ queryKey: ["users", filters], queryFn: async () => (await api.get("/users", { params: filters })).data.data });

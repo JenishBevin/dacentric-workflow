@@ -133,6 +133,15 @@ usersRouter.patch(
   asyncHandler(async (req, res) => ok(res, await usersService.updateEmployee(req.params.id, (req as any).validatedBody, req.user!)))
 );
 
+usersRouter.delete(
+  "/employees/:id",
+  requirePermission(PermissionKey.MANAGE_USERS, "ALL"),
+  asyncHandler(async (req, res) => {
+    await usersService.deleteEmployee(req.params.id, req.user!);
+    return ok(res, { success: true });
+  })
+);
+
 // --- Departments / Teams — used by Team Workload's filter controls (Section 30) ---
 usersRouter.get(
   "/departments",

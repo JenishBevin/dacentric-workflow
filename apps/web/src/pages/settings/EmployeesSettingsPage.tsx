@@ -4,6 +4,7 @@ import {
   useAllEmployees,
   useCreateEmployee,
   useUpdateEmployee,
+  useDeleteEmployee,
   useDepartments,
   useTeams,
   useCreateDepartment,
@@ -12,6 +13,7 @@ import {
 } from "../../api/misc";
 import { Button, Input, Label, Select, Badge, Skeleton, ErrorState, EmptyState } from "../../components/ui/primitives";
 import { Drawer } from "../../components/ui/Drawer";
+import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
 import { useAuth } from "../../context/AuthContext";
@@ -40,10 +42,23 @@ export default function EmployeesSettingsPage() {
   const { data: employees, isLoading, isError, refetch } = useAllEmployees(search);
   const createEmployee = useCreateEmployee();
   const updateEmployee = useUpdateEmployee();
+  const deleteEmployee = useDeleteEmployee();
 
   const [newOpen, setNewOpen] = useState(false);
   const [editEmployee, setEditEmployee] = useState<EmployeeRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EmployeeRow | null>(null);
   const [sort, setSort] = useState<{ key: "name" | "code"; dir: "asc" | "desc" } | null>(null);
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      await deleteEmployee.mutateAsync(deleteTarget.id);
+      push({ variant: "success", title: "Employee deleted." });
+      setDeleteTarget(null);
+    } catch (err) {
+      push({ variant: "error", title: "Could not delete employee", description: extractApiError(err).message });
+    }
+  }
 
   function toggleSort(key: "name" | "code") {
     setSort((prev) => (prev?.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
@@ -124,6 +139,9 @@ export default function EmployeesSettingsPage() {
                       <Button variant="ghost" size="sm" onClick={() => setEditEmployee(e)}>
                         Edit
                       </Button>
+                      <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setDeleteTarget(e)}>
+                        Delete
+                      </Button>
                     </td>
                   )}
                 </tr>
@@ -143,6 +161,37 @@ export default function EmployeesSettingsPage() {
           onSuccess={() => push({ variant: "success", title: "Employee updated." })}
         />
       )}
+
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete employee?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={confirmDelete} loading={deleteEmployee.isPending}>
+              Delete Employee
+            </Button>
+          </>
+        }
+      >
+        {deleteTarget && (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600">
+              Delete <span className="font-medium text-slate-900">{deleteTarget.fullName}</span> ({deleteTarget.employeeCode})? This permanently removes
+              their HR record.
+            </p>
+            {deleteTarget.user && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                This will also unlink their login ({deleteTarget.user.name}) from this HR record — the login itself stays active.
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
