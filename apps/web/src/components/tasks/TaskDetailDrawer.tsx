@@ -342,7 +342,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
             <div className="flex gap-2">
               {(task.board?.name === "Enquiry List" || task.board?.name === "Estimation" || task.board?.name === "Accounts") &&
                 task.stage?.name?.toLowerCase() !== "lost" &&
-                task.stage?.name?.toLowerCase() !== "rejected" && (
+                task.stage?.name?.toLowerCase() !== "rejected" &&
+                !(task.board?.name === "Estimation" && task.stage?.name?.toLowerCase() === "new") && (
                 <>
                   {task.board?.name === "Enquiry List" && task.lostApprovalStatus === "PENDING_APPROVAL" ? (
                     can(user, "APPROVE_TASK", "ALL") || isAdmin(user) ? (
