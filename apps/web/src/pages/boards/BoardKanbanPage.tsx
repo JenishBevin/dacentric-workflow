@@ -159,6 +159,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   }
 
   const canManageBoard = isAdmin(user) || board?.members.some((m: any) => m.userId === user?.id && m.role === "OWNER") || can(user, "EDIT_BOARD");
+  const canAddStage = isSuperAdmin(user);
   const canCreateTask = can(user, "CREATE_TASK");
   const canMoveTasks = can(user, "MOVE_TASK");
   const canExport = can(user, "EXPORT");
@@ -349,6 +350,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         onOpenSettings={() => openSettings("general")}
         onAddStage={() => openSettings("stages")}
         canManage={canManageBoard}
+        canAddStage={canAddStage}
         canExport={canExport}
       />
 

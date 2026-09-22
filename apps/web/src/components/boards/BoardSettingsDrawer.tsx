@@ -18,6 +18,8 @@ import {
 import { useEmployeeDirectory } from "../../api/misc";
 import { CustomerPicker } from "../customers/CustomerPicker";
 import { useToast } from "../../context/ToastContext";
+import { useAuth } from "../../context/AuthContext";
+import { isSuperAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/apiClient";
@@ -33,6 +35,8 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
 }) => {
   const [tab, setTab] = useState<Tab>(initialTab);
   const { push } = useToast();
+  const { user } = useAuth();
+  const canAddStage = isSuperAdmin(user);
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -149,22 +153,24 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
 
       {tab === "stages" && (
         <div className="space-y-3">
-          <div className="flex gap-2">
-            <Input placeholder="New stage name" value={newStageName} onChange={(e) => setNewStageName(e.target.value)} />
-            <Button
-              onClick={async () => {
-                if (!newStageName.trim()) return;
-                try {
-                  await addStage.mutateAsync({ name: newStageName.trim() });
-                  setNewStageName("");
-                } catch (err) {
-                  push({ variant: "error", title: "Could not add stage", description: extractApiError(err).message });
-                }
-              }}
-            >
-              <Plus className="h-4 w-4" /> Add
-            </Button>
-          </div>
+          {canAddStage && (
+            <div className="flex gap-2">
+              <Input placeholder="New stage name" value={newStageName} onChange={(e) => setNewStageName(e.target.value)} />
+              <Button
+                onClick={async () => {
+                  if (!newStageName.trim()) return;
+                  try {
+                    await addStage.mutateAsync({ name: newStageName.trim() });
+                    setNewStageName("");
+                  } catch (err) {
+                    push({ variant: "error", title: "Could not add stage", description: extractApiError(err).message });
+                  }
+                }}
+              >
+                <Plus className="h-4 w-4" /> Add
+              </Button>
+            </div>
+          )}
 
           <div className="space-y-2">
             {stages.map((stage: any, idx: number) => (

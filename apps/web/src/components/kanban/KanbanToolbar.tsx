@@ -21,10 +21,11 @@ interface Props {
   onOpenSettings: () => void;
   onAddStage: () => void;
   canManage: boolean;
+  canAddStage: boolean;
   canExport: boolean;
 }
 
-export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onChange, onExport, onOpenMembers, onOpenSettings, onAddStage, canManage, canExport }) => {
+export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onChange, onExport, onOpenMembers, onOpenSettings, onAddStage, canManage, canAddStage, canExport }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -51,7 +52,7 @@ export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onCh
           <AvatarGroup names={board.members.map((m) => m.name)} max={4} />
         </button>
 
-        {canManage && (
+        {canAddStage && (
           <Button variant="outline" size="sm" onClick={onAddStage} className="hidden sm:inline-flex">
             <Plus className="h-3.5 w-3.5" /> Add Stage
           </Button>

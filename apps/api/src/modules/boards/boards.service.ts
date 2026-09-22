@@ -604,6 +604,11 @@ export async function deleteBoard(boardId: string, actor: AuthedUser, cascadeCon
 export async function addStage(boardId: string, input: { name: string; color?: string; wipLimit?: number | null; isTerminal?: boolean }, actor: AuthedUser) {
   const role = await assertBoardVisible(boardId, actor);
   assertCanEditBoard(role);
+  // Adding a stage is Super Admin only — hidden from the UI for anyone else
+  // too, but that's just UX.
+  if (!actor.roles.includes(RoleCode.SUPER_ADMIN)) {
+    throw Errors.forbidden("Only a Super Admin can add a stage.");
+  }
 
   const maxPosition = await prisma.boardStage.aggregate({ where: { boardId }, _max: { position: true } });
   const stage = await prisma.boardStage.create({
