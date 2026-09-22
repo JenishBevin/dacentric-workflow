@@ -254,7 +254,7 @@ export default function HistoryPage() {
         </div>
       )}
 
-      {openTaskId && <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
+      {openTaskId && <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} readOnly />}
 
       {openProjectId && <HistoryProjectSummary boardId={openProjectId} onClose={() => setOpenProjectId(null)} />}
     </div>
@@ -314,7 +314,7 @@ function HistoryProjectSummary({ boardId, onClose }: { boardId: string; onClose:
         </div>
       )}
 
-      {openTaskId && <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
+      {openTaskId && <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} readOnly />}
     </Modal>
   );
 }

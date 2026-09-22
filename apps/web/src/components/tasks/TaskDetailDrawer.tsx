@@ -56,6 +56,10 @@ interface Props {
   taskId: string | null;
   onClose: () => void;
   onDeleted?: () => void;
+  /** Opened from a read-only context (Project/Task History's summary) —
+   *  this record is a closed chapter, so none of the workflow-transition
+   *  buttons (Qualified/Submit/Awarded/Lost/Approve/Reject) render. */
+  readOnly?: boolean;
 }
 
 /**
@@ -64,7 +68,7 @@ interface Props {
  * than tabs) so nothing important is hidden by default — closer to how
  * enterprise work-management tools like this one present a task.
  */
-export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }) => {
+export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, readOnly }) => {
   const { user } = useAuth();
   const { push } = useToast();
   const navigate = useNavigate();
@@ -342,6 +346,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         task && (
           <div className="flex w-full items-center justify-between">
             <div className="flex gap-2">
+              {!readOnly && (
+              <>
               {/* Enquiry List: Qualified is available any time before the enquiry
                   is dragged into Lost — New excluded, per Section design. */}
               {task.board?.name === "Enquiry List" &&
@@ -372,9 +378,12 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                   approval — only ever shows once the card is actually sitting
                   in the Lost column (dragged, or moved via the Stage picker).
                   Requesting approval from here; a reject sends it back to
-                  whichever stage it came from. */}
+                  whichever stage it came from. Once APPROVED it's a closed
+                  record in Project/Task History — no buttons at all, same as
+                  every other resolved task/project. */}
               {(task.board?.name === "Enquiry List" || task.board?.name === "Estimation") &&
-                task.stage?.name?.trim().toLowerCase() === "lost" && (
+                task.stage?.name?.trim().toLowerCase() === "lost" &&
+                task.lostApprovalStatus !== "APPROVED" && (
                 <>
                   {task.lostApprovalStatus === "PENDING_APPROVAL" ? (
                     can(user, "APPROVE_TASK", "ALL") || isAdmin(user) ? (
@@ -487,6 +496,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                     </Button>
                   )}
                 </>
+              )}
+              </>
               )}
               <Button
                 variant="outline"
