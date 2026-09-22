@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
-export const SERVICE_CATALOG = ["MEP", "ELV", "IT", "Automation & Innovation", "Civil", "Fitout", "AMC", "Demolition", "Approvals"];
+export const SERVICE_CATALOG = ["MEP", "ELV", "IT", "Automation & Innovation", "Civil", "Fitout", "AMC", "Demolition", "Approvals", "Others"];
 
 /**
  * Idempotently ensures the fixed company Service catalog exists, in this
