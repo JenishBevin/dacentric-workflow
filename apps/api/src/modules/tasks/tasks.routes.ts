@@ -3,7 +3,8 @@ import multer from "multer";
 import { asyncHandler, ok, created } from "../../common/http";
 import { validate } from "../../common/validate";
 import { authenticate } from "../../middleware/authenticate";
-import { requirePermission } from "../../middleware/authorize";
+import { requirePermission, requireAnyRole } from "../../middleware/authorize";
+import { RoleCode } from "@dacentric/types";
 import * as tasksService from "./tasks.service";
 import * as checklistService from "./checklist.service";
 import * as commentsService from "./comments.service";
@@ -64,9 +65,12 @@ tasksRouter.post(
 );
 
 // Must come before "/:taskId" so Express doesn't capture "import-enquiries" as a taskId.
+// Bulk import bypasses the app's usual one-at-a-time data entry, so it's
+// restricted to Super Admin regardless of CREATE_TASK scope — the button is
+// hidden from everyone else in the UI too, but that's just UX.
 tasksRouter.post(
   "/import-enquiries",
-  requirePermission(PermissionKey.CREATE_TASK, "OWN"),
+  requireAnyRole(RoleCode.SUPER_ADMIN),
   upload.single("file"),
   asyncHandler(async (req, res) => {
     if (!req.file) throw Errors.badRequest("No file was uploaded.");
@@ -77,7 +81,7 @@ tasksRouter.post(
 // Same reasoning as import-enquiries above — must come before "/:taskId".
 tasksRouter.post(
   "/import-estimations",
-  requirePermission(PermissionKey.CREATE_TASK, "OWN"),
+  requireAnyRole(RoleCode.SUPER_ADMIN),
   upload.single("file"),
   asyncHandler(async (req, res) => {
     if (!req.file) throw Errors.badRequest("No file was uploaded.");

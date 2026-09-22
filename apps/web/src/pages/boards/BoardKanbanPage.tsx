@@ -15,7 +15,7 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Button, Skeleton, ErrorState, Badge } from "../../components/ui/primitives";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
-import { can, isAdmin } from "../../lib/permissions";
+import { can, isAdmin, isSuperAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { TaskSummary, BoardStage } from "../../lib/types";
 import clsx from "clsx";
@@ -297,7 +297,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
               </button>
             </div>
           )}
-          {panelView === "project" && canCreateTask && !board.isArchived && board.name === "Enquiry List" && (
+          {panelView === "project" && canCreateTask && !board.isArchived && board.name === "Enquiry List" && isSuperAdmin(user) && (
             <>
               <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportEnquiriesFile} />
               <Button variant="outline" onClick={() => importFileInputRef.current?.click()} loading={importEnquiries.isPending}>
@@ -305,7 +305,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
               </Button>
             </>
           )}
-          {panelView === "project" && canCreateTask && !board.isArchived && isEstimationBoard && (
+          {panelView === "project" && canCreateTask && !board.isArchived && isEstimationBoard && isSuperAdmin(user) && (
             <>
               <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportEstimationsFile} />
               <Button variant="outline" onClick={() => importFileInputRef.current?.click()} loading={importEstimations.isPending}>
