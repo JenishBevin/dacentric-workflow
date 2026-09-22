@@ -100,7 +100,7 @@ export default function UsersSettingsPage() {
       {users && users.length === 0 && <EmptyState title="No users match these filters." />}
 
       {users && users.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-white">
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <tr>

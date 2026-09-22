@@ -33,7 +33,7 @@ export default function TimeLogsPage() {
       {rows && rows.length > 0 && (
         <>
           {/* Desktop / tablet table */}
-          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white sm:block">
+          <div className="hidden max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-white sm:block">
             <table className="w-full text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                 <tr>
