@@ -413,45 +413,66 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                 task.stage?.name?.toLowerCase() !== "rejected" &&
                 !(task.board?.name === "Estimation" && task.stage?.name?.toLowerCase() === "new") && (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={awardTask.isPending}
-                    onClick={async () => {
-                      try {
-                        const result = await awardTask.mutateAsync(task.id);
-                        if (result.kind === "project-created-pending-approval") {
-                          push({
-                            variant: "success",
-                            title: "Awarded — sent to Accounts, Procurement, and the Project team.",
-                            description: `${result.name} is now waiting on Accounts sign-off.`,
-                          });
-                          onClose();
-                          navigate(`/workflow/boards/${result.id}`);
-                        } else if (result.kind === "project-created") {
-                          push({ variant: "success", title: "Approved — project and procurement created.", description: result.name });
-                          onClose();
-                          navigate(`/workflow/boards/${result.id}`);
+                  {task.board?.name === "Estimation" && task.stage?.name?.trim().toLowerCase() === "in progress" ? (
+                    // "In Progress" doesn't Award straight to a Project anymore —
+                    // it just moves to the "Submitted" stage; Awarding (creating
+                    // the real Project) still happens from there, same as before.
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      loading={moveTask.isPending}
+                      onClick={async () => {
+                        const submittedStage = stages.find((s: any) => s.name.trim().toLowerCase() === "submitted");
+                        if (!submittedStage) {
+                          push({ variant: "error", title: 'No "Submitted" stage found on this board.' });
+                          return;
                         }
-                      } catch (err) {
-                        push({
-                          variant: "error",
-                          title: task.board?.name === "Accounts" ? "Could not approve" : "Could not award",
-                          description: extractApiError(err).message,
-                        });
-                      }
-                    }}
-                  >
-                    {task.board?.name === "Accounts" ? (
-                      <>
-                        <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Approve
-                      </>
-                    ) : (
-                      <>
-                        <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Awarded
-                      </>
-                    )}
-                  </Button>
+                        await performMove(submittedStage.id);
+                      }}
+                    >
+                      <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Submit
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      loading={awardTask.isPending}
+                      onClick={async () => {
+                        try {
+                          const result = await awardTask.mutateAsync(task.id);
+                          if (result.kind === "project-created-pending-approval") {
+                            push({
+                              variant: "success",
+                              title: "Awarded — sent to Accounts, Procurement, and the Project team.",
+                              description: `${result.name} is now waiting on Accounts sign-off.`,
+                            });
+                            onClose();
+                            navigate(`/workflow/boards/${result.id}`);
+                          } else if (result.kind === "project-created") {
+                            push({ variant: "success", title: "Approved — project and procurement created.", description: result.name });
+                            onClose();
+                            navigate(`/workflow/boards/${result.id}`);
+                          }
+                        } catch (err) {
+                          push({
+                            variant: "error",
+                            title: task.board?.name === "Accounts" ? "Could not approve" : "Could not award",
+                            description: extractApiError(err).message,
+                          });
+                        }
+                      }}
+                    >
+                      {task.board?.name === "Accounts" ? (
+                        <>
+                          <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Approve
+                        </>
+                      ) : (
+                        <>
+                          <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Awarded
+                        </>
+                      )}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
