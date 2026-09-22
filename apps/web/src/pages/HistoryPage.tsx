@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { format, startOfDay, endOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { Download, Archive, Trello, Inbox, ChevronRight, RotateCcw } from "lucide-react";
 import { useHistory } from "../api/history";
@@ -7,6 +7,9 @@ import { useRestoreTask } from "../api/tasks";
 import { useSetBoardCompleted } from "../api/boards";
 import { downloadExport } from "../api/misc";
 import { Select, Button, Skeleton, ErrorState, EmptyState, Badge, Label } from "../components/ui/primitives";
+import { Drawer } from "../components/ui/Drawer";
+import { TaskDetailDrawer } from "../components/tasks/TaskDetailDrawer";
+import BoardKanbanPage from "./boards/BoardKanbanPage";
 import { useToast } from "../context/ToastContext";
 import { extractApiError } from "../lib/apiClient";
 import clsx from "clsx";
@@ -28,12 +31,16 @@ type DatePreset = "today" | "week" | "month" | "custom" | null;
  * Project and every resolved Enquiry. Projects move here once manually
  * marked Completed; Enquiries move here once moved to the "Lost" stage. */
 export default function HistoryPage() {
-  const navigate = useNavigate();
   const { push } = useToast();
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
+  // A history row is a closed chapter — it no longer shows up on the live
+  // Projects/Estimation/Enquiries pages, so opening one navigates nowhere;
+  // it just pops up a read-only view right here instead.
+  const [openProject, setOpenProject] = useState<{ id: string; name: string } | null>(null);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [preset, setPreset] = useState<DatePreset>(null);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -95,9 +102,8 @@ export default function HistoryPage() {
   }, [highlightId, rows]);
 
   function openRow(r: any) {
-    if (r.kind === "PROJECT") navigate(`/workflow/boards/${r.id}`);
-    else if (r.board === "Estimation") navigate(`/workflow/estimation?task=${r.id}`);
-    else navigate(`/workflow/enquiries?task=${r.id}`);
+    if (r.kind === "PROJECT") setOpenProject({ id: r.id, name: r.name });
+    else setOpenTaskId(r.id);
   }
 
   return (
@@ -246,6 +252,12 @@ export default function HistoryPage() {
           </table>
         </div>
       )}
+
+      {openTaskId && <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
+
+      <Drawer open={!!openProject} onClose={() => setOpenProject(null)} title={openProject?.name ?? "Project"} widthClassName="w-full lg:w-[92vw]">
+        {openProject && <BoardKanbanPage boardId={openProject.id} />}
+      </Drawer>
     </div>
   );
 }
