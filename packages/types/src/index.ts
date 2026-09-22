@@ -221,8 +221,12 @@ export function formatProjectId(year: number, sequence: number): string {
   return formatQptsId("PRJ", year, sequence);
 }
 
+// Estimation IDs use their own "QPTS/QN/" numbering (matching the
+// quotation reference format shown on the letterhead PDF), not the plain
+// "QPTS-" prefix the other QPTS ID types share.
 export function formatEstimationId(year: number, sequence: number): string {
-  return formatQptsId(null, year, sequence);
+  const seq = String(sequence).padStart(QPTS_SEQUENCE_PAD_LENGTH, "0");
+  return `${QPTS_PREFIX}/QN/${year}-${seq}`;
 }
 
 export function formatEnquiryId(year: number, sequence: number): string {
