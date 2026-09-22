@@ -12,6 +12,7 @@ import { getPermissionScope, scopeAtLeast, isSystemLevelAdmin } from "../../comm
 import { createRecurringSeries, attachTemplateAndScheduleFirst } from "../recurrence/recurrence.service";
 import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard, ACCOUNTS_BOARD_NAME, getOrCreatePersonalBoard } from "../boards/boards.service";
 import { nextYearlySequence } from "../../common/sequence";
+import { createCustomer } from "../customers/customers.service";
 
 export interface CreateTaskInput {
   boardId?: string;
@@ -1316,6 +1317,270 @@ export async function importEnquiriesFromExcel(buffer: Buffer, actor: AuthedUser
     entityType: "Task",
     boardId: board.id,
     afterValue: { source: "excel-import", created: result.created, skipped: result.skipped.length },
+  });
+
+  return result;
+}
+
+// --- Excel import for Estimation history (Estimations tab, plus an
+// optional Awarded Projects tab for the ones that were won) ---
+
+const ESTIMATION_IMPORT_COLUMN_ALIASES: Record<string, string[]> = {
+  estimationId: ["estimation id"],
+  title: ["title"],
+  customerName: ["customer name", "customer", "company"],
+  service: ["service", "service type"],
+  priority: ["priority"],
+  stage: ["stage"],
+  assigneeEmail: ["assignee email", "assignee", "assigned to"],
+  startDate: ["start date"],
+  dueDate: ["due date"],
+  amount: ["estimated amount (aed)", "estimated amount", "amount"],
+  description: ["description"],
+};
+
+const AWARDED_PROJECT_IMPORT_COLUMN_ALIASES: Record<string, string[]> = {
+  estimationId: ["estimation id"],
+  projectId: ["project id"],
+  status: ["project status", "status"],
+  completionDate: ["completion date"],
+  accountsApproval: ["accounts approval"],
+};
+
+export interface ImportEstimationsResult {
+  createdEstimations: number;
+  createdProjects: number;
+  skipped: Array<{ sheet: string; row: number; reason: string }>;
+}
+
+function buildColumnLookup(headerCells: unknown[], aliases: Record<string, string[]>): Record<string, number | undefined> {
+  const columnIndex: Record<string, number> = {};
+  headerCells.forEach((cell, idx) => {
+    if (typeof cell === "string" && cell.trim()) columnIndex[cell.trim().toLowerCase()] = idx;
+  });
+  const resolveColumn = (field: string): number | undefined => {
+    for (const alias of aliases[field]) {
+      const idx = columnIndex[alias];
+      if (idx !== undefined) return idx;
+    }
+    return undefined;
+  };
+  return Object.fromEntries(Object.keys(aliases).map((f) => [f, resolveColumn(f)]));
+}
+
+async function findOrCreateCustomerByName(name: string, actor: AuthedUser) {
+  const existing = await prisma.customer.findFirst({ where: { isDeleted: false, name: { equals: name, mode: "insensitive" } } });
+  if (existing) return existing;
+  return createCustomer({ name }, actor);
+}
+
+/** One upload covering both an estimation's own record (Estimations tab)
+ *  and — for the ones that were actually won — the resulting Project
+ *  (Awarded Projects tab, matched back by Estimation ID). Estimation ID and
+ *  Project ID are taken verbatim from the file rather than auto-generated,
+ *  since this is backfilling records that already have real historical
+ *  reference numbers. A "Lost" row needs nothing from the second tab — it
+ *  already surfaces correctly in Project/Task History once it's on the
+ *  Estimation board with that stage. */
+export async function importEstimationsFromExcel(buffer: Buffer, actor: AuthedUser): Promise<ImportEstimationsResult> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as any);
+
+  const estSheet = workbook.getWorksheet("Estimations") ?? workbook.worksheets[0];
+  if (!estSheet) throw Errors.badRequest('The uploaded file must have an "Estimations" worksheet.');
+  const projSheet = workbook.getWorksheet("Awarded Projects");
+
+  const estFieldColumns = buildColumnLookup(estSheet.getRow(1).values as unknown[], ESTIMATION_IMPORT_COLUMN_ALIASES);
+  if (!estFieldColumns.estimationId || !estFieldColumns.title) {
+    throw Errors.badRequest('The Estimations sheet must have "Estimation ID" and "Title" columns (row 1).');
+  }
+
+  const boardStub = await getOrCreateEstimationBoard(actor);
+  const board = await prisma.board.findUniqueOrThrow({ where: { id: boardStub.id }, include: { stages: { orderBy: { position: "asc" } } } });
+  const services = await prisma.service.findMany();
+
+  const result: ImportEstimationsResult = { createdEstimations: 0, createdProjects: 0, skipped: [] };
+  const taskIdByEstimationId = new Map<string, { taskId: string; title: string; serviceId: string | null; customerId: string | null }>();
+
+  for (let rowNumber = 2; rowNumber <= estSheet.rowCount; rowNumber++) {
+    const row = estSheet.getRow(rowNumber);
+    const cellText = (idx?: number) => (idx ? String(row.getCell(idx).value ?? "").trim() : "");
+    if (Object.values(estFieldColumns).every((idx) => !cellText(idx))) continue;
+
+    const estimationIdRaw = cellText(estFieldColumns.estimationId);
+    const title = cellText(estFieldColumns.title);
+    if (!estimationIdRaw || !title) {
+      result.skipped.push({ sheet: "Estimations", row: rowNumber, reason: "Missing Estimation ID or Title" });
+      continue;
+    }
+
+    try {
+      const existingRecord = await prisma.estimationRecord.findUnique({ where: { estimationId: estimationIdRaw } });
+      if (existingRecord) throw new Error(`Estimation ID "${estimationIdRaw}" already exists`);
+
+      const stageName = cellText(estFieldColumns.stage) || "New";
+      const stage = board.stages.find((s) => s.name.toLowerCase() === stageName.toLowerCase());
+      if (!stage) throw new Error(`Unknown Stage "${stageName}" — must be New, In Progress, Converted, or Lost`);
+
+      const priorityRaw = cellText(estFieldColumns.priority).toUpperCase();
+      const priority = (Object.values(TaskPriority) as string[]).includes(priorityRaw) ? priorityRaw : TaskPriority.MEDIUM;
+
+      const customerName = cellText(estFieldColumns.customerName);
+      const customer = customerName ? await findOrCreateCustomerByName(customerName, actor) : null;
+
+      const serviceName = cellText(estFieldColumns.service);
+      const service = serviceName ? services.find((s) => s.name.toLowerCase() === serviceName.toLowerCase()) : undefined;
+      if (serviceName && !service) throw new Error(`Unknown Service "${serviceName}"`);
+
+      const assigneeEmail = cellText(estFieldColumns.assigneeEmail);
+      const assigneeUser = assigneeEmail
+        ? await prisma.user.findFirst({ where: { workEmail: { equals: assigneeEmail, mode: "insensitive" }, status: "ACTIVE" } })
+        : null;
+      if (assigneeEmail && !assigneeUser) throw new Error(`Assignee email "${assigneeEmail}" not found or not an active user`);
+
+      const task = await createTask(
+        {
+          boardId: board.id,
+          stageId: stage.id,
+          title,
+          description: cellText(estFieldColumns.description) || undefined,
+          priority,
+          customerId: customer?.id ?? null,
+          serviceId: service?.id,
+          assigneeUserIds: [assigneeUser?.id ?? actor.id],
+          startDate: parseExcelDate(cellText(estFieldColumns.startDate)),
+          dueDate: parseExcelDate(cellText(estFieldColumns.dueDate)),
+        },
+        actor
+      );
+
+      // createTask() auto-assigned a live-sequence estimation id (via
+      // ensureEstimationRecord) — overwrite it with the historical id this
+      // row actually carries.
+      const amountCell = cellText(estFieldColumns.amount);
+      const amount = amountCell ? Number(amountCell) : undefined;
+      await prisma.estimationRecord.update({
+        where: { taskId: task.id },
+        data: {
+          estimationId: estimationIdRaw,
+          ...(amount !== undefined && Number.isFinite(amount) ? { subtotal: amount, totalAmount: amount } : {}),
+        },
+      });
+
+      taskIdByEstimationId.set(estimationIdRaw, { taskId: task.id, title, serviceId: service?.id ?? null, customerId: customer?.id ?? null });
+      result.createdEstimations++;
+    } catch (err: any) {
+      result.skipped.push({ sheet: "Estimations", row: rowNumber, reason: err?.message ?? "Unknown error" });
+    }
+  }
+
+  // --- Awarded Projects tab: turns a "Converted" estimation into a real
+  // Project board, so it shows up correctly in Project/Task History. ---
+  if (projSheet) {
+    if (!scopeAtLeast(getPermissionScope(actor.permissions, PermissionKey.CREATE_BOARD), "OWN")) {
+      throw Errors.forbidden("You do not have permission to create Projects, so the Awarded Projects sheet can't be imported.");
+    }
+
+    const projFieldColumns = buildColumnLookup(projSheet.getRow(1).values as unknown[], AWARDED_PROJECT_IMPORT_COLUMN_ALIASES);
+    if (!projFieldColumns.estimationId || !projFieldColumns.projectId) {
+      throw Errors.badRequest('The Awarded Projects sheet must have "Estimation ID" and "Project ID" columns (row 1).');
+    }
+
+    for (let rowNumber = 2; rowNumber <= projSheet.rowCount; rowNumber++) {
+      const row = projSheet.getRow(rowNumber);
+      const cellText = (idx?: number) => (idx ? String(row.getCell(idx).value ?? "").trim() : "");
+      if (Object.values(projFieldColumns).every((idx) => !cellText(idx))) continue;
+
+      const estimationIdRaw = cellText(projFieldColumns.estimationId);
+      const projectIdRaw = cellText(projFieldColumns.projectId);
+      if (!estimationIdRaw || !projectIdRaw) {
+        result.skipped.push({ sheet: "Awarded Projects", row: rowNumber, reason: "Missing Estimation ID or Project ID" });
+        continue;
+      }
+
+      try {
+        const linkedEstimation = taskIdByEstimationId.get(estimationIdRaw);
+        if (!linkedEstimation) {
+          throw new Error(`Estimation ID "${estimationIdRaw}" wasn't found among the rows just imported from the Estimations sheet`);
+        }
+
+        const existingBoard = await prisma.board.findUnique({ where: { boardId: projectIdRaw } });
+        if (existingBoard) throw new Error(`Project ID "${projectIdRaw}" already exists`);
+
+        const statusRaw = cellText(projFieldColumns.status).toLowerCase();
+        const isCompleted = statusRaw === "completed";
+        if (statusRaw !== "completed" && statusRaw !== "in progress") {
+          throw new Error(`Unknown Project Status "${cellText(projFieldColumns.status)}" — must be In Progress or Completed`);
+        }
+
+        const approvalRaw = cellText(projFieldColumns.accountsApproval).toLowerCase();
+        const accountsApprovalStatus = approvalRaw === "rejected" ? "REJECTED" : "APPROVED";
+        if (approvalRaw !== "approved" && approvalRaw !== "rejected") {
+          throw new Error(`Unknown Accounts Approval "${cellText(projFieldColumns.accountsApproval)}" — must be Approved or Rejected`);
+        }
+
+        const completionDate = parseExcelDate(cellText(projFieldColumns.completionDate));
+        if (!completionDate) throw new Error("Missing or unreadable Completion Date");
+
+        await prisma.$transaction(async (tx) => {
+          const placeholderId = `TEMP-${Date.now()}-${Math.random()}`;
+          const created = await tx.board.create({
+            data: {
+              boardId: placeholderId,
+              name: linkedEstimation.title,
+              boardType: BoardType.STANDALONE,
+              serviceId: linkedEstimation.serviceId,
+              customerId: linkedEstimation.customerId,
+              isHighlighted: true,
+              isCompleted,
+              completedAt: isCompleted ? completionDate : null,
+              accountsApprovalStatus: accountsApprovalStatus as any,
+              accountsDecidedAt: completionDate,
+              createdById: actor.id,
+              stages: {
+                create: DEFAULT_STAGES.map((s, idx) => ({
+                  name: s.name,
+                  color: s.color,
+                  position: idx,
+                  isTerminal: (s as any).isTerminal ?? idx === DEFAULT_STAGES.length - 1,
+                })),
+              },
+              members: { create: [{ userId: actor.id, role: "OWNER" }] },
+            },
+            include: { stages: { orderBy: { position: "asc" } } },
+          });
+          const projectBoard = await tx.board.update({
+            where: { id: created.id },
+            data: { boardId: projectIdRaw },
+            include: { stages: { orderBy: { position: "asc" } } },
+          });
+
+          const targetStage = isCompleted ? projectBoard.stages[projectBoard.stages.length - 1] : projectBoard.stages[0];
+          await tx.task.update({
+            where: { id: linkedEstimation.taskId },
+            data: { boardId: projectBoard.id, stageId: targetStage.id, isCompleted, completedAt: isCompleted ? completionDate : null, version: { increment: 1 } },
+          });
+
+          const procurementYear = completionDate.getFullYear();
+          const procurementSequence = await nextYearlySequence("PROCUREMENT", procurementYear, tx);
+          await tx.procurementRecord.create({
+            data: { boardId: projectBoard.id, year: procurementYear, sequence: procurementSequence, procurementId: formatProcurementId(procurementYear, procurementSequence) },
+          });
+        });
+
+        result.createdProjects++;
+      } catch (err: any) {
+        result.skipped.push({ sheet: "Awarded Projects", row: rowNumber, reason: err?.message ?? "Unknown error" });
+      }
+    }
+  }
+
+  await writeAudit({
+    actor,
+    action: AuditAction.CREATE,
+    entityType: "Task",
+    boardId: board.id,
+    afterValue: { source: "excel-import-estimations", createdEstimations: result.createdEstimations, createdProjects: result.createdProjects, skipped: result.skipped.length },
   });
 
   return result;

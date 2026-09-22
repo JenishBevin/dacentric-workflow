@@ -384,6 +384,30 @@ export function useImportEnquiries() {
   });
 }
 
+export interface ImportEstimationsResult {
+  createdEstimations: number;
+  createdProjects: number;
+  skipped: Array<{ sheet: string; row: number; reason: string }>;
+}
+
+export function useImportEstimations() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return (await api.post<{ data: ImportEstimationsResult }>("/tasks/import-estimations", form, { headers: { "Content-Type": "multipart/form-data" } }))
+        .data.data;
+    },
+    onSuccess: () => {
+      invalidateTaskEverywhere(qc);
+      // Awarded rows create Project boards, which shifts each Service's
+      // project count on the Projects landing page.
+      qc.invalidateQueries({ queryKey: ["services"] });
+    },
+  });
+}
+
 export function useWatcherMutations(taskId: string) {
   const qc = useQueryClient();
   const invalidate = () => {

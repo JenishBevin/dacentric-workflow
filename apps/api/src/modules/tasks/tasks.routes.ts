@@ -74,6 +74,17 @@ tasksRouter.post(
   })
 );
 
+// Same reasoning as import-enquiries above — must come before "/:taskId".
+tasksRouter.post(
+  "/import-estimations",
+  requirePermission(PermissionKey.CREATE_TASK, "OWN"),
+  upload.single("file"),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw Errors.badRequest("No file was uploaded.");
+    return ok(res, await tasksService.importEstimationsFromExcel(req.file.buffer, req.user!));
+  })
+);
+
 // NOTE: must be registered before the generic "/:taskId" GET route below,
 // otherwise Express would treat "search" as a taskId path param.
 // Scoped by visibleBoardsWhere (Business Rule 16 / Section 36) — a task on

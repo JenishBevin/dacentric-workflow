@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload, Trello, PackageSearch, Building2, Landmark } from "lucide-react";
 import { useBoardDetail, useReorderStages, useSetBoardCompleted } from "../../api/boards";
-import { useBoardTasks, useDuplicateTask, useDeleteTask, useImportEnquiries } from "../../api/tasks";
+import { useBoardTasks, useDuplicateTask, useDeleteTask, useImportEnquiries, useImportEstimations } from "../../api/tasks";
 import { downloadExport } from "../../api/misc";
 import { KanbanToolbar } from "../../components/kanban/KanbanToolbar";
 import { KanbanBoard } from "../../components/kanban/KanbanBoard";
@@ -94,7 +94,9 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   const deleteTask = useDeleteTask();
   const setBoardCompleted = useSetBoardCompleted();
   const importEnquiries = useImportEnquiries();
+  const importEstimations = useImportEstimations();
   const importFileInputRef = useRef<HTMLInputElement>(null);
+  const isEstimationBoard = board?.name === "Estimation";
 
   async function handleImportEnquiriesFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -108,6 +110,25 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         description: result.skipped.length ? `${result.skipped.length} row(s) skipped — see console for details.` : undefined,
       });
       if (result.skipped.length) console.warn("Enquiry import — skipped rows:", result.skipped);
+    } catch (err) {
+      push({ variant: "error", title: "Import failed", description: extractApiError(err).message });
+    }
+  }
+
+  async function handleImportEstimationsFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const result = await importEstimations.mutateAsync(file);
+      const parts = [`${result.createdEstimations} estimation${result.createdEstimations === 1 ? "" : "s"}`];
+      if (result.createdProjects) parts.push(`${result.createdProjects} awarded project${result.createdProjects === 1 ? "" : "s"}`);
+      push({
+        variant: "success",
+        title: `Imported ${parts.join(" and ")}.`,
+        description: result.skipped.length ? `${result.skipped.length} row(s) skipped — see console for details.` : undefined,
+      });
+      if (result.skipped.length) console.warn("Estimation import — skipped rows:", result.skipped);
     } catch (err) {
       push({ variant: "error", title: "Import failed", description: extractApiError(err).message });
     }
@@ -280,6 +301,14 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
             <>
               <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportEnquiriesFile} />
               <Button variant="outline" onClick={() => importFileInputRef.current?.click()} loading={importEnquiries.isPending}>
+                <Upload className="h-4 w-4" /> Import from Excel
+              </Button>
+            </>
+          )}
+          {panelView === "project" && canCreateTask && !board.isArchived && isEstimationBoard && (
+            <>
+              <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportEstimationsFile} />
+              <Button variant="outline" onClick={() => importFileInputRef.current?.click()} loading={importEstimations.isPending}>
                 <Upload className="h-4 w-4" /> Import from Excel
               </Button>
             </>
