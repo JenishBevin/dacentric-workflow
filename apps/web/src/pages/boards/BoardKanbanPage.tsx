@@ -354,28 +354,34 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         canExport={canExport}
       />
 
-      {tasksLoading ? (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {stages.map((s) => (
-            <Skeleton key={s.id} className="h-96 w-72 shrink-0" />
-          ))}
-        </div>
-      ) : stages.length === 0 ? (
-        <ErrorState message="This project has no stages yet. Add one from Project Settings." onRetry={() => openSettings("stages")} />
-      ) : view === "list" ? (
-        <TaskListView stages={stages} tasksByStage={tasksByStage} onOpenTask={(task) => openTask(task.id)} />
-      ) : (
-        <KanbanBoard
-          stages={stages}
-          tasksByStage={tasksByStage}
-          onAddTask={(stageId) => { setRecurringPrefill(null); setNewTaskStageId(stageId); }}
-          onOpenTask={(task) => openTask(task.id)}
-          onTaskMenuAction={handleTaskMenuAction}
-          onStageMenuAction={handleStageMenuAction}
-          canManageStages={canManageBoard}
-          canMoveTasks={canMoveTasks}
-        />
-      )}
+      {/* min-h-0 lets this flex-1 box actually shrink to the space left after
+          the toolbar above, instead of growing with its content — that's
+          what keeps the Kanban row's horizontal scrollbar on screen instead
+          of sinking below the fold on a tall board. */}
+      <div className="min-h-0 flex-1">
+        {tasksLoading ? (
+          <div className="flex h-full gap-4 overflow-x-auto pb-4">
+            {stages.map((s) => (
+              <Skeleton key={s.id} className="h-96 w-72 shrink-0" />
+            ))}
+          </div>
+        ) : stages.length === 0 ? (
+          <ErrorState message="This project has no stages yet. Add one from Project Settings." onRetry={() => openSettings("stages")} />
+        ) : view === "list" ? (
+          <TaskListView stages={stages} tasksByStage={tasksByStage} onOpenTask={(task) => openTask(task.id)} />
+        ) : (
+          <KanbanBoard
+            stages={stages}
+            tasksByStage={tasksByStage}
+            onAddTask={(stageId) => { setRecurringPrefill(null); setNewTaskStageId(stageId); }}
+            onOpenTask={(task) => openTask(task.id)}
+            onTaskMenuAction={handleTaskMenuAction}
+            onStageMenuAction={handleStageMenuAction}
+            canManageStages={canManageBoard}
+            canMoveTasks={canMoveTasks}
+          />
+        )}
+      </div>
 
       {canManageBoard && board.name !== "Enquiry List" && board.name !== "Estimation" && board.name !== "Accounts" && !board.isCompleted && (
         <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">

@@ -43,7 +43,14 @@ export const AppLayout: React.FC = () => {
             page's last row — e.g. Audit Trail's pagination — never ends up
             hidden underneath it. */}
         <main className="flex-1 overflow-y-auto pb-16 sm:pb-20">
-          <div className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6">
+          {/* flex h-full flex-col: lets a page (e.g. a Kanban board) opt into
+              filling exactly the remaining viewport height and scrolling
+              internally, so its own horizontal scrollbar stays on screen
+              instead of sinking to the bottom of unbounded tall content.
+              A page that doesn't opt in (no h-full/flex-1 of its own) is
+              unaffected — it still just sizes to its content and this <main>
+              scrolls as before. */}
+          <div className="mx-auto flex h-full max-w-[1600px] flex-col px-4 py-5 sm:px-6">
             {/* Local Suspense boundary: only the page content re-suspends on
                 route change, so the sidebar/header never unmount-and-flash. */}
             <Suspense fallback={<ContentFallback />}>
