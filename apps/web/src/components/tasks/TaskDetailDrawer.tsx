@@ -342,12 +342,39 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
         task && (
           <div className="flex w-full items-center justify-between">
             <div className="flex gap-2">
-              {(task.board?.name === "Enquiry List" || task.board?.name === "Estimation" || task.board?.name === "Accounts") &&
-                task.stage?.name?.toLowerCase() !== "lost" &&
-                task.stage?.name?.toLowerCase() !== "rejected" &&
-                !(task.board?.name === "Estimation" && task.stage?.name?.toLowerCase() === "new") && (
+              {/* Enquiry List: Qualified is available any time before the enquiry
+                  is dragged into Lost — New excluded, per Section design. */}
+              {task.board?.name === "Enquiry List" &&
+                task.stage?.name?.toLowerCase() !== "new" &&
+                task.stage?.name?.toLowerCase() !== "lost" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={awardTask.isPending}
+                  onClick={async () => {
+                    try {
+                      const result = await awardTask.mutateAsync(task.id);
+                      if (result.kind === "moved-to-estimation") {
+                        push({ variant: "success", title: "Qualified — moved to Estimation.", description: result.name });
+                        onClose();
+                        navigate(`/workflow/estimation`);
+                      }
+                    } catch (err) {
+                      push({ variant: "error", title: "Could not award", description: extractApiError(err).message });
+                    }
+                  }}
+                >
+                  <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Qualified
+                </Button>
+              )}
+
+              {/* Enquiry List: Lost — and its Management approval — only ever
+                  shows once the card is actually sitting in the Lost column
+                  (dragged there on the Kanban board). Requesting approval from
+                  here; a reject sends it back to whichever stage it came from. */}
+              {task.board?.name === "Enquiry List" && task.stage?.name?.toLowerCase() === "lost" && (
                 <>
-                  {task.board?.name === "Enquiry List" && task.lostApprovalStatus === "PENDING_APPROVAL" ? (
+                  {task.lostApprovalStatus === "PENDING_APPROVAL" ? (
                     can(user, "APPROVE_TASK", "ALL") || isAdmin(user) ? (
                       <>
                         <Button
@@ -374,94 +401,88 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                       <Badge tone="amber">Pending Lost approval</Badge>
                     )
                   ) : (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        loading={awardTask.isPending}
-                        onClick={async () => {
-                          try {
-                            const result = await awardTask.mutateAsync(task.id);
-                            if (result.kind === "moved-to-estimation") {
-                              push({ variant: "success", title: "Qualified — moved to Estimation.", description: result.name });
-                              onClose();
-                              navigate(`/workflow/estimation`);
-                            } else if (result.kind === "project-created-pending-approval") {
-                              push({
-                                variant: "success",
-                                title: "Awarded — sent to Accounts, Procurement, and the Project team.",
-                                description: `${result.name} is now waiting on Accounts sign-off.`,
-                              });
-                              onClose();
-                              navigate(`/workflow/boards/${result.id}`);
-                            } else {
-                              push({ variant: "success", title: "Approved — project and procurement created.", description: result.name });
-                              onClose();
-                              navigate(`/workflow/boards/${result.id}`);
-                            }
-                          } catch (err) {
-                            push({
-                              variant: "error",
-                              title: task.board?.name === "Accounts" ? "Could not approve" : "Could not award",
-                              description: extractApiError(err).message,
-                            });
-                          }
-                        }}
-                      >
-                        {task.board?.name === "Accounts" ? (
-                          <>
-                            <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Approve
-                          </>
-                        ) : task.board?.name === "Estimation" ? (
-                          <>
-                            <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Awarded
-                          </>
-                        ) : (
-                          <>
-                            <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Qualified
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        loading={markTaskLost.isPending}
-                        onClick={async () => {
-                          // Enquiry List needs a reason up front — it's what
-                          // Management reviews when deciding. Accounts also
-                          // needs a reason, recorded directly (no approval
-                          // chain of its own — Accounts sign-off IS the
-                          // approval). Every other board moves straight to
-                          // Lost.
-                          if (task.board?.name === "Enquiry List") {
-                            setLostRequestOpen(true);
-                            return;
-                          }
-                          if (task.board?.name === "Accounts") {
-                            setAccountsRejectOpen(true);
-                            return;
-                          }
-                          try {
-                            await markTaskLost.mutateAsync({ taskId: task.id });
-                            push({ variant: "success", title: "Marked as Lost.", description: "Moved to Project/Task History." });
-                            onClose();
-                          } catch (err) {
-                            push({ variant: "error", title: "Could not mark as Lost", description: extractApiError(err).message });
-                          }
-                        }}
-                      >
-                        {task.board?.name === "Accounts" ? (
-                          <>
-                            <XIcon className="h-3.5 w-3.5 text-red-500" /> Reject
-                          </>
-                        ) : (
-                          <>
-                            <ThumbsDown className="h-3.5 w-3.5 text-red-500" /> Lost
-                          </>
-                        )}
-                      </Button>
-                    </>
+                    <Button variant="outline" size="sm" loading={markTaskLost.isPending} onClick={() => setLostRequestOpen(true)}>
+                      <ThumbsDown className="h-3.5 w-3.5 text-red-500" /> Lost
+                    </Button>
                   )}
+                </>
+              )}
+
+              {(task.board?.name === "Estimation" || task.board?.name === "Accounts") &&
+                task.stage?.name?.toLowerCase() !== "lost" &&
+                task.stage?.name?.toLowerCase() !== "rejected" &&
+                !(task.board?.name === "Estimation" && task.stage?.name?.toLowerCase() === "new") && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={awardTask.isPending}
+                    onClick={async () => {
+                      try {
+                        const result = await awardTask.mutateAsync(task.id);
+                        if (result.kind === "project-created-pending-approval") {
+                          push({
+                            variant: "success",
+                            title: "Awarded — sent to Accounts, Procurement, and the Project team.",
+                            description: `${result.name} is now waiting on Accounts sign-off.`,
+                          });
+                          onClose();
+                          navigate(`/workflow/boards/${result.id}`);
+                        } else if (result.kind === "project-created") {
+                          push({ variant: "success", title: "Approved — project and procurement created.", description: result.name });
+                          onClose();
+                          navigate(`/workflow/boards/${result.id}`);
+                        }
+                      } catch (err) {
+                        push({
+                          variant: "error",
+                          title: task.board?.name === "Accounts" ? "Could not approve" : "Could not award",
+                          description: extractApiError(err).message,
+                        });
+                      }
+                    }}
+                  >
+                    {task.board?.name === "Accounts" ? (
+                      <>
+                        <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Approve
+                      </>
+                    ) : (
+                      <>
+                        <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Awarded
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={markTaskLost.isPending}
+                    onClick={async () => {
+                      // Accounts needs a reason up front, recorded directly (no
+                      // approval chain of its own — Accounts sign-off IS the
+                      // approval). Estimation moves straight to Lost.
+                      if (task.board?.name === "Accounts") {
+                        setAccountsRejectOpen(true);
+                        return;
+                      }
+                      try {
+                        await markTaskLost.mutateAsync({ taskId: task.id });
+                        push({ variant: "success", title: "Marked as Lost.", description: "Moved to Project/Task History." });
+                        onClose();
+                      } catch (err) {
+                        push({ variant: "error", title: "Could not mark as Lost", description: extractApiError(err).message });
+                      }
+                    }}
+                  >
+                    {task.board?.name === "Accounts" ? (
+                      <>
+                        <XIcon className="h-3.5 w-3.5 text-red-500" /> Reject
+                      </>
+                    ) : (
+                      <>
+                        <ThumbsDown className="h-3.5 w-3.5 text-red-500" /> Lost
+                      </>
+                    )}
+                  </Button>
                 </>
               )}
               <Button

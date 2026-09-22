@@ -961,16 +961,23 @@ async function findLostApproverIds(): Promise<string[]> {
   return users.map((u) => u.id);
 }
 
-/** The "Lost" action on an Enquiry List task — instead of moving it
- *  immediately, this flags it as awaiting Management's sign-off; the task
- *  only actually lands on the "Lost" stage once decideLost() approves it.
- *  Every other board's Lost button still calls markTaskLost() directly. */
+/** The "Lost" action on an Enquiry List task — dragging the card onto the
+ *  board's "Lost" column moves it there immediately (same as any other
+ *  stage move); this call, only offered once it's actually sitting there,
+ *  flags it as awaiting Management's sign-off. Approving it just confirms
+ *  it in place; rejecting sends it back to whichever stage it came from
+ *  (see decideLost()). Every other board's Lost button still calls
+ *  markTaskLost() directly. */
 export async function requestLostApproval(taskId: string, reason: string | undefined, actor: AuthedUser) {
   const ctx = await loadTaskWithAccess(taskId, actor);
   assertCanEditTask(ctx);
 
   if (ctx.task.board?.name !== "Enquiry List") {
     return markTaskLost(taskId, actor);
+  }
+
+  if (ctx.task.stage?.name?.toLowerCase() !== "lost") {
+    throw Errors.badRequest('This enquiry must be moved to the "Lost" stage before a Lost approval can be requested.');
   }
 
   if (ctx.task.lostApprovalStatus === TaskApprovalStatus.PENDING_APPROVAL) {
@@ -1007,10 +1014,11 @@ export async function requestLostApproval(taskId: string, reason: string | undef
   return serializeTask(updated);
 }
 
-/** Management's decision on a pending Lost request — approving moves the
- *  task to the Lost stage (via markTaskLost, so it shows up in Project/Task
- *  History exactly like any other Lost enquiry); rejecting just clears the
- *  pending flag and leaves the task where it was. */
+/** Management's decision on a pending Lost request — the task is already
+ *  sitting in the Lost stage by this point (dragged there before the
+ *  request was raised), so approving just confirms it in place; rejecting
+ *  sends it back to whichever stage it came from (restoreStageId, captured
+ *  by moveTask when it entered Lost — same mechanism restoreTask() uses). */
 export async function decideLost(taskId: string, approve: boolean, actor: AuthedUser, reason?: string) {
   const ctx = await loadTaskWithAccess(taskId, actor);
 
@@ -1024,9 +1032,28 @@ export async function decideLost(taskId: string, approve: boolean, actor: Authed
   const assigneeIds = ctx.task.assignees.map((a) => a.userId);
 
   if (!approve) {
+    let restoreStage = ctx.task.restoreStageId
+      ? await prisma.boardStage.findFirst({ where: { id: ctx.task.restoreStageId, boardId: ctx.task.boardId } })
+      : null;
+    if (!restoreStage) {
+      restoreStage = await prisma.boardStage.findFirst({
+        where: { boardId: ctx.task.boardId, isTerminal: false, NOT: { name: { equals: "Lost", mode: "insensitive" } } },
+        orderBy: { position: "asc" },
+      });
+    }
+    if (!restoreStage) throw Errors.badRequest("This board has no earlier stage to send this enquiry back to.");
+
     const updated = await prisma.task.update({
       where: { id: taskId },
-      data: { lostApprovalStatus: TaskApprovalStatus.NONE, lostReason: null, version: { increment: 1 } },
+      data: {
+        stageId: restoreStage.id,
+        isCompleted: false,
+        completedAt: null,
+        restoreStageId: null,
+        lostApprovalStatus: TaskApprovalStatus.NONE,
+        lostReason: null,
+        version: { increment: 1 },
+      },
       include: TASK_DETAIL_INCLUDE as any,
     });
 
@@ -1039,6 +1066,8 @@ export async function decideLost(taskId: string, approve: boolean, actor: Authed
       field: "lostApprovalStatus",
       afterValue: reason ? `rejected: ${reason}` : "rejected",
     });
+
+    await recordStatusHistory(taskId, restoreStage.name, actor, "Lost request rejected");
 
     await notifyMany(assigneeIds, {
       event: NotificationEvent.APPROVAL_REJECTED,
