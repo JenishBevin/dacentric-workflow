@@ -172,8 +172,8 @@ tasksRouter.put(
 );
 
 // The "Lost" action on an enquiry, the counterpart to "Qualified"/"Awarded".
-// On Enquiry List this only requests Management's sign-off (see the two
-// routes below); every other board still moves straight to "Lost".
+// On Enquiry List and Estimation this only requests Management's sign-off
+// (see the two routes below); every other board still moves straight to "Lost".
 tasksRouter.post(
   "/:taskId/lost",
   requirePermission(PermissionKey.MOVE_TASK, "OWN"),

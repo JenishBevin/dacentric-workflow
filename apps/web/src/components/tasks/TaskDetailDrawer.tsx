@@ -368,11 +368,13 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                 </Button>
               )}
 
-              {/* Enquiry List: Lost — and its Management approval — only ever
-                  shows once the card is actually sitting in the Lost column
-                  (dragged there on the Kanban board). Requesting approval from
-                  here; a reject sends it back to whichever stage it came from. */}
-              {task.board?.name === "Enquiry List" && task.stage?.name?.toLowerCase() === "lost" && (
+              {/* Enquiry List and Estimation: Lost — and its Management
+                  approval — only ever shows once the card is actually sitting
+                  in the Lost column (dragged, or moved via the Stage picker).
+                  Requesting approval from here; a reject sends it back to
+                  whichever stage it came from. */}
+              {(task.board?.name === "Enquiry List" || task.board?.name === "Estimation") &&
+                task.stage?.name?.trim().toLowerCase() === "lost" && (
                 <>
                   {task.lostApprovalStatus === "PENDING_APPROVAL" ? (
                     can(user, "APPROVE_TASK", "ALL") || isAdmin(user) ? (
@@ -473,37 +475,17 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
                       )}
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={markTaskLost.isPending}
-                    onClick={async () => {
-                      // Accounts needs a reason up front, recorded directly (no
-                      // approval chain of its own — Accounts sign-off IS the
-                      // approval). Estimation moves straight to Lost.
-                      if (task.board?.name === "Accounts") {
-                        setAccountsRejectOpen(true);
-                        return;
-                      }
-                      try {
-                        await markTaskLost.mutateAsync({ taskId: task.id });
-                        push({ variant: "success", title: "Marked as Lost.", description: "Moved to Project/Task History." });
-                        onClose();
-                      } catch (err) {
-                        push({ variant: "error", title: "Could not mark as Lost", description: extractApiError(err).message });
-                      }
-                    }}
-                  >
-                    {task.board?.name === "Accounts" ? (
-                      <>
-                        <XIcon className="h-3.5 w-3.5 text-red-500" /> Reject
-                      </>
-                    ) : (
-                      <>
-                        <ThumbsDown className="h-3.5 w-3.5 text-red-500" /> Lost
-                      </>
-                    )}
-                  </Button>
+                  {/* Accounts needs a reason up front, recorded directly (no
+                      approval chain of its own — Accounts sign-off IS the
+                      approval). Estimation's Lost now goes through the same
+                      Management-approval gate as Enquiry List — moving the
+                      Stage picker to "Lost" surfaces that block above, so
+                      there's no direct one-click Lost action here anymore. */}
+                  {task.board?.name === "Accounts" && (
+                    <Button variant="outline" size="sm" onClick={() => setAccountsRejectOpen(true)}>
+                      <XIcon className="h-3.5 w-3.5 text-red-500" /> Reject
+                    </Button>
+                  )}
                 </>
               )}
               <Button
@@ -932,13 +914,13 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted }
           setLostRequestReason("");
         }}
         title="Mark as Lost"
-        description="A reason is required — this goes to Management for approval before the enquiry actually moves to Lost."
+        description="A reason is required — this goes to Management for approval before the task actually moves to Lost."
       >
         <textarea
           rows={3}
           value={lostRequestReason}
           onChange={(e) => setLostRequestReason(e.target.value)}
-          placeholder="Why is this enquiry Lost?"
+          placeholder="Why is this Lost?"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-visible:focus-ring"
         />
         <div className="mt-3 flex justify-end gap-2">

@@ -961,30 +961,33 @@ async function findLostApproverIds(): Promise<string[]> {
   return users.map((u) => u.id);
 }
 
-/** The "Lost" action on an Enquiry List task — dragging the card onto the
- *  board's "Lost" column moves it there immediately (same as any other
- *  stage move); this call, only offered once it's actually sitting there,
- *  flags it as awaiting Management's sign-off. Approving it just confirms
- *  it in place; rejecting sends it back to whichever stage it came from
- *  (see decideLost()). Every other board's Lost button still calls
- *  markTaskLost() directly. */
+// Both pipeline boards gate Lost behind Management's sign-off — every other
+// board's Lost button still calls markTaskLost() directly.
+const LOST_APPROVAL_GATED_BOARDS = ["Enquiry List", "Estimation"];
+
+/** The "Lost" action on an Enquiry List or Estimation task — dragging the
+ *  card onto the board's "Lost" column moves it there immediately (same as
+ *  any other stage move); this call, only offered once it's actually
+ *  sitting there, flags it as awaiting Management's sign-off. Approving it
+ *  just confirms it in place; rejecting sends it back to whichever stage it
+ *  came from (see decideLost()). */
 export async function requestLostApproval(taskId: string, reason: string | undefined, actor: AuthedUser) {
   const ctx = await loadTaskWithAccess(taskId, actor);
   assertCanEditTask(ctx);
 
-  if (ctx.task.board?.name !== "Enquiry List") {
+  if (!ctx.task.board?.name || !LOST_APPROVAL_GATED_BOARDS.includes(ctx.task.board.name)) {
     return markTaskLost(taskId, actor);
   }
 
-  if (ctx.task.stage?.name?.toLowerCase() !== "lost") {
-    throw Errors.badRequest('This enquiry must be moved to the "Lost" stage before a Lost approval can be requested.');
+  if (ctx.task.stage?.name?.trim().toLowerCase() !== "lost") {
+    throw Errors.badRequest('This task must be moved to the "Lost" stage before a Lost approval can be requested.');
   }
 
   if (ctx.task.lostApprovalStatus === TaskApprovalStatus.PENDING_APPROVAL) {
     throw Errors.conflict("A Lost approval request is already pending for this task.");
   }
   if (!reason?.trim()) {
-    throw Errors.badRequest("A reason is required to request this enquiry be marked Lost.");
+    throw Errors.badRequest("A reason is required to request this task be marked Lost.");
   }
 
   const updated = await prisma.task.update({
