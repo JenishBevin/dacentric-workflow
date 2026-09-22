@@ -1448,8 +1448,14 @@ export async function importEstimationsFromExcel(buffer: Buffer, actor: AuthedUs
       if (existingRecord) throw new Error(`Estimation ID "${estimationIdRaw}" already exists`);
 
       const stageName = cellText(estFieldColumns.stage) || "New";
-      const stage = board.stages.find((s) => s.name.toLowerCase() === stageName.toLowerCase());
-      if (!stage) throw new Error(`Unknown Stage "${stageName}" — must be New, In Progress, Converted, or Lost`);
+      // Board stage names can carry stray whitespace from being renamed via
+      // Configure Stages (e.g. "In Progress " with a trailing space) — match
+      // on the trimmed name so an otherwise-correct sheet doesn't silently
+      // fail every row on that stage.
+      const stage = board.stages.find((s) => s.name.trim().toLowerCase() === stageName.trim().toLowerCase());
+      if (!stage) {
+        throw new Error(`Unknown Stage "${stageName}" — must match one of this board's actual stages: ${board.stages.map((s) => s.name.trim()).join(", ")}`);
+      }
 
       const priorityRaw = cellText(estFieldColumns.priority).toUpperCase();
       const priority = (Object.values(TaskPriority) as string[]).includes(priorityRaw) ? priorityRaw : TaskPriority.MEDIUM;
