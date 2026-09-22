@@ -383,7 +383,12 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         )}
       </div>
 
-      {canManageBoard && board.name !== "Enquiry List" && board.name !== "Estimation" && board.name !== "Accounts" && !board.isCompleted && (
+      {canManageBoard &&
+        board.name !== "Enquiry List" &&
+        board.name !== "Estimation" &&
+        board.name !== "Accounts" &&
+        !board.isCompleted &&
+        board.accountsApprovalStatus !== "REJECTED" && (
         <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
           <p className="text-xs text-slate-500">Once every task on this project is done, mark it Completed to move it into Project/Task History.</p>
           <Button variant="outline" size="sm" onClick={() => setConfirmComplete(true)}>

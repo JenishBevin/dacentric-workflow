@@ -7,9 +7,10 @@ import { useRestoreTask } from "../api/tasks";
 import { useSetBoardCompleted } from "../api/boards";
 import { downloadExport } from "../api/misc";
 import { Select, Button, Skeleton, ErrorState, EmptyState, Badge, Label } from "../components/ui/primitives";
-import { Drawer } from "../components/ui/Drawer";
+import { Modal } from "../components/ui/Modal";
 import { TaskDetailDrawer } from "../components/tasks/TaskDetailDrawer";
-import BoardKanbanPage from "./boards/BoardKanbanPage";
+import { useBoardDetail } from "../api/boards";
+import { useBoardTasks } from "../api/tasks";
 import { useToast } from "../context/ToastContext";
 import { extractApiError } from "../lib/apiClient";
 import clsx from "clsx";
@@ -38,8 +39,8 @@ export default function HistoryPage() {
   const [status, setStatus] = useState("");
   // A history row is a closed chapter — it no longer shows up on the live
   // Projects/Estimation/Enquiries pages, so opening one navigates nowhere;
-  // it just pops up a read-only view right here instead.
-  const [openProject, setOpenProject] = useState<{ id: string; name: string } | null>(null);
+  // it just pops up a read-only summary right here instead.
+  const [openProjectId, setOpenProjectId] = useState<string | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [preset, setPreset] = useState<DatePreset>(null);
   const [customFrom, setCustomFrom] = useState("");
@@ -102,7 +103,7 @@ export default function HistoryPage() {
   }, [highlightId, rows]);
 
   function openRow(r: any) {
-    if (r.kind === "PROJECT") setOpenProject({ id: r.id, name: r.name });
+    if (r.kind === "PROJECT") setOpenProjectId(r.id);
     else setOpenTaskId(r.id);
   }
 
@@ -255,9 +256,65 @@ export default function HistoryPage() {
 
       {openTaskId && <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
 
-      <Drawer open={!!openProject} onClose={() => setOpenProject(null)} title={openProject?.name ?? "Project"} widthClassName="w-full lg:w-[92vw]">
-        {openProject && <BoardKanbanPage boardId={openProject.id} />}
-      </Drawer>
+      {openProjectId && <HistoryProjectSummary boardId={openProjectId} onClose={() => setOpenProjectId(null)} />}
     </div>
+  );
+}
+
+/** Read-only project summary for a History row — deliberately not the live
+ * BoardKanbanPage (no edit affordances, no "Mark as Completed", no
+ * Procurement toggle that would navigate away): this project's chapter is
+ * already closed, so this just shows what it was, task list included. */
+function HistoryProjectSummary({ boardId, onClose }: { boardId: string; onClose: () => void }) {
+  const { data: board, isLoading, isError } = useBoardDetail(boardId);
+  const { data: tasks } = useBoardTasks(boardId);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+
+  const isLost = board?.accountsApprovalStatus === "REJECTED";
+  const status = isLost ? "Lost" : board?.isCompleted ? "Completed" : "In Progress";
+  const statusTone = isLost ? "red" : board?.isCompleted ? "green" : "amber";
+
+  return (
+    <Modal open onClose={onClose} title={board?.name ?? "Project"} size="lg">
+      {isLoading && <Skeleton className="h-48 w-full" />}
+      {isError && <ErrorState message="Could not load this project." />}
+      {board && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-400">{board.boardId}</span>
+            <Badge tone={statusTone as any}>{status}</Badge>
+            {board.service?.name && <Badge tone="slate">{board.service.name}</Badge>}
+          </div>
+          {board.customer && (
+            <p className="text-sm text-slate-600">
+              Customer: <span className="font-medium text-slate-800">{board.customer.name}</span>{" "}
+              <span className="text-slate-400">· {board.customer.customerId}</span>
+            </p>
+          )}
+
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-slate-700">Tasks ({tasks?.length ?? 0})</p>
+            <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-slate-200">
+              {(tasks ?? []).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setOpenTaskId(t.id)}
+                  className="flex w-full items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 text-left text-sm last:border-0 hover:bg-slate-50"
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    <span className="mr-1.5 text-xs text-slate-400">{t.taskId}</span>
+                    {t.title}
+                  </span>
+                  <Badge tone="slate">{t.stage?.name}</Badge>
+                </button>
+              ))}
+              {(tasks ?? []).length === 0 && <p className="px-3 py-6 text-center text-xs text-slate-400">No tasks on this project.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openTaskId && <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
+    </Modal>
   );
 }
