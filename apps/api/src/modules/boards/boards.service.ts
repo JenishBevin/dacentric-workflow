@@ -758,6 +758,9 @@ export async function listProcurementBoards(user: AuthedUser, search?: string) {
       // and move to Project/Task History as Lost — they stop showing up as
       // active procurement work here, though the record itself is kept.
       isArchived: false,
+      // Completed projects move to Project/Task History too, same as
+      // listBoards()'s own Projects view — this list is active work only.
+      isCompleted: false,
       procurementRecord: { isNot: null },
       ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
     },
