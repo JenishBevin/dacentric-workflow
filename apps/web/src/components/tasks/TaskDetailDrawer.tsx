@@ -29,7 +29,7 @@ import { useToast } from "../../context/ToastContext";
 import { can, isAdmin, canSeeSecretAttachments } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt, Plus } from "lucide-react";
+import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt, Plus, PauseCircle } from "lucide-react";
 import { format } from "date-fns";
 import clsx from "clsx";
 import { useCustomerDetail } from "../../api/customers";
@@ -422,6 +422,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
               {(task.board?.name === "Estimation" || task.board?.name === "Accounts") &&
                 task.stage?.name?.toLowerCase() !== "lost" &&
                 task.stage?.name?.toLowerCase() !== "rejected" &&
+                task.stage?.name?.trim().toLowerCase() !== "hold" &&
                 !(task.board?.name === "Estimation" && task.stage?.name?.toLowerCase() === "new") && (
                 <>
                   {task.board?.name === "Estimation" && task.stage?.name?.trim().toLowerCase() === "in progress" ? (
@@ -484,6 +485,25 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
                       )}
                     </Button>
                   )}
+                  {/* Submitted can also be parked on Hold instead of moving
+                      forward — pauses it without touching Lost/Awarded. */}
+                  {task.board?.name === "Estimation" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      loading={moveTask.isPending}
+                      onClick={async () => {
+                        const holdStage = stages.find((s: any) => s.name.trim().toLowerCase() === "hold");
+                        if (!holdStage) {
+                          push({ variant: "error", title: 'No "Hold" stage found on this board.' });
+                          return;
+                        }
+                        await performMove(holdStage.id);
+                      }}
+                    >
+                      <PauseCircle className="h-3.5 w-3.5 text-amber-600" /> Hold
+                    </Button>
+                  )}
                   {/* Accounts needs a reason up front, recorded directly (no
                       approval chain of its own — Accounts sign-off IS the
                       approval). Estimation's Lost now goes through the same
@@ -496,6 +516,26 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
                     </Button>
                   )}
                 </>
+              )}
+
+              {/* Hold is a dead end except back to Submitted — no Awarded,
+                  no Lost, nothing else, while it's parked. */}
+              {task.board?.name === "Estimation" && task.stage?.name?.trim().toLowerCase() === "hold" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={moveTask.isPending}
+                  onClick={async () => {
+                    const submittedStage = stages.find((s: any) => s.name.trim().toLowerCase() === "submitted");
+                    if (!submittedStage) {
+                      push({ variant: "error", title: 'No "Submitted" stage found on this board.' });
+                      return;
+                    }
+                    await performMove(submittedStage.id);
+                  }}
+                >
+                  <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Back to Submit
+                </Button>
               )}
               </>
               )}
