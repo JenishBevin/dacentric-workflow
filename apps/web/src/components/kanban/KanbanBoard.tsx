@@ -73,7 +73,7 @@ export const KanbanBoard: React.FC<Props> = ({ stages, tasksByStage, onAddTask, 
   return (
     <>
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex h-full gap-4 overflow-x-auto pb-4">
+        <div className="flex gap-4 overflow-x-auto pb-4">
           {stages.map((stage) => (
             <StageColumn
               key={stage.id}

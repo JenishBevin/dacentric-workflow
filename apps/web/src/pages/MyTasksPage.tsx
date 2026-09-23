@@ -115,7 +115,7 @@ export default function MyTasksPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">My Tasks</h1>
@@ -176,33 +176,31 @@ export default function MyTasksPage() {
       )}
 
       {totalCount > 0 && view === "kanban" && (
-        <div className="min-h-0 flex-1">
-          <div className="flex h-full gap-4 overflow-x-auto pb-4">
-            {GROUP_ORDER.map(({ key, label, hint }) => {
-              const items: MyTaskItem[] = groups[key] ?? [];
-              return (
-                <div key={key} className="flex w-72 shrink-0 flex-col rounded-xl bg-slate-100/70">
-                  <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-                    <p className="text-sm font-semibold text-slate-800">{label}</p>
-                    <span className="text-xs text-slate-400">{items.length}</span>
-                  </div>
-                  <div className="flex min-h-[80px] flex-1 flex-col gap-2 overflow-y-auto p-3">
-                    {items.map((item) => (
-                      <button key={item.id} onClick={() => openTask(item.id)} className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm hover:shadow-md">
-                        <p className="text-[11px] font-medium text-slate-400">{item.taskId}</p>
-                        <p className="mt-0.5 line-clamp-2 text-sm font-medium text-slate-900">{item.title}</p>
-                        <div className="mt-2 flex items-center justify-between">
-                          <PriorityBadge priority={item.priority} />
-                          <DueDateBadge dueDate={item.dueDate} status={item.dueDateStatus} />
-                        </div>
-                      </button>
-                    ))}
-                    {items.length === 0 && <p className="py-6 text-center text-xs text-slate-400">{hint}</p>}
-                  </div>
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {GROUP_ORDER.map(({ key, label, hint }) => {
+            const items: MyTaskItem[] = groups[key] ?? [];
+            return (
+              <div key={key} className="flex w-72 shrink-0 flex-col rounded-xl bg-slate-100/70">
+                <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+                  <p className="text-sm font-semibold text-slate-800">{label}</p>
+                  <span className="text-xs text-slate-400">{items.length}</span>
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex min-h-[80px] flex-1 flex-col gap-2 overflow-y-auto p-3">
+                  {items.map((item) => (
+                    <button key={item.id} onClick={() => openTask(item.id)} className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm hover:shadow-md">
+                      <p className="text-[11px] font-medium text-slate-400">{item.taskId}</p>
+                      <p className="mt-0.5 line-clamp-2 text-sm font-medium text-slate-900">{item.title}</p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <PriorityBadge priority={item.priority} />
+                        <DueDateBadge dueDate={item.dueDate} status={item.dueDateStatus} />
+                      </div>
+                    </button>
+                  ))}
+                  {items.length === 0 && <p className="py-6 text-center text-xs text-slate-400">{hint}</p>}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
