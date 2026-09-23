@@ -176,7 +176,11 @@ export default function MyTasksPage() {
       )}
 
       {totalCount > 0 && view === "kanban" && (
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        // Self-contained viewport bound, same technique as the Estimation/
+        // Enquiry List Kanban board — 260px covers Header + page title +
+        // view toggle above this row (shorter than a project board's own
+        // toolbar), so it only clips in once columns would truly overflow.
+        <div className="flex max-h-[calc(100vh-260px)] gap-4 overflow-x-auto pb-4">
           {GROUP_ORDER.map(({ key, label, hint }) => {
             const items: MyTaskItem[] = groups[key] ?? [];
             return (

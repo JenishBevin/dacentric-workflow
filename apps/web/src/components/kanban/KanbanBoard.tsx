@@ -73,7 +73,15 @@ export const KanbanBoard: React.FC<Props> = ({ stages, tasksByStage, onAddTask, 
   return (
     <>
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        {/* Self-contained viewport bound (no ancestor height chain to break
+            other pages, unlike an earlier attempt at this) — 380px is a
+            generous allowance for Header + page title + toolbar above this
+            row, so on a short window the row simply renders shorter than
+            the cap (its natural height), and only once columns would truly
+            exceed the remaining space does this clip in and the row's own
+            horizontal scrollbar stays on-screen instead of sinking below
+            the fold. */}
+        <div className="flex max-h-[calc(100vh-380px)] gap-4 overflow-x-auto pb-4">
           {stages.map((stage) => (
             <StageColumn
               key={stage.id}
