@@ -411,13 +411,23 @@ export async function generateQuotationPdf(input: QuotationPdfInput, opts?: { pr
   y += 10;
 
   // --- Signature ---
-  ensureSpace(40);
+  // Stamp gets its own reserved block, stacked between "Thanks & Regards,"
+  // and the preparer's name/designation/mobile — not overlapping any text,
+  // top to bottom: "Thanks & Regards," -> stamp -> name -> designation -> mobile.
+  ensureSpace(60);
   doc.text("Thanks & Regards,", contentRight, y, { align: "right" });
-  // Extra clearance below "Thanks & Regards," (was 6mm) — the stamp below
-  // needs room to sit clear of this line entirely, not just the name line,
-  // regardless of which optional lines (designation/mobile) follow.
-  y += 14;
-  const nameY = y; // baseline of the preparer's name
+  y += 8;
+
+  const stampSize = 28; // mm — square, source asset is trimmed to a 1:1 aspect
+  const stampCenterX = contentRight - 20;
+  try {
+    const stampDataUrl = await toDataUrl(qplusStamp);
+    doc.addImage(stampDataUrl, "PNG", stampCenterX - stampSize / 2, y, stampSize, stampSize, undefined, "NONE");
+  } catch {
+    // Non-fatal — proceed without the stamp rather than blocking the download.
+  }
+  y += stampSize + 4;
+
   doc.text(input.preparerName, contentRight, y, { align: "right" });
   y += 4.8;
   if (input.preparerDesignation) {
@@ -427,19 +437,6 @@ export async function generateQuotationPdf(input: QuotationPdfInput, opts?: { pr
   if (input.preparerMobile) {
     doc.text(`Mob: ${input.preparerMobile}`, contentRight, y, { align: "right" });
     y += 4.8;
-  }
-
-  // Company stamp, centered just below the preparer's name — same as a
-  // physical seal stamped across a signature on a paper copy — but kept
-  // clear of "Thanks & Regards," above via the extra gap added above.
-  try {
-    const stampDataUrl = await toDataUrl(qplusStamp);
-    const stampSize = 28; // mm — square, source asset is trimmed to a 1:1 aspect
-    const stampCenterX = contentRight - 20;
-    const stampCenterY = nameY + 3;
-    doc.addImage(stampDataUrl, "PNG", stampCenterX - stampSize / 2, stampCenterY - stampSize / 2, stampSize, stampSize, undefined, "NONE");
-  } catch {
-    // Non-fatal — proceed without the stamp rather than blocking the download.
   }
 
   printFooter();
