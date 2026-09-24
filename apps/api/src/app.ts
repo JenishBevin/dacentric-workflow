@@ -29,6 +29,7 @@ import { chatRouter } from "./modules/chat/chat.routes";
 import { historyRouter } from "./modules/history/history.routes";
 import { claimsRouter } from "./modules/claims/claims.routes";
 import { customersRouter } from "./modules/customers/customers.routes";
+import { checklistTemplatesRouter } from "./modules/checklistTemplates/checklistTemplates.routes";
 import { backupRouter } from "./modules/backup/backup.routes";
 import { contactRouter } from "./modules/contact/contact.routes";
 
@@ -75,6 +76,7 @@ export function createApp() {
   app.use("/api/history", historyRouter);
   app.use("/api/claims", claimsRouter);
   app.use("/api/customers", customersRouter);
+  app.use("/api/checklist-templates", checklistTemplatesRouter);
   app.use("/api/backup", backupRouter);
   app.use("/api/contact", contactRouter);
 

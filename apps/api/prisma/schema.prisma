@@ -316,6 +316,19 @@ model BoardTemplate {
   boardsCreatedFrom Board[]
 }
 
+// A reusable checklist a user can save while creating a task (Enquiry List /
+// Estimation) and apply to later tasks via a "Use template" picker — distinct
+// from BoardTemplate.checklistTemplate above, which seeds a new *board's*
+// default tasks rather than being picked ad hoc while creating one task.
+model ChecklistTemplate {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  items       Json     // string[] of checklist item text
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // The fixed company service catalog (MEP, ELV, IT, ...). Every Project
 // (Board) optionally belongs to one Service; the "Projects" nav shows the
 // Service catalog first, then the projects filed under whichever one you pick.

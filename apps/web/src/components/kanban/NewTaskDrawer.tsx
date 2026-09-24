@@ -8,6 +8,7 @@ import { CustomerPicker } from "../customers/CustomerPicker";
 import { useCreateTask } from "../../api/tasks";
 import { useServices } from "../../api/boards";
 import { useTags, useLinkedRecordSearch } from "../../api/misc";
+import { useChecklistTemplates, useCreateChecklistTemplate } from "../../api/checklistTemplates";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
 import { Board, BoardStage, CustomerRef } from "../../lib/types";
@@ -59,6 +60,8 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
   const createTask = useCreateTask();
   const { data: allTags } = useTags();
   const { data: services } = useServices();
+  const { data: checklistTemplates } = useChecklistTemplates();
+  const createChecklistTemplate = useCreateChecklistTemplate();
   // Both pipeline boards need a Service selected up front — Enquiry List so
   // an eventual Award has one to hand off, Estimation because a task can be
   // created here directly, without ever passing through Enquiry List.
@@ -69,6 +72,8 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
   const [approver, setApprover] = useState<{ userId: string; name: string }[]>([]);
   const [checklist, setChecklist] = useState<string[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState("");
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [templateName, setTemplateName] = useState("");
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [recordQuery, setRecordQuery] = useState("");
   const [linkedRecord, setLinkedRecord] = useState<{ id: string; type: string; name: string } | null>(null);
@@ -106,6 +111,8 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
     setApprover([]);
     setChecklist([]);
     setNewChecklistItem("");
+    setSaveTemplateOpen(false);
+    setTemplateName("");
     setTagIds([]);
     setLinkedRecord(null);
     setRecordQuery("");
@@ -142,6 +149,28 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, prefill]);
+
+  function applyChecklistTemplate(templateId: string) {
+    const template = checklistTemplates?.find((t) => t.id === templateId);
+    if (!template) return;
+    setChecklist((current) => {
+      const existing = new Set(current.map((item) => item.trim().toLowerCase()));
+      const additions = template.items.filter((item) => !existing.has(item.trim().toLowerCase()));
+      return [...current, ...additions];
+    });
+  }
+
+  async function handleSaveChecklistTemplate() {
+    if (!templateName.trim()) return;
+    try {
+      await createChecklistTemplate.mutateAsync({ name: templateName.trim(), items: checklist });
+      push({ variant: "success", title: "Checklist template saved." });
+      setTemplateName("");
+      setSaveTemplateOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not save template", description: extractApiError(err).message });
+    }
+  }
 
   const onSubmit = async (values: FormValues) => {
     if (assignees.length === 0) {
@@ -297,7 +326,24 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
         </section>
 
         <section>
-          <Label>Checklist</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label>Checklist</Label>
+            {isEnquiryBoard && checklistTemplates && checklistTemplates.length > 0 && (
+              <Select
+                className="w-auto py-1 text-xs"
+                value=""
+                onChange={(e) => applyChecklistTemplate(e.target.value)}
+                aria-label="Use checklist template"
+              >
+                <option value="">Use template…</option>
+                {checklistTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.items.length})
+                  </option>
+                ))}
+              </Select>
+            )}
+          </div>
           <div className="space-y-1.5">
             {checklist.map((item, idx) => (
               <div key={idx} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm">
@@ -334,6 +380,34 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
               <Plus className="h-4 w-4" />
             </button>
           </div>
+          {isEnquiryBoard && checklist.length > 0 && (
+            <div className="mt-2">
+              {saveTemplateOpen ? (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Template name"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    className="text-sm"
+                  />
+                  <Button type="button" size="sm" onClick={handleSaveChecklistTemplate} loading={createChecklistTemplate.isPending}>
+                    Save
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => { setSaveTemplateOpen(false); setTemplateName(""); }}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSaveTemplateOpen(true)}
+                  className="text-xs font-medium text-brand-600 hover:underline"
+                >
+                  Save this checklist as a template
+                </button>
+              )}
+            </div>
+          )}
         </section>
 
         <section>
