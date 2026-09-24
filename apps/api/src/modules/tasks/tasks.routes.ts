@@ -103,10 +103,23 @@ tasksRouter.get(
       where: {
         isDeleted: false,
         board: visibleBoardsWhere(req.user!),
-        OR: [{ title: { contains: q, mode: "insensitive" } }, { taskId: { contains: q, mode: "insensitive" } }],
+        OR: [
+          { title: { contains: q, mode: "insensitive" } },
+          { taskId: { contains: q, mode: "insensitive" } },
+          { enquiryRecord: { enquiryId: { contains: q, mode: "insensitive" } } },
+          { estimationRecord: { estimationId: { contains: q, mode: "insensitive" } } },
+          { estimationRecord: { quotationRef: { contains: q, mode: "insensitive" } } },
+        ],
       },
       take: 20,
-      select: { id: true, taskId: true, title: true, boardId: true },
+      select: {
+        id: true,
+        taskId: true,
+        title: true,
+        boardId: true,
+        enquiryRecord: { select: { enquiryId: true } },
+        estimationRecord: { select: { estimationId: true, quotationRef: true } },
+      },
     });
     return ok(res, tasks);
   })

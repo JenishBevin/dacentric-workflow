@@ -55,10 +55,14 @@ function useBreadcrumbs() {
   return segments.map((s) => BREADCRUMB_LABELS[s] ?? s);
 }
 
-// A Task ID (WF-000001), Project ID (QPTS-PRJ-2026-0001) or Claim ID
-// (CLM-000001) typed into the search box — searched for an exact match so
-// it jumps straight to that record.
-const ID_LOOKUP_PATTERN = /^(WF-\d+|CLM-\d+|QPTS-PRJ-\d{4}-\d+)$/i;
+// A Task ID (WF-000001), Project ID (QPTS-PRJ-2026-0001), Claim ID
+// (CLM-000001), Enquiry ID (QPTS-ENQ-2026-0001), Estimation ID
+// (QPTS-2026-0001) or Quotation Ref (QPTS/QN/2026-0001) typed into the
+// search box — searched for an exact match so it jumps straight to that
+// record. Order matters: QPTS-PRJ- and QPTS-ENQ- must be checked before the
+// bare QPTS-\d{4}- (Estimation ID) alternative, otherwise a shorter prefix
+// match could misfire — hence the negative lookahead below.
+const ID_LOOKUP_PATTERN = /^(WF-\d+|CLM-\d+|QPTS-PRJ-\d{4}-\d+|QPTS-ENQ-\d{4}-\d+|QPTS(?!-PRJ-|-ENQ-)-\d{4}-\d+|QPTS\/QN\/\d{4}-\d+)$/i;
 
 export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobileMenu }) => {
   const { user, logout } = useAuth();
@@ -98,22 +102,27 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
     const q = search.trim();
     if (!q) return;
 
-    if (ID_LOOKUP_PATTERN.test(q)) {
+    // Collapse stray internal whitespace (e.g. a typo like "QPTS/QN/2026- 0006")
+    // before matching against an ID pattern — none of these codes contain
+    // meaningful spaces, unlike a project-name search.
+    const compact = q.replace(/\s+/g, "");
+
+    if (ID_LOOKUP_PATTERN.test(compact)) {
       setSearching(true);
       try {
-        const upper = q.toUpperCase();
+        const upper = compact.toUpperCase();
         const isProjectId = upper.startsWith("QPTS-PRJ-");
         const isClaimId = upper.startsWith("CLM-");
         if (isProjectId) {
-          const { data } = await api.get("/boards/search/lookup", { params: { q } });
-          const match = (data.data as any[]).find((b) => b.boardId.toLowerCase() === q.toLowerCase());
+          const { data } = await api.get("/boards/search/lookup", { params: { q: compact } });
+          const match = (data.data as any[]).find((b) => b.boardId.toLowerCase() === compact.toLowerCase());
           if (match) {
             setSearch("");
             navigate(`/workflow/boards/${match.id}`);
             return;
           }
         } else if (isClaimId) {
-          const { data } = await api.get("/claims/search/lookup", { params: { q } });
+          const { data } = await api.get("/claims/search/lookup", { params: { q: compact } });
           const match = data.data as { id: string; claimId: string; status: string } | null;
           if (match) {
             setSearch("");
@@ -122,8 +131,15 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
             return;
           }
         } else {
-          const { data } = await api.get("/tasks/search/lookup", { params: { q } });
-          const match = (data.data as any[]).find((t) => t.taskId.toLowerCase() === q.toLowerCase());
+          const { data } = await api.get("/tasks/search/lookup", { params: { q: compact } });
+          const ql = compact.toLowerCase();
+          const match = (data.data as any[]).find(
+            (t) =>
+              t.taskId.toLowerCase() === ql ||
+              t.enquiryRecord?.enquiryId?.toLowerCase() === ql ||
+              t.estimationRecord?.estimationId?.toLowerCase() === ql ||
+              t.estimationRecord?.quotationRef?.toLowerCase() === ql
+          );
           if (match) {
             setSearch("");
             navigate(`/workflow/boards/${match.boardId}?task=${match.id}`);
