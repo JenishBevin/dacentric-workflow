@@ -34,6 +34,11 @@ export const updateUserSchema = z.object({
   roles: z.array(z.nativeEnum(RoleCode)).min(1).optional(),
   moduleAccess: z.array(z.nativeEnum(ModuleCode)).min(1).optional(),
   status: z.enum(["ACTIVE", "DEACTIVATED"]).optional(),
+  // Links (or, with null, unlinks) an HRMS employee record after the user
+  // already exists — e.g. a bulk-imported account whose employeeCode didn't
+  // exist in HRMS yet at import time. The DB's unique constraint on
+  // User.employeeId rejects linking an employee already claimed by someone else.
+  employeeId: z.string().uuid().optional().nullable(),
 });
 
 export const createEmployeeSchema = z.object({

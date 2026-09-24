@@ -150,7 +150,14 @@ export async function listUsers(filters: { status?: string; search?: string }) {
 
 export async function updateUser(
   userId: string,
-  input: { name?: string; workEmail?: string; roles?: RoleCode[]; moduleAccess?: ModuleCode[]; status?: "ACTIVE" | "DEACTIVATED" },
+  input: {
+    name?: string;
+    workEmail?: string;
+    roles?: RoleCode[];
+    moduleAccess?: ModuleCode[];
+    status?: "ACTIVE" | "DEACTIVATED";
+    employeeId?: string | null;
+  },
   actor: AuthedUser
 ) {
   const existing = await prisma.user.findUnique({ where: { id: userId }, include: { roles: { include: { role: true } } } });
@@ -185,6 +192,7 @@ export async function updateUser(
   if (normalizedEmail) data.workEmail = normalizedEmail;
   if (input.moduleAccess) data.moduleAccess = input.moduleAccess;
   if (input.status) data.status = input.status;
+  if (input.employeeId !== undefined) data.employeeId = input.employeeId;
 
   await prisma.$transaction(async (tx) => {
     if (Object.keys(data).length) {

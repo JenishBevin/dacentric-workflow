@@ -45,7 +45,7 @@ interface UserRow {
   status: string;
   moduleAccess: ModuleCode[];
   roles: Array<{ role: { code: RoleCode; name: string } }>;
-  employee?: { fullName: string } | null;
+  employee?: { id: string; fullName: string; employeeCode: string } | null;
 }
 
 /** Section 6/7: Settings → Users — invitation-only provisioning, bulk import, resend, deactivate. */
@@ -478,6 +478,11 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
   const [workEmail, setWorkEmail] = useState(user.workEmail);
   const canEditEmail = isSuperAdmin(actor);
 
+  const originalEmployeeId = user.employee?.id ?? null;
+  const [employeeId, setEmployeeId] = useState<string | null>(originalEmployeeId);
+  const [employeeQuery, setEmployeeQuery] = useState(user.employee ? `${user.employee.fullName} (${user.employee.employeeCode})` : "");
+  const { data: unlinked } = useUnlinkedEmployees(employeeQuery);
+
   return (
     <Drawer
       open
@@ -494,11 +499,13 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
             onClick={async () => {
               try {
                 const emailChanged = canEditEmail && workEmail.trim() !== user.workEmail;
+                const employeeChanged = employeeId !== originalEmployeeId;
                 await onUpdate.mutateAsync({
                   userId: user.id,
                   roles,
                   moduleAccess: modules,
                   ...(emailChanged ? { workEmail: workEmail.trim() } : {}),
+                  ...(employeeChanged ? { employeeId } : {}),
                 });
                 push({ variant: "success", title: "User updated." });
                 onClose();
@@ -520,6 +527,52 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
             <p className="mt-1 text-xs text-slate-400">Only Super Admin can change another user's sign-in email. The change takes effect immediately.</p>
           </div>
         )}
+        <div>
+          <Label>HRMS Employee Link</Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Search unlinked employee records…"
+              value={employeeQuery}
+              onChange={(e) => {
+                setEmployeeQuery(e.target.value);
+                setEmployeeId(null);
+              }}
+            />
+            {employeeId && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEmployeeId(null);
+                  setEmployeeQuery("");
+                }}
+              >
+                Remove
+              </Button>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            Useful when an employee's HRMS record was created after their login — e.g. a bulk-imported account whose employeeCode
+            didn't exist in HRMS yet at the time.
+          </p>
+          {employeeQuery && !employeeId && unlinked && unlinked.length > 0 && (
+            <div className="mt-1 max-h-32 overflow-y-auto rounded-lg border border-slate-200">
+              {unlinked.map((e: any) => (
+                <button
+                  key={e.id}
+                  type="button"
+                  onClick={() => {
+                    setEmployeeId(e.id);
+                    setEmployeeQuery(`${e.name} (${e.employeeCode})`);
+                  }}
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-slate-50"
+                >
+                  {e.name} <span className="text-xs text-slate-400">{e.department}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <RoleModuleCheckboxes roles={roles} setRoles={setRoles} modules={modules} setModules={setModules} />
       </div>
     </Drawer>
