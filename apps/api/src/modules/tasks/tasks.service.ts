@@ -480,6 +480,19 @@ export async function listBoardTasks(
   return tasks.map(serializeTask);
 }
 
+/** Bulk-export support (Tasks / My Tasks): tasks selected there can span
+ * several boards, unlike listBoardTasks above, so this scopes by
+ * visibleBoardsWhere the same way "/search/lookup" does rather than by a
+ * single board. */
+export async function listTasksByIds(taskIds: string[], actor: AuthedUser) {
+  const { visibleBoardsWhere } = await import("../boards/board-access");
+  const tasks = await prisma.task.findMany({
+    where: { id: { in: taskIds }, isDeleted: false, board: visibleBoardsWhere(actor) },
+    include: TASK_DETAIL_INCLUDE as any,
+  });
+  return tasks.map(serializeTask);
+}
+
 export async function updateTask(taskId: string, input: Record<string, any>, actor: AuthedUser) {
   const ctx = await loadTaskWithAccess(taskId, actor);
   assertCanEditTask(ctx);
@@ -1201,6 +1214,42 @@ export async function deleteTask(taskId: string, actor: AuthedUser) {
   assertCanDeleteTask(ctx);
   await prisma.task.update({ where: { id: taskId }, data: { isDeleted: true, deletedAt: new Date() } });
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "Task", entityId: taskId, boardId: ctx.task.boardId, beforeValue: { title: ctx.task.title, taskId: ctx.task.taskId } });
+}
+
+export interface BulkResult {
+  succeeded: string[];
+  failed: { id: string; error: string }[];
+}
+
+export async function bulkDeleteTasks(taskIds: string[], actor: AuthedUser): Promise<BulkResult> {
+  const result: BulkResult = { succeeded: [], failed: [] };
+  for (const taskId of taskIds) {
+    try {
+      await deleteTask(taskId, actor);
+      result.succeeded.push(taskId);
+    } catch (err) {
+      result.failed.push({ id: taskId, error: err instanceof Error ? err.message : "Could not delete this task." });
+    }
+  }
+  return result;
+}
+
+export async function bulkMoveTasks(
+  taskIds: string[],
+  stageId: string,
+  actor: AuthedUser,
+  confirmWipOverride = false
+): Promise<BulkResult> {
+  const result: BulkResult = { succeeded: [], failed: [] };
+  for (const taskId of taskIds) {
+    try {
+      await moveTask(taskId, stageId, actor, confirmWipOverride);
+      result.succeeded.push(taskId);
+    } catch (err) {
+      result.failed.push({ id: taskId, error: err instanceof Error ? err.message : "Could not move this task." });
+    }
+  }
+  return result;
 }
 
 export async function duplicateTask(taskId: string, actor: AuthedUser) {

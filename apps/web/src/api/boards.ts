@@ -216,6 +216,29 @@ export function useDeleteBoard() {
   });
 }
 
+export interface BulkResult {
+  succeeded: string[];
+  failed: { id: string; error: string }[];
+}
+
+export function useBulkDeleteBoards() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ boardIds, confirmCascade }: { boardIds: string[]; confirmCascade?: boolean }) =>
+      (await api.post<{ data: BulkResult }>("/boards/bulk-delete", { boardIds, confirmCascade })).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["boards"] }),
+  });
+}
+
+export function useBulkArchiveBoards() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ boardIds, archived }: { boardIds: string[]; archived: boolean }) =>
+      (await api.post<{ data: BulkResult }>("/boards/bulk-archive", { boardIds, archived })).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["boards"] }),
+  });
+}
+
 export function useAddStage(boardId: string) {
   const qc = useQueryClient();
   return useMutation({

@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Building2 } from "lucide-react";
-import { Badge } from "../ui/primitives";
+import { Badge, Checkbox } from "../ui/primitives";
 import { PriorityBadge, DueDateBadge, ChecklistProgress } from "../workflow/badges";
 import { BoardStage, TaskSummary } from "../../lib/types";
 import clsx from "clsx";
@@ -13,7 +13,9 @@ export const TaskListView: React.FC<{
   stages: BoardStage[];
   tasksByStage: Record<string, TaskSummary[]>;
   onOpenTask: (task: TaskSummary) => void;
-}> = ({ stages, tasksByStage, onOpenTask }) => {
+  isTaskSelected?: (taskId: string) => boolean;
+  onToggleTaskSelect?: (taskId: string) => void;
+}> = ({ stages, tasksByStage, onOpenTask, isTaskSelected, onToggleTaskSelect }) => {
   const totalCount = stages.reduce((sum, s) => sum + (tasksByStage[s.id]?.length ?? 0), 0);
 
   if (totalCount === 0) {
@@ -49,6 +51,11 @@ export const TaskListView: React.FC<{
                     task.isHighlighted && "bg-amber-50"
                   )}
                 >
+                  {onToggleTaskSelect && (
+                    <span onClick={(e) => e.stopPropagation()} className="shrink-0">
+                      <Checkbox checked={!!isTaskSelected?.(task.id)} onChange={() => onToggleTaskSelect(task.id)} aria-label={`Select ${task.taskId}`} />
+                    </span>
+                  )}
                   <span className="min-w-0 sm:flex-1">
                     <span className="mr-1.5 text-xs text-slate-400">{task.taskId}</span>
                     {task.enquiryId && <span className="mr-1.5 text-xs text-brand-500">{task.enquiryId}</span>}

@@ -6,7 +6,16 @@ import { authenticate } from "../../middleware/authenticate";
 import { requirePermission } from "../../middleware/authorize";
 import { Errors } from "../../common/errors";
 import * as customersService from "./customers.service";
-import { createCustomerSchema, updateCustomerSchema, createContactSchema, updateContactSchema, createProductSchema, createInteractionSchema } from "./customers.schemas";
+import {
+  createCustomerSchema,
+  updateCustomerSchema,
+  createContactSchema,
+  updateContactSchema,
+  createProductSchema,
+  createInteractionSchema,
+  bulkDeleteCustomersSchema,
+  bulkUpdateCustomerStatusSchema,
+} from "./customers.schemas";
 import { PermissionKey } from "@dacentric/types";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
@@ -35,6 +44,25 @@ customersRouter.post(
   requirePermission(PermissionKey.CRM_ERP_LINKING, "OWN"),
   validate(createCustomerSchema),
   asyncHandler(async (req, res) => created(res, await customersService.createCustomer((req as any).validatedBody, req.user!)))
+);
+
+// Must come before "/:id" — otherwise Express would capture "bulk-delete" as an id.
+customersRouter.post(
+  "/bulk-delete",
+  requirePermission(PermissionKey.CRM_ERP_LINKING, "OWN"),
+  validate(bulkDeleteCustomersSchema),
+  asyncHandler(async (req, res) => ok(res, await customersService.bulkDeleteCustomers((req as any).validatedBody.customerIds, req.user!)))
+);
+
+// Same ordering requirement as "/bulk-delete" above.
+customersRouter.post(
+  "/bulk-status",
+  requirePermission(PermissionKey.CRM_ERP_LINKING, "OWN"),
+  validate(bulkUpdateCustomerStatusSchema),
+  asyncHandler(async (req, res) => {
+    const { customerIds, status } = (req as any).validatedBody;
+    return ok(res, await customersService.bulkUpdateCustomerStatus(customerIds, status, req.user!));
+  })
 );
 
 // Must come before "/:id" so Express doesn't capture "import" as an id.

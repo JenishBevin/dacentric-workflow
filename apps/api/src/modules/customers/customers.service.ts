@@ -56,6 +56,28 @@ export async function listCustomers(filters: { search?: string; status?: string;
   }));
 }
 
+// Bulk-export support (Customer list) — same row shape as listCustomers,
+// just filtered to a specific id selection instead of search/status filters.
+export async function listCustomersByIds(ids: string[]) {
+  const customers = await prisma.customer.findMany({
+    where: { id: { in: ids }, isDeleted: false },
+    select: CUSTOMER_SUMMARY_SELECT,
+  });
+  return customers.map((c) => ({
+    customerId: c.customerId,
+    name: c.name,
+    status: c.status,
+    industry: c.industry,
+    country: c.country,
+    mainContactName: c.mainContactName,
+    phone: c.phone,
+    email: c.email,
+    accountManager: c.accountManager?.name ?? "",
+    enquiryCount: c._count.tasks,
+    projectCount: c._count.boards,
+  }));
+}
+
 // Global "search by Customer ID or name" lookup — used by pickers embedded
 // in New Enquiry / New Project, and the header search box.
 export async function searchCustomers(q: string) {
@@ -153,6 +175,37 @@ export async function deleteCustomer(id: string, actor: AuthedUser) {
 
   await prisma.customer.update({ where: { id }, data: { isDeleted: true } });
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "Customer", entityId: id, beforeValue: { name: existing.name } });
+}
+
+export interface BulkResult {
+  succeeded: string[];
+  failed: { id: string; error: string }[];
+}
+
+export async function bulkDeleteCustomers(customerIds: string[], actor: AuthedUser): Promise<BulkResult> {
+  const result: BulkResult = { succeeded: [], failed: [] };
+  for (const id of customerIds) {
+    try {
+      await deleteCustomer(id, actor);
+      result.succeeded.push(id);
+    } catch (err) {
+      result.failed.push({ id, error: err instanceof Error ? err.message : "Could not delete this customer." });
+    }
+  }
+  return result;
+}
+
+export async function bulkUpdateCustomerStatus(customerIds: string[], status: CustomerStatus, actor: AuthedUser): Promise<BulkResult> {
+  const result: BulkResult = { succeeded: [], failed: [] };
+  for (const id of customerIds) {
+    try {
+      await updateCustomer(id, { status } as UpdateCustomerInput, actor);
+      result.succeeded.push(id);
+    } catch (err) {
+      result.failed.push({ id, error: err instanceof Error ? err.message : "Could not update this customer." });
+    }
+  }
+  return result;
 }
 
 // The Customer 360 view: profile + contacts + every enquiry/project linked

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { MoreVertical, Link2, LayoutGrid, AlertCircle, Building2 } from "lucide-react";
 import clsx from "clsx";
-import { Card, Badge, AvatarGroup } from "../ui/primitives";
+import { Card, Badge, AvatarGroup, Checkbox } from "../ui/primitives";
 import { Board } from "../../lib/types";
 
 interface Props {
@@ -13,9 +13,11 @@ interface Props {
   onManageMembers: () => void;
   onDelete: () => void;
   canManage: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-export const BoardCard: React.FC<Props> = ({ board, onEdit, onDuplicate, onArchive, onManageMembers, onDelete, canManage }) => {
+export const BoardCard: React.FC<Props> = ({ board, onEdit, onDuplicate, onArchive, onManageMembers, onDelete, canManage, selected, onToggleSelect }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -40,6 +42,11 @@ export const BoardCard: React.FC<Props> = ({ board, onEdit, onDuplicate, onArchi
         </span>
       )}
       <div className="flex items-start justify-between gap-2">
+        {onToggleSelect && (
+          <span onClick={(e) => e.stopPropagation()} className="mt-0.5 shrink-0">
+            <Checkbox checked={!!selected} onChange={onToggleSelect} aria-label={`Select ${board.name}`} />
+          </span>
+        )}
         <Link to={`/workflow/boards/${board.id}`} className="min-w-0 flex-1">
           <p className="truncate font-semibold text-slate-900 hover:text-brand-700">{board.name}</p>
           <p className="text-[11px] font-medium text-slate-400">{board.boardId}</p>

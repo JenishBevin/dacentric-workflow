@@ -2,14 +2,19 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { List, LayoutGrid, Plus } from "lucide-react";
 import { useMyTasks } from "../api/misc";
-import { useQuickComplete, useMoveTask } from "../api/tasks";
+import { downloadExport } from "../api/misc";
+import { useQuickComplete, useMoveTask, useBulkDeleteTasks, useBulkMoveTasks } from "../api/tasks";
 import { useBoardDetail, useBoards, usePersonalTasksBoard } from "../api/boards";
 import { Button, Checkbox, Skeleton, EmptyState, ErrorState, Badge } from "../components/ui/primitives";
+import { BulkActionBar } from "../components/ui/BulkActionBar";
 import { PriorityBadge, DueDateBadge, ChecklistProgress } from "../components/workflow/badges";
 import { MoveToStageSheet, MovableTask } from "../components/kanban/MoveToStageSheet";
+import { BulkMoveToStageSheet } from "../components/kanban/BulkMoveToStageSheet";
 import { NewTaskDrawer } from "../components/kanban/NewTaskDrawer";
 import { TaskDetailDrawer } from "../components/tasks/TaskDetailDrawer";
 import { Modal } from "../components/ui/Modal";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { useSelection } from "../hooks/useSelection";
 import { useToast } from "../context/ToastContext";
 import { extractApiError } from "../lib/apiClient";
 import { can } from "../lib/permissions";
@@ -48,9 +53,54 @@ export default function MyTasksPage() {
   const { data: groups, isLoading, isError, refetch } = useMyTasks();
   const quickComplete = useQuickComplete();
   const moveTask = useMoveTask();
+  const bulkDeleteTasks = useBulkDeleteTasks();
+  const bulkMoveTasks = useBulkMoveTasks();
   const [view, setView] = useState<"list" | "kanban">("list");
   const [moveItem, setMoveItem] = useState<MyTaskItem | null>(null);
   const { data: moveBoard } = useBoardDetail(moveItem?.boardId);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+
+  const allItems = useMemo(() => (groups ? Object.values(groups).flat() : []) as MyTaskItem[], [groups]);
+  const itemById = useMemo(() => new Map(allItems.map((i) => [i.id, i])), [allItems]);
+  const selection = useSelection(allItems.map((i) => i.id));
+  const selectedItems = useMemo(() => [...selection.selectedIds].map((id) => itemById.get(id)!).filter(Boolean), [selection.selectedIds, itemById]);
+  const selectedBoardId = selectedItems.length > 0 && selectedItems.every((i) => i.boardId === selectedItems[0].boardId) ? selectedItems[0].boardId : null;
+  const { data: bulkMoveBoard } = useBoardDetail(bulkMoveOpen ? selectedBoardId ?? undefined : undefined);
+
+  function reportBulkResult(result: { succeeded: string[]; failed: { id: string; error: string }[] }, verb: string) {
+    if (result.failed.length === 0) {
+      push({ variant: "success", title: `${result.succeeded.length} task${result.succeeded.length === 1 ? "" : "s"} ${verb}.` });
+    } else {
+      push({
+        variant: result.succeeded.length ? "success" : "error",
+        title: `${result.succeeded.length} ${verb}, ${result.failed.length} failed.`,
+        description: result.failed[0].error,
+      });
+    }
+  }
+
+  async function confirmBulkDelete() {
+    try {
+      const result = await bulkDeleteTasks.mutateAsync([...selection.selectedIds]);
+      reportBulkResult(result, "deleted");
+      selection.clear();
+      setBulkDeleteOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not delete tasks", description: extractApiError(err).message });
+    }
+  }
+
+  async function performBulkMove(stageId: string) {
+    try {
+      const result = await bulkMoveTasks.mutateAsync({ taskIds: [...selection.selectedIds], stageId });
+      reportBulkResult(result, "moved");
+      selection.clear();
+      setBulkMoveOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not move tasks", description: extractApiError(err).message });
+    }
+  }
   const [boardPickerOpen, setBoardPickerOpen] = useState(() => searchParams.get("newTask") === "1");
   const [newTaskBoardId, setNewTaskBoardId] = useState<string | null>(null);
   const { data: myBoards } = useBoards({ scope: "MY" });
@@ -79,6 +129,9 @@ export default function MyTasksPage() {
   }
 
   const canCreateTask = can(user, "CREATE_TASK");
+  const canDeleteTasks = can(user, "DELETE_TASK");
+  const canMoveTasks = can(user, "MOVE_TASK");
+  const canExport = can(user, "EXPORT");
   const totalCount = useMemo(() => (groups ? Object.values(groups).reduce((sum: number, arr: any) => sum + arr.length, 0) : 0), [groups]);
 
   async function complete(item: MyTaskItem) {
@@ -141,7 +194,39 @@ export default function MyTasksPage() {
       {totalCount === 0 && <EmptyState icon={<List className="h-8 w-8" />} title="No tasks assigned to you." description="When you're assigned a task on any board, it will show up here." />}
 
       {totalCount > 0 && view === "list" && (
+        <BulkActionBar count={selection.count} onClear={selection.clear}>
+          {canDeleteTasks && (
+            <Button variant="danger" size="sm" onClick={() => setBulkDeleteOpen(true)}>
+              Delete selected
+            </Button>
+          )}
+          {canMoveTasks && (
+            <Button variant="outline" size="sm" disabled={!selectedBoardId} title={!selectedBoardId ? "Select tasks from a single project to move them together." : undefined} onClick={() => setBulkMoveOpen(true)}>
+              Move to stage
+            </Button>
+          )}
+          {canExport && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                downloadExport("/exports/tasks", { ids: [...selection.selectedIds].join(",") }, `tasks-export-${Date.now()}.xlsx`).catch((err) =>
+                  push({ variant: "error", title: "Export failed", description: extractApiError(err).message })
+                )
+              }
+            >
+              Export selected
+            </Button>
+          )}
+        </BulkActionBar>
+      )}
+
+      {totalCount > 0 && view === "list" && (
         <div className="space-y-5">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Checkbox checked={selection.isAllSelected} onChange={selection.toggleAll} aria-label="Select all tasks" />
+            Select all ({allItems.length})
+          </div>
           {GROUP_ORDER.map(({ key, label, hint }) => {
             const items: MyTaskItem[] = groups[key] ?? [];
             if (items.length === 0) return null;
@@ -153,6 +238,7 @@ export default function MyTasksPage() {
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                   {items.map((item, idx) => (
                     <div key={item.id} className={clsx("flex flex-wrap items-center gap-3 px-3 py-2.5 sm:flex-nowrap", idx !== 0 && "border-t border-slate-100")}>
+                      <Checkbox checked={selection.isSelected(item.id)} onChange={() => selection.toggle(item.id)} aria-label={`Select ${item.taskId}`} />
                       <Checkbox checked={item.isCompleted} disabled={item.isCompleted} onChange={() => complete(item)} aria-label={`Complete ${item.taskId}`} />
                       <button onClick={() => openTask(item.id)} className="min-w-0 flex-1 text-left">
                         <span className="mr-1.5 text-xs text-slate-400">{item.taskId}</span>
@@ -214,6 +300,24 @@ export default function MyTasksPage() {
         task={moveItem as MovableTask | null}
         stages={[...(moveBoard?.stages ?? [])].sort((a: any, b: any) => a.position - b.position)}
         onSelect={performMove}
+      />
+
+      <BulkMoveToStageSheet
+        open={bulkMoveOpen}
+        onClose={() => setBulkMoveOpen(false)}
+        count={selection.count}
+        stages={[...(bulkMoveBoard?.stages ?? [])].sort((a: any, b: any) => a.position - b.position)}
+        onSelect={performBulkMove}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title="Delete tasks"
+        message={`Are you sure you want to delete ${selection.count} task${selection.count === 1 ? "" : "s"}? This cannot be undone.`}
+        confirmLabel="Delete tasks"
+        loading={bulkDeleteTasks.isPending}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={confirmBulkDelete}
       />
 
       <Modal open={boardPickerOpen} onClose={() => setBoardPickerOpen(false)} title="Create task on which project?">

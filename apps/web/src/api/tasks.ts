@@ -98,6 +98,28 @@ export function useMoveTask() {
   });
 }
 
+export interface BulkResult {
+  succeeded: string[];
+  failed: { id: string; error: string }[];
+}
+
+export function useBulkDeleteTasks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (taskIds: string[]) => (await api.post<{ data: BulkResult }>("/tasks/bulk-delete", { taskIds })).data.data,
+    onSuccess: () => invalidateTaskEverywhere(qc),
+  });
+}
+
+export function useBulkMoveTasks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskIds, stageId, confirmWipOverride }: { taskIds: string[]; stageId: string; confirmWipOverride?: boolean }) =>
+      (await api.post<{ data: BulkResult }>("/tasks/bulk-move", { taskIds, stageId, confirmWipOverride })).data.data,
+    onSuccess: () => invalidateTaskEverywhere(qc),
+  });
+}
+
 export interface AwardTaskResult {
   kind: "moved-to-estimation" | "project-created-pending-approval" | "project-created";
   id: string;

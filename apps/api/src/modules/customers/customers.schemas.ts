@@ -37,6 +37,15 @@ export const setCustomerLinkSchema = z.object({
   customerId: z.string().uuid().nullable(),
 });
 
+export const bulkDeleteCustomersSchema = z.object({
+  customerIds: z.array(z.string().uuid()).min(1, "Select at least one customer."),
+});
+
+export const bulkUpdateCustomerStatusSchema = z.object({
+  customerIds: z.array(z.string().uuid()).min(1, "Select at least one customer."),
+  status: z.nativeEnum(CustomerStatus),
+});
+
 export const createProductSchema = z.object({
   name: z.string().min(1, "Product name is required.").max(200),
   quantity: z.number().int().positive().optional(),

@@ -65,6 +65,16 @@ export const updateMemberRoleSchema = z.object({
   role: z.enum(["OWNER", "EDITOR", "VIEWER", "COMMENTER"]),
 });
 
+export const bulkDeleteBoardsSchema = z.object({
+  boardIds: z.array(z.string().uuid()).min(1, "Select at least one project."),
+  confirmCascade: z.boolean().optional(),
+});
+
+export const bulkArchiveBoardsSchema = z.object({
+  boardIds: z.array(z.string().uuid()).min(1, "Select at least one project."),
+  archived: z.boolean(),
+});
+
 const isoDate = z.coerce.date();
 
 export const updateProcurementSchema = z.object({

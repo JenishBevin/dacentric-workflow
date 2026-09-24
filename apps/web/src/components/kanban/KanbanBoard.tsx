@@ -20,9 +20,22 @@ interface Props {
   onStageMenuAction: (stage: BoardStage, action: "rename" | "wip" | "color" | "moveLeft" | "moveRight" | "delete") => void;
   canManageStages: boolean;
   canMoveTasks: boolean;
+  isTaskSelected?: (taskId: string) => boolean;
+  onToggleTaskSelect?: (taskId: string) => void;
 }
 
-export const KanbanBoard: React.FC<Props> = ({ stages, tasksByStage, onAddTask, onOpenTask, onTaskMenuAction, onStageMenuAction, canManageStages, canMoveTasks }) => {
+export const KanbanBoard: React.FC<Props> = ({
+  stages,
+  tasksByStage,
+  onAddTask,
+  onOpenTask,
+  onTaskMenuAction,
+  onStageMenuAction,
+  canManageStages,
+  canMoveTasks,
+  isTaskSelected,
+  onToggleTaskSelect,
+}) => {
   const { push } = useToast();
   const moveTask = useMoveTask();
   const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
@@ -93,6 +106,8 @@ export const KanbanBoard: React.FC<Props> = ({ stages, tasksByStage, onAddTask, 
               onStageMenuAction={(action) => onStageMenuAction(stage, action)}
               canManageStage={canManageStages}
               dragDisabled={!canMoveTasks}
+              isTaskSelected={isTaskSelected}
+              onToggleTaskSelect={onToggleTaskSelect}
             />
           ))}
         </div>

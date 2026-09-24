@@ -14,6 +14,8 @@ import {
   addMemberSchema,
   updateMemberRoleSchema,
   updateProcurementSchema,
+  bulkDeleteBoardsSchema,
+  bulkArchiveBoardsSchema,
 } from "./boards.schemas";
 import { PermissionKey } from "@dacentric/types";
 
@@ -42,6 +44,26 @@ boardsRouter.post(
   asyncHandler(async (req, res) => {
     const board = await boardsService.createBoard((req as any).validatedBody, req.user!);
     return created(res, board);
+  })
+);
+
+// Must come before "/:boardId" — otherwise Express would capture
+// "bulk-delete"/"bulk-archive" as a boardId path param and never reach these handlers.
+boardsRouter.post(
+  "/bulk-delete",
+  validate(bulkDeleteBoardsSchema),
+  asyncHandler(async (req, res) => {
+    const { boardIds, confirmCascade } = (req as any).validatedBody;
+    return ok(res, await boardsService.bulkDeleteBoards(boardIds, req.user!, confirmCascade));
+  })
+);
+
+boardsRouter.post(
+  "/bulk-archive",
+  validate(bulkArchiveBoardsSchema),
+  asyncHandler(async (req, res) => {
+    const { boardIds, archived } = (req as any).validatedBody;
+    return ok(res, await boardsService.bulkArchiveBoards(boardIds, archived, req.user!));
   })
 );
 

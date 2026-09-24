@@ -19,6 +19,8 @@ import {
   createTaskSchema,
   updateTaskSchema,
   moveTaskSchema,
+  bulkDeleteTasksSchema,
+  bulkMoveTasksSchema,
   setAssigneesSchema,
   quickEditSchema,
   checklistItemSchema,
@@ -107,6 +109,25 @@ tasksRouter.get(
       select: { id: true, taskId: true, title: true, boardId: true },
     });
     return ok(res, tasks);
+  })
+);
+
+// Same ordering requirement as "/search/lookup" above.
+tasksRouter.post(
+  "/bulk-delete",
+  requirePermission(PermissionKey.DELETE_TASK, "OWN"),
+  validate(bulkDeleteTasksSchema),
+  asyncHandler(async (req, res) => ok(res, await tasksService.bulkDeleteTasks((req as any).validatedBody.taskIds, req.user!)))
+);
+
+// Same ordering requirement as "/search/lookup" above.
+tasksRouter.post(
+  "/bulk-move",
+  requirePermission(PermissionKey.MOVE_TASK, "OWN"),
+  validate(bulkMoveTasksSchema),
+  asyncHandler(async (req, res) => {
+    const { taskIds, stageId, confirmWipOverride } = (req as any).validatedBody;
+    return ok(res, await tasksService.bulkMoveTasks(taskIds, stageId, req.user!, confirmWipOverride));
   })
 );
 

@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Plus, Search } from "lucide-react";
-import { useBoards, useArchiveBoard, useDuplicateBoard, useDeleteBoard, useServices } from "../../api/boards";
-import { Button, Input, Select, Skeleton, EmptyState, ErrorState } from "../../components/ui/primitives";
+import { useBoards, useArchiveBoard, useDuplicateBoard, useDeleteBoard, useServices, useBulkDeleteBoards, useBulkArchiveBoards } from "../../api/boards";
+import { downloadExport } from "../../api/misc";
+import { Button, Input, Select, Checkbox, Skeleton, EmptyState, ErrorState } from "../../components/ui/primitives";
 import { BoardCard } from "../../components/boards/BoardCard";
 import { NewBoardDrawer } from "../../components/boards/NewBoardDrawer";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { BulkActionBar } from "../../components/ui/BulkActionBar";
+import { useSelection } from "../../hooks/useSelection";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 import { can, isAdmin } from "../../lib/permissions";
@@ -43,8 +46,46 @@ export default function ServiceProjectsPage() {
   const archiveBoard = useArchiveBoard();
   const duplicateBoard = useDuplicateBoard();
   const deleteBoard = useDeleteBoard();
+  const bulkDeleteBoards = useBulkDeleteBoards();
+  const bulkArchiveBoards = useBulkArchiveBoards();
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const canCreate = can(user, "CREATE_BOARD");
+  const canExport = can(user, "EXPORT");
+  const selection = useSelection((boards ?? []).map((b) => b.id));
+
+  function reportBulkResult(result: { succeeded: string[]; failed: { id: string; error: string }[] }, verb: string) {
+    if (result.failed.length === 0) {
+      push({ variant: "success", title: `${result.succeeded.length} project${result.succeeded.length === 1 ? "" : "s"} ${verb}.` });
+    } else {
+      push({
+        variant: result.succeeded.length ? "success" : "error",
+        title: `${result.succeeded.length} ${verb}, ${result.failed.length} failed.`,
+        description: result.failed[0].error,
+      });
+    }
+  }
+
+  async function confirmBulkDelete() {
+    try {
+      const result = await bulkDeleteBoards.mutateAsync({ boardIds: [...selection.selectedIds], confirmCascade: true });
+      reportBulkResult(result, "deleted");
+      selection.clear();
+      setBulkDeleteOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not delete projects", description: extractApiError(err).message });
+    }
+  }
+
+  async function handleBulkArchive(archived: boolean) {
+    try {
+      const result = await bulkArchiveBoards.mutateAsync({ boardIds: [...selection.selectedIds], archived });
+      reportBulkResult(result, archived ? "archived" : "unarchived");
+      selection.clear();
+    } catch (err) {
+      push({ variant: "error", title: "Could not update projects", description: extractApiError(err).message });
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -83,6 +124,35 @@ export default function ServiceProjectsPage() {
           <option value="ARCHIVED">Archived Projects</option>
         </Select>
       </div>
+
+      {boards && boards.length > 0 && (
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <Checkbox checked={selection.isAllSelected} onChange={selection.toggleAll} aria-label="Select all projects" />
+          Select all ({boards.length})
+        </div>
+      )}
+
+      <BulkActionBar count={selection.count} onClear={selection.clear}>
+        <Button variant="danger" size="sm" onClick={() => setBulkDeleteOpen(true)}>
+          Delete selected
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => handleBulkArchive(scope !== "ARCHIVED")}>
+          {scope === "ARCHIVED" ? "Unarchive selected" : "Archive selected"}
+        </Button>
+        {canExport && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              downloadExport("/exports/boards", { ids: [...selection.selectedIds].join(",") }, `projects-export-${Date.now()}.xlsx`).catch((err) =>
+                push({ variant: "error", title: "Export failed", description: extractApiError(err).message })
+              )
+            }
+          >
+            Export selected
+          </Button>
+        )}
+      </BulkActionBar>
 
       {isLoading && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -129,6 +199,8 @@ export default function ServiceProjectsPage() {
                 }
               }}
               onDelete={() => setPendingDelete(board)}
+              selected={selection.isSelected(board.id)}
+              onToggleSelect={() => selection.toggle(board.id)}
             />
           ))}
         </div>
@@ -163,6 +235,16 @@ export default function ServiceProjectsPage() {
             push({ variant: "error", title: "Could not delete project", description: extractApiError(err).message });
           }
         }}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title="Delete projects"
+        message={`Are you sure you want to delete ${selection.count} project${selection.count === 1 ? "" : "s"}? This cannot be undone.`}
+        confirmLabel="Delete projects"
+        loading={bulkDeleteBoards.isPending}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={confirmBulkDelete}
       />
     </div>
   );

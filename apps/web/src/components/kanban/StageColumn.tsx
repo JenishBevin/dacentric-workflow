@@ -16,9 +16,22 @@ interface Props {
   onStageMenuAction: (action: "rename" | "wip" | "color" | "moveLeft" | "moveRight" | "delete") => void;
   canManageStage: boolean;
   dragDisabled?: boolean;
+  isTaskSelected?: (taskId: string) => boolean;
+  onToggleTaskSelect?: (taskId: string) => void;
 }
 
-export const StageColumn: React.FC<Props> = ({ stage, tasks, onAddTask, onOpenTask, onTaskMenuAction, onStageMenuAction, canManageStage, dragDisabled }) => {
+export const StageColumn: React.FC<Props> = ({
+  stage,
+  tasks,
+  onAddTask,
+  onOpenTask,
+  onTaskMenuAction,
+  onStageMenuAction,
+  canManageStage,
+  dragDisabled,
+  isTaskSelected,
+  onToggleTaskSelect,
+}) => {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
   const [menuOpen, setMenuOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -78,7 +91,15 @@ export const StageColumn: React.FC<Props> = ({ stage, tasks, onAddTask, onOpenTa
       >
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onOpen={() => onOpenTask(task)} onMenuAction={(a) => onTaskMenuAction(task, a)} dragDisabled={dragDisabled} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onOpen={() => onOpenTask(task)}
+              onMenuAction={(a) => onTaskMenuAction(task, a)}
+              dragDisabled={dragDisabled}
+              selected={isTaskSelected?.(task.id)}
+              onToggleSelect={onToggleTaskSelect ? () => onToggleTaskSelect(task.id) : undefined}
+            />
           ))}
         </SortableContext>
         {tasks.length === 0 && <p className="py-6 text-center text-xs text-slate-400">No tasks in this stage.</p>}

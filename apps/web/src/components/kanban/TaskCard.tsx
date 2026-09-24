@@ -16,6 +16,8 @@ interface Props {
   onOpen: () => void;
   onMenuAction: (action: "duplicate" | "move" | "recurring" | "delete") => void;
   dragDisabled?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 /**
@@ -26,7 +28,7 @@ interface Props {
  * assignee/due-date/priority happens in the full Task Detail Panel (via
  * "Open task"), which already exposes every field for editing.
  */
-export const TaskCard: React.FC<Props> = ({ task, onOpen, onMenuAction, dragDisabled }) => {
+export const TaskCard: React.FC<Props> = ({ task, onOpen, onMenuAction, dragDisabled, selected, onToggleSelect }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, disabled: dragDisabled });
   const [menuOpen, setMenuOpen] = React.useState(false);
   const { push } = useToast();
@@ -50,6 +52,11 @@ export const TaskCard: React.FC<Props> = ({ task, onOpen, onMenuAction, dragDisa
         </span>
       )}
       <div className="flex items-start gap-1.5">
+        {onToggleSelect && (
+          <span onClick={(e) => e.stopPropagation()} className="mt-0.5 shrink-0">
+            <Checkbox checked={!!selected} onChange={onToggleSelect} aria-label={`Select ${task.taskId}`} />
+          </span>
+        )}
         <button
           {...attributes}
           {...listeners}

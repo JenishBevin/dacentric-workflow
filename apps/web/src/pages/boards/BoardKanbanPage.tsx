@@ -2,17 +2,20 @@ import React, { useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload, Trello, PackageSearch, Building2, Landmark } from "lucide-react";
 import { useBoardDetail, useReorderStages, useSetBoardCompleted } from "../../api/boards";
-import { useBoardTasks, useDuplicateTask, useDeleteTask, useImportEnquiries, useImportEstimations } from "../../api/tasks";
+import { useBoardTasks, useDuplicateTask, useDeleteTask, useImportEnquiries, useImportEstimations, useBulkDeleteTasks, useBulkMoveTasks } from "../../api/tasks";
 import { downloadExport } from "../../api/misc";
 import { KanbanToolbar } from "../../components/kanban/KanbanToolbar";
 import { KanbanBoard } from "../../components/kanban/KanbanBoard";
 import { TaskListView } from "../../components/kanban/TaskListView";
+import { BulkMoveToStageSheet } from "../../components/kanban/BulkMoveToStageSheet";
 import { NewTaskDrawer } from "../../components/kanban/NewTaskDrawer";
 import { TaskDetailDrawer } from "../../components/tasks/TaskDetailDrawer";
 import { BoardSettingsDrawer } from "../../components/boards/BoardSettingsDrawer";
 import { ProcurementPanel } from "../../components/procurement/ProcurementPanel";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { Button, Skeleton, ErrorState, Badge } from "../../components/ui/primitives";
+import { BulkActionBar } from "../../components/ui/BulkActionBar";
+import { Button, Checkbox, Skeleton, ErrorState, Badge } from "../../components/ui/primitives";
+import { useSelection } from "../../hooks/useSelection";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 import { can, isAdmin, isSuperAdmin } from "../../lib/permissions";
@@ -92,7 +95,46 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   const reorderStages = useReorderStages(boardId ?? "");
   const duplicateTask = useDuplicateTask();
   const deleteTask = useDeleteTask();
+  const bulkDeleteTasks = useBulkDeleteTasks();
+  const bulkMoveTasks = useBulkMoveTasks();
   const setBoardCompleted = useSetBoardCompleted();
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const selection = useSelection((tasks ?? []).map((t) => t.id));
+
+  function reportBulkResult(result: { succeeded: string[]; failed: { id: string; error: string }[] }, verb: string) {
+    if (result.failed.length === 0) {
+      push({ variant: "success", title: `${result.succeeded.length} task${result.succeeded.length === 1 ? "" : "s"} ${verb}.` });
+    } else {
+      push({
+        variant: result.succeeded.length ? "success" : "error",
+        title: `${result.succeeded.length} ${verb}, ${result.failed.length} failed.`,
+        description: result.failed[0].error,
+      });
+    }
+  }
+
+  async function confirmBulkDelete() {
+    try {
+      const result = await bulkDeleteTasks.mutateAsync([...selection.selectedIds]);
+      reportBulkResult(result, "deleted");
+      selection.clear();
+      setBulkDeleteOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not delete tasks", description: extractApiError(err).message });
+    }
+  }
+
+  async function performBulkMove(stageId: string) {
+    try {
+      const result = await bulkMoveTasks.mutateAsync({ taskIds: [...selection.selectedIds], stageId });
+      reportBulkResult(result, "moved");
+      selection.clear();
+      setBulkMoveOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not move tasks", description: extractApiError(err).message });
+    }
+  }
   const importEnquiries = useImportEnquiries();
   const importEstimations = useImportEstimations();
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -163,6 +205,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   const canCreateTask = can(user, "CREATE_TASK");
   const canMoveTasks = can(user, "MOVE_TASK");
   const canExport = can(user, "EXPORT");
+  const canDeleteTasks = can(user, "DELETE_TASK");
 
   const stages: BoardStage[] = useMemo(() => [...(board?.stages ?? [])].sort((a: any, b: any) => a.position - b.position), [board]);
 
@@ -354,6 +397,41 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         canExport={canExport}
       />
 
+      {!tasksLoading && stages.length > 0 && tasks && tasks.length > 0 && (
+        <div className="mb-2 flex items-center gap-2 text-sm text-slate-600">
+          <Checkbox checked={selection.isAllSelected} onChange={selection.toggleAll} aria-label="Select all tasks" />
+          Select all ({tasks.length})
+        </div>
+      )}
+
+      {(canDeleteTasks || canMoveTasks || canExport) && (
+        <BulkActionBar count={selection.count} onClear={selection.clear}>
+          {canDeleteTasks && (
+            <Button variant="danger" size="sm" onClick={() => setBulkDeleteOpen(true)}>
+              Delete selected
+            </Button>
+          )}
+          {canMoveTasks && (
+            <Button variant="outline" size="sm" onClick={() => setBulkMoveOpen(true)}>
+              Move to stage
+            </Button>
+          )}
+          {canExport && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                downloadExport("/exports/tasks", { ids: [...selection.selectedIds].join(",") }, `tasks-export-${Date.now()}.xlsx`).catch((err) =>
+                  push({ variant: "error", title: "Export failed", description: extractApiError(err).message })
+                )
+              }
+            >
+              Export selected
+            </Button>
+          )}
+        </BulkActionBar>
+      )}
+
       {tasksLoading ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {stages.map((s) => (
@@ -363,7 +441,13 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
       ) : stages.length === 0 ? (
         <ErrorState message="This project has no stages yet. Add one from Project Settings." onRetry={() => openSettings("stages")} />
       ) : view === "list" ? (
-        <TaskListView stages={stages} tasksByStage={tasksByStage} onOpenTask={(task) => openTask(task.id)} />
+        <TaskListView
+          stages={stages}
+          tasksByStage={tasksByStage}
+          onOpenTask={(task) => openTask(task.id)}
+          isTaskSelected={selection.isSelected}
+          onToggleTaskSelect={selection.toggle}
+        />
       ) : (
         <KanbanBoard
           stages={stages}
@@ -374,6 +458,8 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
           onStageMenuAction={handleStageMenuAction}
           canManageStages={canManageBoard}
           canMoveTasks={canMoveTasks}
+          isTaskSelected={selection.isSelected}
+          onToggleTaskSelect={selection.toggle}
         />
       )}
 
@@ -425,6 +511,24 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
           }
           setPendingDeleteTask(null);
         }}
+      />
+
+      <BulkMoveToStageSheet
+        open={bulkMoveOpen}
+        onClose={() => setBulkMoveOpen(false)}
+        count={selection.count}
+        stages={stages}
+        onSelect={performBulkMove}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title="Delete tasks"
+        message={`Are you sure you want to delete ${selection.count} task${selection.count === 1 ? "" : "s"}? This cannot be undone.`}
+        confirmLabel="Delete tasks"
+        loading={bulkDeleteTasks.isPending}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={confirmBulkDelete}
       />
 
       <ConfirmDialog

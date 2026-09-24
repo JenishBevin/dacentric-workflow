@@ -106,6 +106,34 @@ export async function listBoards(
   }));
 }
 
+/** Bulk-export support (Projects list) — scoped the same way listBoards is
+ * (Business Rule 16 / Section 36), just filtered to a specific id selection
+ * instead of the search/scope filters used to render the screen. */
+export async function listBoardsByIds(boardIds: string[], user: AuthedUser) {
+  const boards = await prisma.board.findMany({
+    where: { id: { in: boardIds }, ...visibleBoardsWhere(user) },
+    include: {
+      stages: { select: { id: true } },
+      customer: { select: { name: true } },
+    },
+  });
+  const openCounts = await prisma.task.groupBy({
+    by: ["boardId"],
+    where: { boardId: { in: boardIds }, isDeleted: false, isCompleted: false },
+    _count: { _all: true },
+  });
+  const openMap = new Map(openCounts.map((c) => [c.boardId, c._count._all]));
+
+  return boards.map((b) => ({
+    boardId: b.boardId,
+    name: b.name,
+    customer: b.customer?.name ?? "",
+    status: b.isArchived ? "Archived" : "Active",
+    stageCount: b.stages.length,
+    openTaskCount: openMap.get(b.id) ?? 0,
+  }));
+}
+
 // Global "search by Project ID or name" lookup for the header search box.
 // Scoped by visibleBoardsWhere (Business Rule 16 / Section 36) — a board a
 // user isn't a member of must never be discoverable through search.
@@ -595,6 +623,37 @@ export async function deleteBoard(boardId: string, actor: AuthedUser, cascadeCon
     boardId,
     beforeValue: { name: board.name },
   });
+}
+
+export interface BulkResult {
+  succeeded: string[];
+  failed: { id: string; error: string }[];
+}
+
+export async function bulkDeleteBoards(boardIds: string[], actor: AuthedUser, cascadeConfirm = true): Promise<BulkResult> {
+  const result: BulkResult = { succeeded: [], failed: [] };
+  for (const boardId of boardIds) {
+    try {
+      await deleteBoard(boardId, actor, cascadeConfirm);
+      result.succeeded.push(boardId);
+    } catch (err) {
+      result.failed.push({ id: boardId, error: err instanceof Error ? err.message : "Could not delete this project." });
+    }
+  }
+  return result;
+}
+
+export async function bulkArchiveBoards(boardIds: string[], archived: boolean, actor: AuthedUser): Promise<BulkResult> {
+  const result: BulkResult = { succeeded: [], failed: [] };
+  for (const boardId of boardIds) {
+    try {
+      await archiveBoard(boardId, archived, actor);
+      result.succeeded.push(boardId);
+    } catch (err) {
+      result.failed.push({ id: boardId, error: err instanceof Error ? err.message : "Could not update this project." });
+    }
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------

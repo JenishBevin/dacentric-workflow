@@ -40,6 +40,51 @@ export function boardExportColumns() {
   ];
 }
 
+/** Shared row shape for both the per-board task export and the bulk
+ * selection export — same columns, same source data (serializeTask output). */
+export function mapTaskExportRow(t: any) {
+  return {
+    taskId: t.taskId,
+    title: t.title,
+    stage: t.stage?.name,
+    priority: t.priority,
+    assignees: t.assignees.map((a: { name: string }) => a.name).join(", "),
+    startDate: t.startDate ? new Date(t.startDate).toISOString().slice(0, 10) : "",
+    dueDate: t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 10) : "",
+    estimatedEffortHours: t.estimatedEffortHours ?? "",
+    checklist: `${t.checklistProgress.done}/${t.checklistProgress.total}`,
+    approvalStatus: t.approvalStatus,
+    tags: t.tags.map((tag: any) => tag.name).join(", "),
+  };
+}
+
+export function customersExportColumns() {
+  return [
+    { header: "Customer ID", key: "customerId", width: 16 },
+    { header: "Name", key: "name", width: 32 },
+    { header: "Status", key: "status", width: 12 },
+    { header: "Industry", key: "industry", width: 18 },
+    { header: "Country", key: "country", width: 16 },
+    { header: "Main Contact", key: "mainContactName", width: 22 },
+    { header: "Phone", key: "phone", width: 16 },
+    { header: "Email", key: "email", width: 26 },
+    { header: "Account Manager", key: "accountManager", width: 20 },
+    { header: "Enquiries", key: "enquiryCount", width: 12 },
+    { header: "Projects", key: "projectCount", width: 12 },
+  ];
+}
+
+export function boardsExportColumns() {
+  return [
+    { header: "Project ID", key: "boardId", width: 16 },
+    { header: "Name", key: "name", width: 32 },
+    { header: "Customer", key: "customer", width: 26 },
+    { header: "Status", key: "status", width: 12 },
+    { header: "Stages", key: "stageCount", width: 10 },
+    { header: "Open Tasks", key: "openTaskCount", width: 12 },
+  ];
+}
+
 export function workloadExportColumns() {
   return [
     { header: "Employee", key: "name", width: 24 },

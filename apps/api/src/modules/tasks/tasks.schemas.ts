@@ -147,6 +147,16 @@ export const requestLostSchema = z.object({
   reason: z.string().trim().min(1).optional(),
 });
 
+export const bulkDeleteTasksSchema = z.object({
+  taskIds: z.array(z.string().uuid()).min(1, "Select at least one task."),
+});
+
+export const bulkMoveTasksSchema = z.object({
+  taskIds: z.array(z.string().uuid()).min(1, "Select at least one task."),
+  stageId: z.string().uuid(),
+  confirmWipOverride: z.boolean().optional(),
+});
+
 export const taskFilterSchema = z.object({
   boardId: z.string().uuid().optional(),
   assigneeUserId: z.string().uuid().optional(),

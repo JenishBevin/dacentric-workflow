@@ -54,6 +54,28 @@ export function useDeleteCustomer() {
   });
 }
 
+export interface BulkResult {
+  succeeded: string[];
+  failed: { id: string; error: string }[];
+}
+
+export function useBulkDeleteCustomers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (customerIds: string[]) => (await api.post<{ data: BulkResult }>("/customers/bulk-delete", { customerIds })).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
+  });
+}
+
+export function useBulkUpdateCustomerStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ customerIds, status }: { customerIds: string[]; status: string }) =>
+      (await api.post<{ data: BulkResult }>("/customers/bulk-status", { customerIds, status })).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
+  });
+}
+
 export function useAddContact(customerId: string) {
   const qc = useQueryClient();
   return useMutation({

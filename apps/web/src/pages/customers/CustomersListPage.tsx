@@ -2,10 +2,14 @@ import React, { useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import clsx from "clsx";
 import { Plus, Building2, Upload, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from "lucide-react";
-import { useCustomers, useCreateCustomer, useImportCustomers, useDeleteCustomer } from "../../api/customers";
-import { Button, Input, Select, Badge, Skeleton, ErrorState, EmptyState } from "../../components/ui/primitives";
+import { useCustomers, useCreateCustomer, useImportCustomers, useDeleteCustomer, useBulkDeleteCustomers, useBulkUpdateCustomerStatus } from "../../api/customers";
+import { downloadExport } from "../../api/misc";
+import { Button, Input, Select, Badge, Checkbox, Skeleton, ErrorState, EmptyState } from "../../components/ui/primitives";
+import { BulkActionBar } from "../../components/ui/BulkActionBar";
 import { Drawer } from "../../components/ui/Drawer";
 import { Modal } from "../../components/ui/Modal";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { useSelection } from "../../hooks/useSelection";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
 import { CustomerStatus, CustomerSummary } from "../../lib/types";
@@ -66,10 +70,50 @@ export default function CustomersListPage() {
   }
   const [newOpen, setNewOpen] = useState(false);
   const canManage = can(user, "CRM_ERP_LINKING", "OWN");
+  const canExport = can(user, "EXPORT");
   const importCustomers = useImportCustomers();
   const deleteCustomer = useDeleteCustomer();
+  const bulkDeleteCustomers = useBulkDeleteCustomers();
+  const bulkUpdateStatus = useBulkUpdateCustomerStatus();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<CustomerSummary | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  const selection = useSelection((sortedCustomers ?? []).map((c) => c.id));
+
+  function reportBulkResult(result: { succeeded: string[]; failed: { id: string; error: string }[] }, verb: string) {
+    if (result.failed.length === 0) {
+      push({ variant: "success", title: `${result.succeeded.length} customer${result.succeeded.length === 1 ? "" : "s"} ${verb}.` });
+    } else {
+      push({
+        variant: result.succeeded.length ? "success" : "error",
+        title: `${result.succeeded.length} ${verb}, ${result.failed.length} failed.`,
+        description: result.failed[0].error,
+      });
+    }
+  }
+
+  async function confirmBulkDelete() {
+    try {
+      const result = await bulkDeleteCustomers.mutateAsync([...selection.selectedIds]);
+      reportBulkResult(result, "deleted");
+      selection.clear();
+      setBulkDeleteOpen(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not delete customers", description: extractApiError(err).message });
+    }
+  }
+
+  async function handleBulkStatusChange(status: string) {
+    if (!status) return;
+    try {
+      const result = await bulkUpdateStatus.mutateAsync({ customerIds: [...selection.selectedIds], status });
+      reportBulkResult(result, "updated");
+      selection.clear();
+    } catch (err) {
+      push({ variant: "error", title: "Could not update customers", description: extractApiError(err).message });
+    }
+  }
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -136,6 +180,33 @@ export default function CustomersListPage() {
         </Select>
       </div>
 
+      {canManage && (
+        <BulkActionBar count={selection.count} onClear={selection.clear}>
+          <Button variant="danger" size="sm" onClick={() => setBulkDeleteOpen(true)}>
+            Delete selected
+          </Button>
+          {canExport && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                downloadExport("/exports/customers", { ids: [...selection.selectedIds].join(",") }, `customers-export-${Date.now()}.xlsx`).catch((err) =>
+                  push({ variant: "error", title: "Export failed", description: extractApiError(err).message })
+                )
+              }
+            >
+              Export selected
+            </Button>
+          )}
+          <Select className="w-auto" value="" onChange={(e) => handleBulkStatusChange(e.target.value)}>
+            <option value="">Change status…</option>
+            <option value="ACTIVE">Active</option>
+            <option value="PROSPECT">Prospect</option>
+            <option value="INACTIVE">Inactive</option>
+          </Select>
+        </BulkActionBar>
+      )}
+
       {isLoading && <Skeleton className="h-64 w-full" />}
       {isError && <ErrorState message="Could not load customers." onRetry={() => refetch()} />}
       {customers && customers.length === 0 && (
@@ -147,6 +218,11 @@ export default function CustomersListPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <tr>
+                {canManage && (
+                  <th className="px-4 py-2.5">
+                    <Checkbox checked={selection.isAllSelected} onChange={selection.toggleAll} aria-label="Select all customers" />
+                  </th>
+                )}
                 <SortableHeader label="Customer" sortKey="name" active={sort} onSort={toggleSort} />
                 <th className="px-4 py-2.5">Main Contact</th>
                 <th className="px-4 py-2.5">Status</th>
@@ -159,6 +235,11 @@ export default function CustomersListPage() {
             <tbody>
               {sortedCustomers!.map((c) => (
                 <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                  {canManage && (
+                    <td className="px-4 py-2.5">
+                      <Checkbox checked={selection.isSelected(c.id)} onChange={() => selection.toggle(c.id)} aria-label={`Select ${c.name}`} />
+                    </td>
+                  )}
                   <td className="px-4 py-2.5">
                     <Link to={`/workflow/customers/${c.id}`} className="font-medium text-brand-700 hover:underline">
                       {c.name}
@@ -232,6 +313,16 @@ export default function CustomersListPage() {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title="Delete customers"
+        message={`Are you sure you want to delete ${selection.count} customer${selection.count === 1 ? "" : "s"}? This cannot be undone.`}
+        confirmLabel="Delete customers"
+        loading={bulkDeleteCustomers.isPending}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={confirmBulkDelete}
+      />
     </div>
   );
 }
