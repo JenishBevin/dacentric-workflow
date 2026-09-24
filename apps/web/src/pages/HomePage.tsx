@@ -23,7 +23,6 @@ import onerraLogoFullLight from "../assets/onerra-logo-full-light.png";
 import onerraLogoIcon from "../assets/onerra-logo-icon.png";
 import onerraMarketingDashboard from "../assets/onerra-marketing-dashboard.webp";
 import onerraMarketingTeamWorkload from "../assets/onerra-marketing-teamworkload.webp";
-import dubaiSkyline from "../assets/dubai-skyline-sunset.jpg";
 
 const SERVICES = [
   {
@@ -63,9 +62,10 @@ const SERVICE_OPTIONS = SERVICES.map((s) => s.title);
 const SOFTWARE_FEATURES = ["Workflow & Project Management", "CRM & Customer Tracking", "HRMS & Employee Management", "ERP & Inventory Control"];
 
 const WHY_US = [
-  { title: "Built In-House", description: "We build and maintain our own software, so we understand what it takes to ship reliable systems." },
-  { title: "Client-Centric", description: "Every engagement starts with understanding your workflow, not fitting you into a generic template." },
-  { title: "Long-Term Support", description: "We stay involved after launch — support, updates, and improvements as your business grows." },
+  { title: "Built Around Your Workflow", description: "Every engagement starts with your actual processes, not a generic template we adapt you into." },
+  { title: "Integrated Systems", description: "Software, infrastructure, and operations connected as one platform, not a pile of disconnected tools." },
+  { title: "Scalable Architecture", description: "Built to grow with the organization, from a single team to the whole business." },
+  { title: "Ongoing Support", description: "We stay involved after launch — support, updates, and improvements as your business grows." },
 ];
 
 const SCREENSHOTS = [
@@ -75,9 +75,9 @@ const SCREENSHOTS = [
 
 const NAV_ITEMS = [
   { label: "Home", href: "#top" },
-  { label: "About", href: "#about" },
-  { label: "Services", href: "#services" },
+  { label: "Solutions", href: "#services" },
   { label: "Software", href: "#software" },
+  { label: "About", href: "#about" },
   { label: "Contact", href: "#contact" },
 ];
 
@@ -127,6 +127,26 @@ function PillNav({ onHomeClick }: { onHomeClick: (e: React.MouseEvent) => void }
         </a>
       ))}
     </div>
+  );
+}
+
+/** Abstract dot-grid + connecting lines, standing in for the old Dubai
+ *  skyline photo — reads as "technology/network" rather than "Dubai city",
+ *  and stays quiet enough to never compete with the headline on top of it. */
+function TechGridBackground() {
+  return (
+    <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+      <defs>
+        <pattern id="tech-grid-dots" width="42" height="42" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="1" fill="white" fillOpacity="0.16" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#tech-grid-dots)" />
+      <line x1="8%" y1="18%" x2="34%" y2="4%" stroke="white" strokeOpacity="0.08" strokeWidth="1" />
+      <line x1="34%" y1="4%" x2="60%" y2="14%" stroke="white" strokeOpacity="0.08" strokeWidth="1" />
+      <line x1="72%" y1="82%" x2="94%" y2="68%" stroke="white" strokeOpacity="0.08" strokeWidth="1" />
+      <line x1="46%" y1="92%" x2="72%" y2="82%" stroke="white" strokeOpacity="0.08" strokeWidth="1" />
+    </svg>
   );
 }
 
@@ -486,21 +506,17 @@ export default function HomePage() {
       {/* Hero — padded to clear the floating header */}
       <div className="relative overflow-hidden bg-[#0b1330] pt-24">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b1330] via-[#111c4e] to-[#1c2f7f]" />
-        <div
-          className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-30"
-          style={{ backgroundImage: `url(${dubaiSkyline})` }}
-        />
+        <TechGridBackground />
         <div className="pointer-events-none absolute -left-28 -top-28 h-80 w-80 rounded-full bg-blue-600/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-32 right-10 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
 
         <div className="relative z-10 mx-auto max-w-6xl px-4 pb-24 pt-12 text-center sm:px-6 sm:pt-20">
           <p className="text-sm font-medium tracking-wide text-blue-300">IT Solutions & Software Services</p>
-          <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl">
-            Technology That Runs Your Business, Not the Other Way Around
+          <h1 className="mx-auto mt-4 max-w-2xl text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl">
+            Technology That Runs Your Business
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base text-slate-300 sm:text-lg">
-            Onerra designs and builds enterprise software, workflow automation, and IT infrastructure for businesses that
-            want systems built around how they actually work.
+          <p className="mx-auto mt-5 max-w-xl text-base text-slate-300 sm:text-lg">
+            Custom software, workflow automation, and IT infrastructure designed around your business.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <a
@@ -509,56 +525,16 @@ export default function HomePage() {
             >
               Explore Services <ArrowRight className="h-4 w-4" />
             </a>
-            <a
-              href="#contact"
-              className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/10"
-            >
-              Get in Touch
-            </a>
           </div>
         </div>
       </div>
 
-      {/* About */}
-      <section id="about" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">About Onerra</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">A product of DaCentric Technologies</h2>
-            <p className="mt-4 text-justify text-slate-600">
-              Onerra is built and maintained by <span className="font-medium text-slate-800">DaCentric Technologies</span>, a
-              software and IT infrastructure company headquartered in the UAE, serving businesses across the MEA region and
-              India. DaCentric combines global technology expertise with local market knowledge to help enterprises adopt
-              secure, scalable digital solutions with confidence.
-            </p>
-            <p className="mt-4 text-justify text-slate-600">
-              DaCentric's work spans enterprise systems, workflow automation, AI-driven solutions, and IT infrastructure —
-              built on long-term partnerships grounded in transparency, integrity, and collaboration. Onerra is a direct
-              product of that same engineering team.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { icon: BarChart3, label: "Operational Focus" },
-              { icon: Users, label: "Client-Centric" },
-              { icon: ShieldCheck, label: "Secure by Design" },
-              { icon: Workflow, label: "Automation First" },
-            ].map(({ icon: Icon, label }) => (
-              <div key={label} className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center">
-                <Icon className="h-6 w-6 text-blue-600" />
-                <span className="text-sm font-medium text-slate-700">{label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Services */}
+      {/* Services — "what we do", right after the hero */}
       <section id="services" className="scroll-mt-20 bg-slate-50 py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">Services</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">Everything your business needs to run on solid systems</h2>
+            <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">What We Do</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">Technology built around how you work</h2>
           </div>
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {SERVICES.map(({ icon: Icon, title, description }) => (
@@ -611,13 +587,62 @@ export default function HomePage() {
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">Why Onerra</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">A partner that stays involved</h2>
         </div>
-        <div className="mt-12 grid gap-6 sm:grid-cols-3">
+        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {WHY_US.map(({ title, description }) => (
             <div key={title} className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
               <h3 className="text-base font-semibold text-slate-900">{title}</h3>
               <p className="mt-2 text-sm text-slate-600">{description}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* About — company background, kept but no longer the first thing after the hero */}
+      <section id="about" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">About Onerra</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">A product of DaCentric Technologies</h2>
+            <p className="mt-4 text-justify text-slate-600">
+              Onerra is built and maintained by <span className="font-medium text-slate-800">DaCentric Technologies</span>, a
+              software and IT infrastructure company headquartered in the UAE, serving businesses across the MEA region and
+              India. DaCentric combines global technology expertise with local market knowledge to help enterprises adopt
+              secure, scalable digital solutions with confidence.
+            </p>
+            <p className="mt-4 text-justify text-slate-600">
+              DaCentric's work spans enterprise systems, workflow automation, AI-driven solutions, and IT infrastructure —
+              built on long-term partnerships grounded in transparency, integrity, and collaboration. Onerra is a direct
+              product of that same engineering team.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { icon: BarChart3, label: "Operational Focus" },
+              { icon: Users, label: "Client-Centric" },
+              { icon: ShieldCheck, label: "Secure by Design" },
+              { icon: Workflow, label: "Automation First" },
+            ].map(({ icon: Icon, label }) => (
+              <div key={label} className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center">
+                <Icon className="h-6 w-6 text-blue-600" />
+                <span className="text-sm font-medium text-slate-700">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="relative overflow-hidden bg-[#0b1330] py-16">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b1330] via-[#111c4e] to-[#1c2f7f]" />
+        <TechGridBackground />
+        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Let's build technology around your business.</h2>
+          <a
+            href="#contact"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-lg transition hover:brightness-95"
+          >
+            Talk to Onerra <ArrowRight className="h-4 w-4" />
+          </a>
         </div>
       </section>
 
