@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Drawer } from "../ui/Drawer";
 import { Button, Input, Label, Select, Badge } from "../ui/primitives";
@@ -12,7 +12,7 @@ import { useChecklistTemplates, useCreateChecklistTemplate } from "../../api/che
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
 import { Board, BoardStage, CustomerRef } from "../../lib/types";
-import { X, Plus } from "lucide-react";
+import { X, Plus, ClipboardList } from "lucide-react";
 
 interface TaskPrefill {
   title: string;
@@ -74,6 +74,16 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
+  const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
+  const templateMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (templateMenuRef.current && !templateMenuRef.current.contains(e.target as Node)) setTemplateMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [recordQuery, setRecordQuery] = useState("");
   const [linkedRecord, setLinkedRecord] = useState<{ id: string; type: string; name: string } | null>(null);
@@ -113,6 +123,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
     setNewChecklistItem("");
     setSaveTemplateOpen(false);
     setTemplateName("");
+    setTemplateMenuOpen(false);
     setTagIds([]);
     setLinkedRecord(null);
     setRecordQuery("");
@@ -328,20 +339,40 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
         <section>
           <div className="flex items-center justify-between gap-2">
             <Label>Checklist</Label>
-            {isEnquiryBoard && checklistTemplates && checklistTemplates.length > 0 && (
-              <Select
-                className="w-auto py-1 text-xs"
-                value=""
-                onChange={(e) => applyChecklistTemplate(e.target.value)}
-                aria-label="Use checklist template"
-              >
-                <option value="">Use template…</option>
-                {checklistTemplates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.items.length})
-                  </option>
-                ))}
-              </Select>
+            {isEnquiryBoard && (
+              <div className="relative" ref={templateMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setTemplateMenuOpen((o) => !o)}
+                  className="flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  <ClipboardList className="h-3.5 w-3.5" /> Templates
+                </button>
+                {templateMenuOpen && (
+                  <div className="absolute right-0 z-20 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg">
+                    {checklistTemplates && checklistTemplates.length > 0 ? (
+                      checklistTemplates.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            applyChecklistTemplate(t.id);
+                            setTemplateMenuOpen(false);
+                          }}
+                          className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left hover:bg-slate-50"
+                        >
+                          <span className="min-w-0 truncate">{t.name}</span>
+                          <span className="shrink-0 text-xs text-slate-400">{t.items.length} item{t.items.length === 1 ? "" : "s"}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="px-3 py-2 text-xs text-slate-400">
+                        No saved templates yet — add checklist items below, then "Save this checklist as a template".
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
           <div className="space-y-1.5">
