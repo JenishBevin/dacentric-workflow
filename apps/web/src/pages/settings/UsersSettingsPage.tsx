@@ -528,7 +528,7 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
 
 const BulkImportModal: React.FC<{ open: boolean; onClose: () => void; onImport: ReturnType<typeof useBulkImportUsers> }> = ({ open, onClose, onImport }) => {
   const { push } = useToast();
-  const [csv, setCsv] = useState("name,workEmail,roles,moduleAccess\nJane Doe,jane.doe@example.com,ESTIMATION,WORKFLOW");
+  const [csv, setCsv] = useState("name,workEmail,roles,moduleAccess,employeeCode\nJane Doe,jane.doe@example.com,ESTIMATION,WORKFLOW,");
 
   async function submit() {
     const lines = csv.trim().split("\n").filter(Boolean);
@@ -543,6 +543,7 @@ const BulkImportModal: React.FC<{ open: boolean; onClose: () => void; onImport: 
         workEmail: row.workEmail,
         roles: (row.roles ?? "").split("|").filter(Boolean),
         moduleAccess: (row.moduleAccess ?? "").split("|").filter(Boolean),
+        employeeCode: row.employeeCode || undefined,
       };
     });
     try {
@@ -561,7 +562,13 @@ const BulkImportModal: React.FC<{ open: boolean; onClose: () => void; onImport: 
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Bulk import users" description="One row per user. roles and moduleAccess are pipe-separated (e.g. ESTIMATION|VIEWER)." size="lg">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Bulk import users"
+      description="One row per user. roles and moduleAccess are pipe-separated (e.g. ESTIMATION|VIEWER). employeeCode is optional — matches an existing HRMS employee record to auto-link it. Every row is invited by email; passwords can't be set here."
+      size="lg"
+    >
       <textarea
         rows={10}
         value={csv}
