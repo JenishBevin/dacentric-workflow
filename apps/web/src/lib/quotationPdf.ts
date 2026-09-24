@@ -411,13 +411,10 @@ export async function generateQuotationPdf(input: QuotationPdfInput, opts?: { pr
   y += 10;
 
   // --- Signature ---
-  // Stamp gets its own reserved block, stacked between "Thanks & Regards,"
-  // and the preparer's name/designation/mobile — not overlapping any text,
-  // top to bottom: "Thanks & Regards," -> stamp -> name -> designation -> mobile.
+  // Stamp gets its own reserved block, above "Thanks & Regards," — not
+  // overlapping any text, top to bottom: stamp -> "Thanks & Regards," ->
+  // name -> designation -> mobile.
   ensureSpace(60);
-  doc.text("Thanks & Regards,", contentRight, y, { align: "right" });
-  y += 8;
-
   const stampSize = 28; // mm — square, source asset is trimmed to a 1:1 aspect
   const stampCenterX = contentRight - 20;
   try {
@@ -427,6 +424,9 @@ export async function generateQuotationPdf(input: QuotationPdfInput, opts?: { pr
     // Non-fatal — proceed without the stamp rather than blocking the download.
   }
   y += stampSize + 4;
+
+  doc.text("Thanks & Regards,", contentRight, y, { align: "right" });
+  y += 6;
 
   doc.text(input.preparerName, contentRight, y, { align: "right" });
   y += 4.8;
