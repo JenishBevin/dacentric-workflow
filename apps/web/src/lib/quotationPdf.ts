@@ -109,11 +109,11 @@ function money(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** Renders the company's fixed proposal letterhead and downloads it as a PDF —
- * layout/sections/boilerplate/font sizes/line spacing/grid borders all match
- * the standard template; only the fields on QuotationPdfInput vary per
- * quotation. */
-export async function generateQuotationPdf(input: QuotationPdfInput) {
+/** Renders the company's fixed proposal letterhead and either downloads it or
+ * opens it in a new tab for preview — layout/sections/boilerplate/font
+ * sizes/line spacing/grid borders all match the standard template; only the
+ * fields on QuotationPdfInput vary per quotation. */
+export async function generateQuotationPdf(input: QuotationPdfInput, opts?: { preview?: boolean; previewWindow?: Window | null }) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = 210;
   const marginX = 15;
@@ -147,6 +147,17 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.15);
     doc.line(x, baselineY + 0.8, x + w, baselineY + 0.8);
+  }
+
+  // Wraps long centered headings (the proposal title, "PROJECT : ...") onto
+  // extra lines instead of running off the page edge — a long project name
+  // otherwise printed past the margins with plain doc.text(). Returns the
+  // baseline Y of the last line drawn, so callers can cascade later fixed
+  // positions down by however many extra lines were needed.
+  function drawCenteredWrapped(text: string, startY: number, maxWidth: number, lineGap: number): number {
+    const lines = doc.splitTextToSize(text, maxWidth) as string[];
+    lines.forEach((line, i) => doc.text(line, pageWidth / 2, startY + i * lineGap, { align: "center" }));
+    return startY + (lines.length - 1) * lineGap;
   }
 
   // ============================= PAGE 1 — cover =============================
@@ -188,14 +199,22 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
     doc.text(line, marginX, y);
   });
 
-  // --- Title / project / ref — fixed positions, same as the reference ---
+  // --- Title / project / ref — fixed starting positions, same as the
+  // reference, but each heading wraps onto extra lines instead of running
+  // off the page edge when it's too long; later lines cascade down by
+  // however much room the previous heading's wrapping consumed. ---
+  const HEADING_MAX_WIDTH = pageWidth - 2 * 20; // 170mm — generous margin either side
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16.3);
-  doc.text(input.title, pageWidth / 2, PAGE1_Y.title, { align: "center" });
+  const titleEndY = drawCenteredWrapped(input.title, PAGE1_Y.title, HEADING_MAX_WIDTH, 7);
+  const titleExtra = titleEndY - PAGE1_Y.title;
 
   doc.setFontSize(13.6);
-  doc.text(`PROJECT : ${input.projectName.toUpperCase()}`, pageWidth / 2, PAGE1_Y.project, { align: "center" });
-  doc.text(`Ref. ${input.refId}`, pageWidth / 2, PAGE1_Y.ref, { align: "center" });
+  const projectStartY = PAGE1_Y.project + titleExtra;
+  const projectEndY = drawCenteredWrapped(`PROJECT : ${input.projectName.toUpperCase()}`, projectStartY, HEADING_MAX_WIDTH, 6);
+  const projectExtra = projectEndY - projectStartY;
+
+  doc.text(`Ref. ${input.refId}`, pageWidth / 2, PAGE1_Y.ref + titleExtra + projectExtra, { align: "center" });
   doc.setFont("helvetica", "normal");
 
   printFooter();
@@ -210,7 +229,11 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   doc.setFontSize(BODY_SIZE);
 
   doc.setFont("helvetica", "bold");
-  doc.text(`Sub : ${input.title}`, marginX, y);
+  // Wraps onto extra lines instead of running off the page edge — same
+  // overflow the centered page-1 title had, just left-aligned here.
+  const subLines = doc.splitTextToSize(`Sub : ${input.title}`, contentRight - marginX) as string[];
+  doc.text(subLines, marginX, y);
+  y += (subLines.length - 1) * 3.8;
   doc.setFont("helvetica", "normal");
   y += 6.5;
   const intro = [
@@ -388,10 +411,13 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   y += 10;
 
   // --- Signature ---
-  ensureSpace(24);
+  ensureSpace(40);
   doc.text("Thanks & Regards,", contentRight, y, { align: "right" });
-  y += 6;
-  const nameY = y; // baseline of the preparer's name — the company stamp overlaps this line
+  // Extra clearance below "Thanks & Regards," (was 6mm) — the stamp below
+  // needs room to sit clear of this line entirely, not just the name line,
+  // regardless of which optional lines (designation/mobile) follow.
+  y += 14;
+  const nameY = y; // baseline of the preparer's name
   doc.text(input.preparerName, contentRight, y, { align: "right" });
   y += 4.8;
   if (input.preparerDesignation) {
@@ -403,13 +429,14 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
     y += 4.8;
   }
 
-  // Company stamp, placed over the preparer's printed name — same as a
-  // physical seal stamped across a signature on a paper copy.
+  // Company stamp, centered just below the preparer's name — same as a
+  // physical seal stamped across a signature on a paper copy — but kept
+  // clear of "Thanks & Regards," above via the extra gap added above.
   try {
     const stampDataUrl = await toDataUrl(qplusStamp);
     const stampSize = 28; // mm — square, source asset is trimmed to a 1:1 aspect
     const stampCenterX = contentRight - 20;
-    const stampCenterY = nameY - 1.5; // nudge up from the text baseline to its visual center
+    const stampCenterY = nameY + 3;
     doc.addImage(stampDataUrl, "PNG", stampCenterX - stampSize / 2, stampCenterY - stampSize / 2, stampSize, stampSize, undefined, "NONE");
   } catch {
     // Non-fatal — proceed without the stamp rather than blocking the download.
@@ -418,5 +445,16 @@ export async function generateQuotationPdf(input: QuotationPdfInput) {
   printFooter();
 
   const fileSafe = input.projectName.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-  doc.save(`quotation-${fileSafe}${input.hidePrices ? "-no-price" : ""}.pdf`);
+  const filename = `quotation-${fileSafe}${input.hidePrices ? "-no-price" : ""}.pdf`;
+  if (opts?.preview) {
+    // Navigates a tab to the rendered PDF's blob URL, rather than
+    // triggering a file download — lets the user check the layout first.
+    // The tab must already be open (see previewWindow): calling
+    // window.open() here, after the awaits above, happens too long after
+    // the user's click for most browsers' popup blockers to allow it.
+    const target = opts.previewWindow ?? window.open("", "_blank");
+    if (target) target.location.href = doc.output("bloburl").toString();
+  } else {
+    doc.save(filename);
+  }
 }

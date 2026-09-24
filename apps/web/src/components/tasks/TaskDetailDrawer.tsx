@@ -227,7 +227,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
   const quoteVatAmount = (quoteSubtotal * (Number(quoteVatRate) || 0)) / 100;
   const quoteTotal = quoteSubtotal + quoteVatAmount;
 
-  async function submitQuotation(mode: "with" | "without" | "both" = "with") {
+  async function submitQuotation(mode: "with" | "without" | "both" | "preview" = "with", previewWindow?: Window | null) {
     if (!taskId) return;
     if (!quoteTitle.trim()) {
       push({ variant: "error", title: "Enter a title for the proposal." });
@@ -281,11 +281,17 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
         preparerDesignation: quotePreparerDesignation.trim(),
         preparerMobile: quotePreparerMobile.trim(),
       };
-      if (mode === "with" || mode === "both") await generateQuotationPdf({ ...pdfInput, hidePrices: false });
-      if (mode === "without" || mode === "both") await generateQuotationPdf({ ...pdfInput, hidePrices: true });
-      push({ variant: "success", title: "Quotation downloaded.", description: "Upload the PDF to this task's Attachments below." });
-      setQuotationOpen(false);
+      if (mode === "preview") {
+        await generateQuotationPdf({ ...pdfInput, hidePrices: false }, { preview: true, previewWindow });
+        push({ variant: "success", title: "Preview opened in a new tab." });
+      } else {
+        if (mode === "with" || mode === "both") await generateQuotationPdf({ ...pdfInput, hidePrices: false });
+        if (mode === "without" || mode === "both") await generateQuotationPdf({ ...pdfInput, hidePrices: true });
+        push({ variant: "success", title: "Quotation downloaded.", description: "Upload the PDF to this task's Attachments below." });
+        setQuotationOpen(false);
+      }
     } catch (err) {
+      previewWindow?.close(); // don't leave a blank about:blank tab behind if generation failed
       push({ variant: "error", title: "Could not create quotation", description: extractApiError(err).message });
     } finally {
       setQuoteGenerating(false);
@@ -1242,6 +1248,19 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
           <div className="flex flex-wrap justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setQuotationOpen(false)}>
               Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Must open synchronously in this click handler — opening it
+                // later (after the awaits inside submitQuotation) is past
+                // the window most browsers allow for a user-gesture popup.
+                const win = window.open("", "_blank");
+                submitQuotation("preview", win);
+              }}
+              loading={saveQuote.isPending || quoteGenerating}
+            >
+              Preview
             </Button>
             <Button variant="outline" onClick={() => submitQuotation("without")} loading={saveQuote.isPending || quoteGenerating}>
               Download without Price
