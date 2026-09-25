@@ -71,6 +71,8 @@ export const ChatWidget: React.FC = () => {
   const [addPeopleSearch, setAddPeopleSearch] = useState("");
   const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set());
   const [showMembers, setShowMembers] = useState(false);
+  const [pulseActive, setPulseActive] = useState(false);
+  const prevUnreadRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const stickerRef = useRef<HTMLDivElement>(null);
@@ -79,6 +81,23 @@ export const ChatWidget: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: unreadCount } = useUnreadChatCount();
+
+  // A brief "new message" cue on the floating button — pulse + ring + typing
+  // dots — the moment the unread count rises while the panel is closed
+  // (polling-based, so this is the closest thing to a "receiving" signal we
+  // have; skips the very first load, which isn't a new arrival).
+  useEffect(() => {
+    if (unreadCount === undefined) return;
+    const prev = prevUnreadRef.current;
+    prevUnreadRef.current = unreadCount;
+    if (prev === null || open) return;
+    if (unreadCount > prev) {
+      setPulseActive(true);
+      const timer = setTimeout(() => setPulseActive(false), 1300);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unreadCount]);
   const { data: conversations, isLoading: conversationsLoading } = useConversations(open && view.screen === "list");
   const { data: messageableUsers } = useMessageableUsers(userSearch, open && view.screen === "new");
   const startConversation = useStartConversation();
@@ -750,18 +769,34 @@ export const ChatWidget: React.FC = () => {
         </div>
       )}
 
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="relative flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-white shadow-xl hover:bg-brand-700"
-        aria-label={open ? "Close chat" : `Open chat${unreadCount ? `, ${unreadCount} unread` : ""}`}
-      >
-        {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
-        {!open && !!unreadCount && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
+      <div className="relative">
+        {pulseActive && (
+          <div className="absolute -top-11 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-100 bg-white px-2.5 py-1.5 shadow-lg">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-chat-dot" style={{ animationDelay: "0ms" }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-chat-dot" style={{ animationDelay: "150ms" }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-chat-dot" style={{ animationDelay: "300ms" }} />
+          </div>
         )}
-      </button>
+        {pulseActive && <span className="pointer-events-none absolute inset-0 rounded-full border-2 border-brand-400 animate-chat-ring" />}
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className={clsx(
+            "relative flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-white shadow-xl hover:bg-brand-700",
+            pulseActive && "animate-chat-pulse"
+          )}
+          aria-label={open ? "Close chat" : `Open chat${unreadCount ? `, ${unreadCount} unread` : ""}`}
+        >
+          {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
+          {!open && !!unreadCount && (
+            <span
+              key={unreadCount}
+              className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white animate-badge-bounce-in"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
+      </div>
 
       <ConfirmDialog
         open={!!pendingDeleteMessageId}
