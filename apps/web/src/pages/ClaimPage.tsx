@@ -262,7 +262,7 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
           <p className="text-sm font-semibold text-slate-800">Pending Approvals &amp; Settlement</p>
           <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            Admin and Finance verifies first, then Management approves, then Accounts settles it with the next salary run.
+            Admin and Finance verifies first, then Management approves, then Accounts settles it.
           </div>
 
           {actionableLoading && <Skeleton className="h-40 w-full" />}
