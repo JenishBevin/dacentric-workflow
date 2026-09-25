@@ -103,6 +103,7 @@ const FilterControls: React.FC<{ filters: Filters; onChange: (f: Filters) => voi
     <Select value={filters.sortBy ?? ""} onChange={(e) => onChange({ ...filters, sortBy: e.target.value || undefined })} className="!w-40">
       <option value="">Sort: Default</option>
       <option value="dueDate">Sort: Due date</option>
+      <option value="createdAt">Sort: Custom Date</option>
       <option value="priority">Sort: Priority</option>
       <option value="title">Sort: Title</option>
     </Select>

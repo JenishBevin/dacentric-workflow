@@ -38,6 +38,7 @@ function sortTasks(tasks: TaskSummary[], key?: string): TaskSummary[] {
   if (!key || key === "none") return tasks;
   const list = [...tasks];
   if (key === "dueDate") list.sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
+  else if (key === "createdAt") list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   else if (key === "priority") list.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
   else if (key === "title") list.sort((a, b) => a.title.localeCompare(b.title));
   else if (key === "assignee") list.sort((a, b) => (a.assignees[0]?.name ?? "").localeCompare(b.assignees[0]?.name ?? ""));

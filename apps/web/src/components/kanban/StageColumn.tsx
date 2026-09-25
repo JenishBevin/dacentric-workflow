@@ -49,7 +49,7 @@ export const StageColumn: React.FC<Props> = ({
   const nearLimit = stage.wipLimit ? openCount >= stage.wipLimit - 1 && !overLimit : false;
 
   return (
-    <div className="flex w-72 shrink-0 flex-col rounded-xl bg-slate-100/70 sm:w-80">
+    <div className="flex h-full w-72 shrink-0 flex-col rounded-xl bg-slate-100/70 sm:w-80">
       <div className="flex items-center justify-between gap-2 px-3 pt-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: stage.color }} />
