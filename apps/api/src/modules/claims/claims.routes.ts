@@ -49,10 +49,11 @@ claimsRouter.post(
   "/",
   upload.array("files", 5),
   asyncHandler(async (req, res) => {
-    const { amount, reason, expenseDate } = req.body as Record<string, string>;
+    const { amount, currency, reason, expenseDate } = req.body as Record<string, string>;
     const files = (req.files as Express.Multer.File[]) ?? [];
     const claim = await claimsService.submitClaim(req.user!, {
       amount: Number(amount),
+      currency,
       reason,
       expenseDate: new Date(expenseDate),
       files,

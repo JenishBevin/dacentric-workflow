@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/apiClient";
 
+export const CLAIM_CURRENCIES = ["AED", "USD", "INR", "GBP", "EUR", "SAR"] as const;
+
 export function useMyClaims() {
   return useQuery({ queryKey: ["my-claims"], queryFn: async () => (await api.get("/claims/mine")).data.data });
 }
@@ -29,9 +31,22 @@ export function useSettledClaims(filters: SettledClaimsFilters, enabled: boolean
 export function useSubmitClaim() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ amount, reason, expenseDate, files }: { amount: number; reason: string; expenseDate: string; files: File[] }) => {
+    mutationFn: async ({
+      amount,
+      currency,
+      reason,
+      expenseDate,
+      files,
+    }: {
+      amount: number;
+      currency: string;
+      reason: string;
+      expenseDate: string;
+      files: File[];
+    }) => {
       const form = new FormData();
       form.append("amount", String(amount));
+      form.append("currency", currency);
       form.append("reason", reason);
       form.append("expenseDate", expenseDate);
       files.forEach((f) => form.append("files", f));

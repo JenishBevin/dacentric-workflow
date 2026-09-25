@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { format } from "date-fns";
 import { Receipt, Plus, Paperclip, Download, Check, X as XIcon, CheckCircle2, Info } from "lucide-react";
-import { useMyClaims, useActionableClaims, useSubmitClaim, useVerifyClaim, useDecideClaim, useSettleClaim, downloadClaimAttachment } from "../api/claims";
-import { Badge, Button, Input, Label, Textarea, Skeleton, EmptyState, Card, ErrorState } from "../components/ui/primitives";
+import { useMyClaims, useActionableClaims, useSubmitClaim, useVerifyClaim, useDecideClaim, useSettleClaim, downloadClaimAttachment, CLAIM_CURRENCIES } from "../api/claims";
+import { Badge, Button, Input, Label, Select, Textarea, Skeleton, EmptyState, Card, ErrorState } from "../components/ui/primitives";
 import { Drawer } from "../components/ui/Drawer";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../context/AuthContext";
@@ -30,8 +30,8 @@ const WAITING_ON_LABEL: Record<string, string> = {
   MANAGEMENT_APPROVED: "Accounts",
 };
 
-function formatAmount(amount: number) {
-  return `AED ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatAmount(amount: number, currency: string = "AED") {
+  return `${currency} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function SubmitClaimDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -39,6 +39,7 @@ function SubmitClaimDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const submit = useSubmitClaim();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState("AED");
   const [expenseDate, setExpenseDate] = useState("");
   const [reason, setReason] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -52,9 +53,10 @@ function SubmitClaimDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   async function submitForm(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await submit.mutateAsync({ amount: Number(amount), reason, expenseDate, files });
+      await submit.mutateAsync({ amount: Number(amount), currency, reason, expenseDate, files });
       push({ variant: "success", title: "Claim submitted.", description: "You'll be notified once it's decided." });
       setAmount("");
+      setCurrency("AED");
       setExpenseDate("");
       setReason("");
       setFiles([]);
@@ -67,9 +69,21 @@ function SubmitClaimDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   return (
     <Drawer open={open} onClose={onClose} title="Claim an Expense" subtitle="Submit a bill you paid on behalf of the company for reimbursement.">
       <form onSubmit={submitForm} className="space-y-4">
-        <div>
-          <Label required>Amount (AED)</Label>
-          <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <Label required>Amount</Label>
+            <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          </div>
+          <div className="w-28">
+            <Label required>Currency</Label>
+            <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+              {CLAIM_CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
         <div>
           <Label required>Expense date</Label>
@@ -226,7 +240,7 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
               >
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-slate-800">{formatAmount(c.amount)}</p>
+                    <p className="text-sm font-medium text-slate-800">{formatAmount(c.amount, c.currency)}</p>
                     <span className="text-xs text-slate-400">{c.claimId}</span>
                   </div>
                   <p className="text-xs text-slate-500">
@@ -287,7 +301,7 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium text-slate-800">{c.employee?.fullName}</p>
-                        <Badge tone="slate">{formatAmount(c.amount)}</Badge>
+                        <Badge tone="slate">{formatAmount(c.amount, c.currency)}</Badge>
                         <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status] ?? c.status}</Badge>
                       </div>
                       <p className="text-xs text-slate-500">

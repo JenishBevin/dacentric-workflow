@@ -151,6 +151,7 @@ exportsRouter.get(
     const exportRows = rows.map((c) => ({
       claimId: c.claimId,
       employee: c.employee.fullName,
+      currency: c.currency,
       amount: c.amount,
       reason: c.reason,
       expenseDate: c.expenseDate.toISOString().slice(0, 10),

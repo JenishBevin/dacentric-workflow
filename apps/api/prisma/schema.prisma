@@ -1347,17 +1347,27 @@ enum ClaimStatus {
   REJECTED
 }
 
+enum ClaimCurrency {
+  AED
+  USD
+  INR
+  GBP
+  EUR
+  SAR
+}
+
 model ExpenseClaim {
-  id           String      @id @default(uuid())
-  claimNumber  Int         @unique @default(autoincrement())
-  claimId      String      @unique // formatted CLM-000001, generated from claimNumber
+  id           String        @id @default(uuid())
+  claimNumber  Int           @unique @default(autoincrement())
+  claimId      String        @unique // formatted CLM-000001, generated from claimNumber
   employeeId   String
-  employee     Employee    @relation("ClaimEmployee", fields: [employeeId], references: [id])
+  employee     Employee      @relation("ClaimEmployee", fields: [employeeId], references: [id])
   amount       Float
+  currency     ClaimCurrency @default(AED)
   reason       String
   expenseDate  DateTime
-  status       ClaimStatus @default(PENDING_VERIFICATION)
-  createdAt    DateTime    @default(now())
+  status       ClaimStatus   @default(PENDING_VERIFICATION)
+  createdAt    DateTime      @default(now())
 
   verifiedById String?
   verifiedBy   User?     @relation("ClaimVerifiedBy", fields: [verifiedById], references: [id])

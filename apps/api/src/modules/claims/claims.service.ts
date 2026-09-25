@@ -4,6 +4,9 @@ import { AuthedUser } from "../../middleware/authenticate";
 import { isSystemLevelAdmin } from "../../common/permissions";
 import { getStorageAdapter, validateFile, scanFile } from "../../lib/storage";
 import { formatClaimId, RoleCode } from "@dacentric/types";
+import { ClaimCurrency } from "@prisma/client";
+
+export const CLAIM_CURRENCIES = Object.values(ClaimCurrency);
 
 const FINANCE_TIER = [RoleCode.ESTIMATION]; // labeled "Admin and Finance" in the UI — see rolesSeed.ts
 const MANAGEMENT_TIER = [RoleCode.MANAGEMENT];
@@ -26,12 +29,13 @@ const CLAIM_INCLUDE = {
 
 export async function submitClaim(
   actor: AuthedUser,
-  input: { amount: number; reason: string; expenseDate: Date; files: Express.Multer.File[] }
+  input: { amount: number; currency: string; reason: string; expenseDate: Date; files: Express.Multer.File[] }
 ) {
   if (!actor.employeeId) {
     throw Errors.badRequest("Your account isn't linked to an employee record, so it can't submit a claim. Ask your administrator to link one.");
   }
   if (!input.amount || input.amount <= 0) throw Errors.badRequest("Enter a claim amount greater than zero.");
+  if (!CLAIM_CURRENCIES.includes(input.currency as ClaimCurrency)) throw Errors.badRequest("Select a valid currency.");
   if (!input.reason.trim()) throw Errors.badRequest("A reason is required.");
   if (!input.files?.length) throw Errors.badRequest("Attach at least one photo or scan of the bill as proof.");
 
@@ -52,6 +56,7 @@ export async function submitClaim(
         claimId: placeholderId,
         employeeId: actor.employeeId!,
         amount: input.amount,
+        currency: input.currency as ClaimCurrency,
         reason: input.reason.trim(),
         expenseDate: input.expenseDate,
         attachments: { create: attachmentsData },

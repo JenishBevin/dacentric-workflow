@@ -10,8 +10,8 @@ import { extractApiError } from "../lib/apiClient";
 
 type DatePreset = "today" | "week" | "month" | "custom" | null;
 
-function formatAmount(amount: number) {
-  return `AED ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatAmount(amount: number, currency: string = "AED") {
+  return `${currency} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /** "Approved Settlements" — its own top-level tab under Request (alongside
@@ -126,7 +126,7 @@ export default function SettlementsPage({ highlightClaimId }: { highlightClaimId
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium text-slate-800">{c.employee?.fullName}</p>
-                  <Badge tone="slate">{formatAmount(c.amount)}</Badge>
+                  <Badge tone="slate">{formatAmount(c.amount, c.currency)}</Badge>
                   <span className="text-xs text-slate-400">{c.claimId}</span>
                 </div>
                 <p className="text-xs text-slate-500">
