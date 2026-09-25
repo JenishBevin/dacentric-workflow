@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { format } from "date-fns";
 import { Receipt, Plus, Paperclip, Download, Check, X as XIcon, CheckCircle2, Info } from "lucide-react";
-import { useMyClaims, useActionableClaims, useSubmitClaim, useDecideClaim, useSettleClaim, downloadClaimAttachment } from "../api/claims";
+import { useMyClaims, useActionableClaims, useSubmitClaim, useVerifyClaim, useDecideClaim, useSettleClaim, downloadClaimAttachment } from "../api/claims";
 import { Badge, Button, Input, Label, Textarea, Skeleton, EmptyState, Card, ErrorState } from "../components/ui/primitives";
 import { Drawer } from "../components/ui/Drawer";
 import { Modal } from "../components/ui/Modal";
@@ -11,16 +11,23 @@ import { useToast } from "../context/ToastContext";
 import { extractApiError } from "../lib/apiClient";
 
 const STATUS_TONE: Record<string, "amber" | "green" | "red" | "blue"> = {
+  PENDING_VERIFICATION: "amber",
   PENDING: "amber",
   MANAGEMENT_APPROVED: "blue",
   SETTLED: "green",
   REJECTED: "red",
 };
 const STATUS_LABEL: Record<string, string> = {
+  PENDING_VERIFICATION: "Awaiting Verification",
   PENDING: "Awaiting Management",
   MANAGEMENT_APPROVED: "Awaiting Settlement",
   SETTLED: "Settled",
   REJECTED: "Rejected",
+};
+const WAITING_ON_LABEL: Record<string, string> = {
+  PENDING_VERIFICATION: "Admin and Finance",
+  PENDING: "Management",
+  MANAGEMENT_APPROVED: "Accounts",
 };
 
 function formatAmount(amount: number) {
@@ -100,22 +107,24 @@ function SubmitClaimDrawer({ open, onClose }: { open: boolean; onClose: () => vo
 }
 
 /** Section: "Claim" option under the Request menu, alongside Leave.
- * Two-stage: Management approves, then Accounts settles it with the next
- * salary run — Accounts' stage is a settlement record, not a second
- * approve/reject gate. */
+ * Three-stage: Admin and Finance verifies and sends it on, then Management
+ * approves, then Accounts settles it with the next salary run — Accounts'
+ * stage is a settlement record, not a second approve/reject gate. */
 export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: string | null }) {
   const { user } = useAuth();
   const { push } = useToast();
   const [submitOpen, setSubmitOpen] = useState(false);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectingStage, setRejectingStage] = useState<"verify" | "decide" | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
   const { data: myClaims, isLoading: myLoading, isError: myError, refetch: refetchMine } = useMyClaims();
 
   const isAdminUser = user?.roles.some((r) => ["SYSTEM_ADMIN", "SUPER_ADMIN"].includes(r)) ?? false;
+  const isFinanceTier = isAdminUser || (user?.roles.includes("ESTIMATION") ?? false); // "Admin and Finance"
   const isManagementTier = isAdminUser || (user?.roles.includes("MANAGEMENT") ?? false);
   const isAccountsTier = isAdminUser || (user?.roles.includes("ACCOUNTS") ?? false);
-  const isApprover = isManagementTier || isAccountsTier;
+  const isApprover = isFinanceTier || isManagementTier || isAccountsTier;
   const { data: actionable, isLoading: actionableLoading } = useActionableClaims(isApprover);
 
   useEffect(() => {
@@ -124,8 +133,18 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [highlightClaimId, myClaims, actionable]);
 
+  const verify = useVerifyClaim();
   const decide = useDecideClaim();
   const settle = useSettleClaim();
+
+  async function verifyApprove(id: string) {
+    try {
+      await verify.mutateAsync({ id, decision: "APPROVED" });
+      push({ variant: "success", title: "Sent on to Management for approval." });
+    } catch (err) {
+      push({ variant: "error", title: "Could not verify claim", description: extractApiError(err).message });
+    }
+  }
 
   async function approve(id: string) {
     try {
@@ -136,12 +155,19 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
     }
   }
 
+  function openReject(id: string, stage: "verify" | "decide") {
+    setRejectingId(id);
+    setRejectingStage(stage);
+  }
+
   async function confirmReject() {
-    if (!rejectingId || !rejectReason.trim()) return;
+    if (!rejectingId || !rejectingStage || !rejectReason.trim()) return;
     try {
-      await decide.mutateAsync({ id: rejectingId, decision: "REJECTED", reason: rejectReason.trim() });
+      const mutation = rejectingStage === "verify" ? verify : decide;
+      await mutation.mutateAsync({ id: rejectingId, decision: "REJECTED", reason: rejectReason.trim() });
       push({ variant: "success", title: "Claim rejected." });
       setRejectingId(null);
+      setRejectingStage(null);
       setRejectReason("");
     } catch (err) {
       push({ variant: "error", title: "Could not reject claim", description: extractApiError(err).message });
@@ -236,7 +262,7 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
           <p className="text-sm font-semibold text-slate-800">Pending Approvals &amp; Settlement</p>
           <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            Management approves first, then Accounts settles it with the next salary run.
+            Admin and Finance verifies first, then Management approves, then Accounts settles it with the next salary run.
           </div>
 
           {actionableLoading && <Skeleton className="h-40 w-full" />}
@@ -246,6 +272,7 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
           {actionable && actionable.length > 0 && (
             <div className="space-y-2">
               {actionable.map((c: any) => {
+                const canVerify = c.status === "PENDING_VERIFICATION" && isFinanceTier;
                 const canDecide = c.status === "PENDING" && isManagementTier;
                 const canSettle = c.status === "MANAGEMENT_APPROVED" && isAccountsTier;
                 return (
@@ -281,12 +308,22 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                      {canVerify && (
+                        <>
+                          <Button size="sm" loading={verify.isPending} onClick={() => verifyApprove(c.id)}>
+                            <Check className="h-3.5 w-3.5" /> Verify &amp; Send for Approval
+                          </Button>
+                          <Button variant="danger" size="sm" onClick={() => openReject(c.id, "verify")}>
+                            <XIcon className="h-3.5 w-3.5" /> Reject
+                          </Button>
+                        </>
+                      )}
                       {canDecide && (
                         <>
                           <Button size="sm" loading={decide.isPending} onClick={() => approve(c.id)}>
                             <Check className="h-3.5 w-3.5" /> Approve
                           </Button>
-                          <Button variant="danger" size="sm" onClick={() => setRejectingId(c.id)}>
+                          <Button variant="danger" size="sm" onClick={() => openReject(c.id, "decide")}>
                             <XIcon className="h-3.5 w-3.5" /> Reject
                           </Button>
                         </>
@@ -296,8 +333,8 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
                           <CheckCircle2 className="h-3.5 w-3.5" /> Mark Settled
                         </Button>
                       )}
-                      {!canDecide && !canSettle && (
-                        <span className="text-xs text-slate-400">Waiting on {c.status === "PENDING" ? "Management" : "Accounts"}</span>
+                      {!canVerify && !canDecide && !canSettle && (
+                        <span className="text-xs text-slate-400">Waiting on {WAITING_ON_LABEL[c.status] ?? c.status}</span>
                       )}
                     </div>
                   </Card>
@@ -312,6 +349,7 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
         open={!!rejectingId}
         onClose={() => {
           setRejectingId(null);
+          setRejectingStage(null);
           setRejectReason("");
         }}
         title="Reject claim"
@@ -321,12 +359,18 @@ export default function ClaimPage({ highlightClaimId }: { highlightClaimId?: str
               variant="outline"
               onClick={() => {
                 setRejectingId(null);
+                setRejectingStage(null);
                 setRejectReason("");
               }}
             >
               Cancel
             </Button>
-            <Button variant="danger" loading={decide.isPending} disabled={!rejectReason.trim()} onClick={confirmReject}>
+            <Button
+              variant="danger"
+              loading={rejectingStage === "verify" ? verify.isPending : decide.isPending}
+              disabled={!rejectReason.trim()}
+              onClick={confirmReject}
+            >
               Reject claim
             </Button>
           </>

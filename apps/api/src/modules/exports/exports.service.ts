@@ -116,6 +116,7 @@ export function settledClaimsExportColumns() {
     { header: "Amount (AED)", key: "amount", width: 14 },
     { header: "Reason", key: "reason", width: 40 },
     { header: "Expense Date", key: "expenseDate", width: 16 },
+    { header: "Verified By", key: "verifiedBy", width: 20 },
     { header: "Approved By", key: "approvedBy", width: 20 },
     { header: "Settled By", key: "settledBy", width: 20 },
     { header: "Settled Date", key: "settledDate", width: 16 },

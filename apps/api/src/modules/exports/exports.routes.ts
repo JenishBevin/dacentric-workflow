@@ -154,6 +154,7 @@ exportsRouter.get(
       amount: c.amount,
       reason: c.reason,
       expenseDate: c.expenseDate.toISOString().slice(0, 10),
+      verifiedBy: c.verifiedBy?.name ?? "",
       approvedBy: c.managementDecidedBy?.name ?? "",
       settledBy: c.settledBy?.name ?? "",
       settledDate: c.settledAt ? c.settledAt.toISOString().slice(0, 10) : "",

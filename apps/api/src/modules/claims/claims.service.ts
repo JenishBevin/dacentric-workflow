@@ -5,9 +5,13 @@ import { isSystemLevelAdmin } from "../../common/permissions";
 import { getStorageAdapter, validateFile, scanFile } from "../../lib/storage";
 import { formatClaimId, RoleCode } from "@dacentric/types";
 
+const FINANCE_TIER = [RoleCode.ESTIMATION]; // labeled "Admin and Finance" in the UI — see rolesSeed.ts
 const MANAGEMENT_TIER = [RoleCode.MANAGEMENT];
 const ACCOUNTS_TIER = [RoleCode.ACCOUNTS];
 
+function isFinanceTier(actor: AuthedUser) {
+  return isSystemLevelAdmin(actor.roles) || actor.roles.some((r) => FINANCE_TIER.includes(r));
+}
 function isManagementTier(actor: AuthedUser) {
   return isSystemLevelAdmin(actor.roles) || actor.roles.some((r) => MANAGEMENT_TIER.includes(r));
 }
@@ -83,17 +87,19 @@ export async function lookupClaimByClaimId(claimId: string, actor: AuthedUser) {
   if (!claim) return null;
 
   const isOwner = actor.employeeId && claim.employeeId === actor.employeeId;
-  if (!isOwner && !isManagementTier(actor) && !isAccountsTier(actor)) return null;
+  if (!isOwner && !isFinanceTier(actor) && !isManagementTier(actor) && !isAccountsTier(actor)) return null;
 
   return claim;
 }
 
-/** Scoped to what this viewer can actually act on: Management only sees
- *  PENDING (stage 1); Accounts only sees MANAGEMENT_APPROVED (stage 2) —
- *  a claim shouldn't show up for Accounts until Management has cleared it.
- *  Admins can act at either stage, so they see both. */
+/** Scoped to what this viewer can actually act on: Admin and Finance only
+ *  sees PENDING_VERIFICATION (stage 1); Management only sees PENDING (stage
+ *  2); Accounts only sees MANAGEMENT_APPROVED (stage 3) — a claim shouldn't
+ *  show up at a later stage until the one before it has cleared. Admins can
+ *  act at any stage, so they see all three. */
 export async function listActionableClaims(actor: AuthedUser) {
-  const statuses: Array<"PENDING" | "MANAGEMENT_APPROVED"> = [];
+  const statuses: Array<"PENDING_VERIFICATION" | "PENDING" | "MANAGEMENT_APPROVED"> = [];
+  if (isFinanceTier(actor)) statuses.push("PENDING_VERIFICATION");
   if (isManagementTier(actor)) statuses.push("PENDING");
   if (isAccountsTier(actor)) statuses.push("MANAGEMENT_APPROVED");
   if (statuses.length === 0) return [];
@@ -110,7 +116,7 @@ export async function listActionableClaims(actor: AuthedUser) {
  *  separate from listActionableClaims so a growing history never crowds out
  *  the pending queue. */
 export async function listSettledClaims(actor: AuthedUser, filters: { dateFrom?: Date; dateTo?: Date }) {
-  if (!isManagementTier(actor) && !isAccountsTier(actor)) return [];
+  if (!isFinanceTier(actor) && !isManagementTier(actor) && !isAccountsTier(actor)) return [];
 
   return prisma.expenseClaim.findMany({
     where: {
@@ -119,10 +125,35 @@ export async function listSettledClaims(actor: AuthedUser, filters: { dateFrom?:
     },
     include: {
       ...CLAIM_INCLUDE,
+      verifiedBy: { select: { id: true, name: true } },
       managementDecidedBy: { select: { id: true, name: true } },
       settledBy: { select: { id: true, name: true } },
     },
     orderBy: { settledAt: "desc" },
+  });
+}
+
+/** Stage 1: Admin and Finance verifies a freshly submitted claim before it
+ *  reaches Management. Verifying moves it to PENDING (the pre-existing
+ *  "awaiting Management" status, unchanged) so Management's own gate below
+ *  needs no changes. */
+export async function verifyClaim(claimId: string, decision: "APPROVED" | "REJECTED", reason: string | undefined, actor: AuthedUser) {
+  if (!isFinanceTier(actor)) throw Errors.forbidden("Only Admin and Finance or an Administrator can verify this claim.");
+
+  const claim = await prisma.expenseClaim.findUnique({ where: { id: claimId } });
+  if (!claim) throw Errors.notFound("Claim");
+  if (claim.status !== "PENDING_VERIFICATION") throw Errors.conflict("This claim has already been verified.");
+  if (decision === "REJECTED" && !reason?.trim()) throw Errors.badRequest("A reason is required to reject a claim.");
+
+  return prisma.expenseClaim.update({
+    where: { id: claimId },
+    data: {
+      status: decision === "APPROVED" ? "PENDING" : "REJECTED",
+      verifiedById: actor.id,
+      verifiedAt: new Date(),
+      rejectReason: decision === "REJECTED" ? reason!.trim() : null,
+    },
+    include: CLAIM_INCLUDE,
   });
 }
 
@@ -168,7 +199,7 @@ export async function downloadClaimAttachment(attachmentId: string, actor: Authe
     include: { claim: true },
   });
   const isOwner = actor.employeeId && attachment.claim.employeeId === actor.employeeId;
-  if (!isOwner && !isManagementTier(actor) && !isAccountsTier(actor)) {
+  if (!isOwner && !isFinanceTier(actor) && !isManagementTier(actor) && !isAccountsTier(actor)) {
     throw Errors.forbidden("You do not have permission to view this file.");
   }
   const buffer = await getStorageAdapter().read(attachment.storageKey);

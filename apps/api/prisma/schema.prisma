@@ -171,6 +171,7 @@ model User {
   createdTickets       SupportTicket[]      @relation("TicketCreatedBy")
   uploadedTicketFiles  TicketAttachment[]   @relation("TicketAttachmentUploader")
   leaveDecisions        LeaveRequest[]      @relation("LeaveDecision")
+  claimVerifications       ExpenseClaim[]   @relation("ClaimVerifiedBy")
   claimManagementDecisions ExpenseClaim[]   @relation("ClaimManagementDecision")
   claimSettlements         ExpenseClaim[]   @relation("ClaimSettledBy")
   conversations         ConversationParticipant[]
@@ -1236,17 +1237,37 @@ model TicketAttachment {
 
 // ---------------------------------------------------------------------------
 // Chat — 1:1 direct messages between any two active users, with optional
-// file attachments. Polling-based (no WebSocket infra); the floating chat
-// widget refetches on an interval, same pattern as Notifications.
+// file attachments, PLUS named group conversations spun up from a specific
+// Task or Project ("Discuss" button) — see ConversationType. Polling-based
+// (no WebSocket infra); the floating chat widget refetches on an interval,
+// same pattern as Notifications.
 // ---------------------------------------------------------------------------
 
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
 model Conversation {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String           @id @default(uuid())
+  type      ConversationType @default(DIRECT)
+  // GROUP only — set by whoever created it ("Discuss" popup); null for DIRECT.
+  name        String?
+  createdById String?
+  // GROUP only — which Task/Board this discussion was started from, so the
+  // "Discuss" button can list & reopen prior discussions instead of only
+  // ever starting new ones. entityType is "TASK" | "BOARD" (plain string,
+  // matching how ChatMessage's CARD metadata already encodes it — not worth
+  // its own Prisma enum for two values used only here and in JSON).
+  entityType String?
+  entityId   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   participants ConversationParticipant[]
   messages     ChatMessage[]
+
+  @@index([entityType, entityId])
 }
 
 model ConversationParticipant {
@@ -1268,6 +1289,11 @@ model ConversationParticipant {
   @@index([userId])
 }
 
+enum ChatMessageKind {
+  TEXT
+  CARD
+}
+
 model ChatMessage {
   id             String       @id @default(uuid())
   conversationId String
@@ -1275,6 +1301,12 @@ model ChatMessage {
   senderId       String
   sender         User         @relation(fields: [senderId], references: [id])
   body           String?      // nullable — a message can be attachment(s)-only
+  // CARD — the auto-seeded "task/project details" card a new GROUP
+  // conversation opens with. { entityType: "TASK"|"BOARD", code, title,
+  // subtitle?, path } — path is the precomputed deep link so the frontend
+  // never needs entity-specific routing logic.
+  kind           ChatMessageKind @default(TEXT)
+  metadata       Json?
   createdAt      DateTime     @default(now())
   editedAt       DateTime?    // set when the sender edits within the 1-minute window
   // "Delete message" is per-viewer too — the user ids this message is
@@ -1302,13 +1334,14 @@ model ChatAttachment {
 
 // ---------------------------------------------------------------------------
 // Expense Claims — the "Claim" option under the Request menu (alongside
-// Leave). Two-stage: Management approves, then Accounts settles it with the
-// next salary run. Unlike Leave, Accounts' stage is a settlement record,
-// not a second approve/reject gate — Management is the only approval.
+// Leave). Three-stage: Admin and Finance verifies and sends it on, then
+// Management approves, then Accounts settles it with the next salary run.
+// Accounts' stage is a settlement record, not a second approve/reject gate.
 // ---------------------------------------------------------------------------
 
 enum ClaimStatus {
-  PENDING              // awaiting Management
+  PENDING_VERIFICATION // awaiting Admin and Finance verification
+  PENDING              // verified, awaiting Management approval
   MANAGEMENT_APPROVED  // approved, awaiting Accounts settlement
   SETTLED              // paid out by Accounts
   REJECTED
@@ -1323,8 +1356,12 @@ model ExpenseClaim {
   amount       Float
   reason       String
   expenseDate  DateTime
-  status       ClaimStatus @default(PENDING)
+  status       ClaimStatus @default(PENDING_VERIFICATION)
   createdAt    DateTime    @default(now())
+
+  verifiedById String?
+  verifiedBy   User?     @relation("ClaimVerifiedBy", fields: [verifiedById], references: [id])
+  verifiedAt   DateTime?
 
   managementDecidedById String?
   managementDecidedBy   User?     @relation("ClaimManagementDecision", fields: [managementDecidedById], references: [id])

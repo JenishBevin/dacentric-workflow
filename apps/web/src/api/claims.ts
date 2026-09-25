@@ -44,6 +44,15 @@ export function useSubmitClaim() {
   });
 }
 
+export function useVerifyClaim() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, decision, reason }: { id: string; decision: "APPROVED" | "REJECTED"; reason?: string }) =>
+      (await api.post(`/claims/${id}/verify`, { decision, reason })).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["actionable-claims"] }),
+  });
+}
+
 export function useDecideClaim() {
   const qc = useQueryClient();
   return useMutation({

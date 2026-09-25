@@ -133,8 +133,8 @@ export default function SettlementsPage({ highlightClaimId }: { highlightClaimId
                   {format(new Date(c.expenseDate), "d MMM yyyy")} · {c.reason}
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
-                  Approved by {c.managementDecidedBy?.name ?? "—"} · Settled by {c.settledBy?.name ?? "—"} on{" "}
-                  {c.settledAt ? format(new Date(c.settledAt), "d MMM yyyy") : "—"}
+                  Verified by {c.verifiedBy?.name ?? "—"} · Approved by {c.managementDecidedBy?.name ?? "—"} · Settled by{" "}
+                  {c.settledBy?.name ?? "—"} on {c.settledAt ? format(new Date(c.settledAt), "d MMM yyyy") : "—"}
                 </p>
                 {c.attachments?.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1.5">

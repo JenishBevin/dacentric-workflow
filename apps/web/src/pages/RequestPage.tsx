@@ -25,9 +25,10 @@ export default function RequestPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const isAdminUser = user?.roles.some((r) => ["SYSTEM_ADMIN", "SUPER_ADMIN"].includes(r)) ?? false;
+  const isFinance = user?.roles.includes("ESTIMATION") ?? false; // "Admin and Finance"
   const isManagement = user?.roles.includes("MANAGEMENT") ?? false;
   const isAccounts = user?.roles.includes("ACCOUNTS") ?? false;
-  const isApprover = isAdminUser || isManagement || isAccounts;
+  const isApprover = isAdminUser || isFinance || isManagement || isAccounts;
 
   const tabs = ALL_TABS.filter((t) => {
     if (t.key === "leave") return !isManagement;

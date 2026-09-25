@@ -62,6 +62,16 @@ claimsRouter.post(
 );
 
 claimsRouter.post(
+  "/:id/verify",
+  validate(z.object({ decision: z.enum(["APPROVED", "REJECTED"]), reason: z.string().max(1000).optional() })),
+  asyncHandler(async (req, res) => {
+    const { decision, reason } = (req as any).validatedBody as { decision: "APPROVED" | "REJECTED"; reason?: string };
+    const claim = await claimsService.verifyClaim(req.params.id, decision, reason, req.user!);
+    return ok(res, claim);
+  })
+);
+
+claimsRouter.post(
   "/:id/decision",
   validate(z.object({ decision: z.enum(["APPROVED", "REJECTED"]), reason: z.string().max(1000).optional() })),
   asyncHandler(async (req, res) => {
