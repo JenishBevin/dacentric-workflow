@@ -11,6 +11,8 @@ import {
   updateEmployeeSchema,
   createDepartmentSchema,
   createTeamSchema,
+  adminActivateUserSchema,
+  bulkAdminActivateSchema,
 } from "./users.schemas";
 import * as usersService from "./users.service";
 import { prisma } from "../../lib/prisma";
@@ -204,6 +206,28 @@ usersRouter.post(
   asyncHandler(async (req, res) => {
     await usersService.resendInvite(req.params.id, req.user!);
     return ok(res, { message: "Invitation resent." });
+  })
+);
+
+// Admin sets the password directly and skips the emailed activation link —
+// must come before "/:id" routes below, same reasoning as "/bulk-import".
+usersRouter.post(
+  "/bulk-activate",
+  requirePermission(PermissionKey.MANAGE_USERS, "ALL"),
+  validate(bulkAdminActivateSchema),
+  asyncHandler(async (req, res) => {
+    const result = await usersService.bulkAdminActivateUsers((req as any).validatedBody.activations, req.user!);
+    return ok(res, result);
+  })
+);
+
+usersRouter.post(
+  "/:id/activate",
+  requirePermission(PermissionKey.MANAGE_USERS, "ALL"),
+  validate(adminActivateUserSchema),
+  asyncHandler(async (req, res) => {
+    const user = await usersService.adminActivateUser(req.params.id, (req as any).validatedBody.password, req.user!);
+    return ok(res, user);
   })
 );
 

@@ -26,6 +26,19 @@ export const bulkImportSchema = z.object({
   users: z.array(bulkImportRowSchema).min(1),
 });
 
+export const adminActivateUserSchema = z.object({
+  password: passwordSchema,
+});
+
+// Deliberately NOT passwordSchema here — one weak password must fail just
+// that account (surfaced per-item by bulkAdminActivateUsers below), not
+// reject the whole batch before any of it reaches the service layer. The
+// real complexity check happens per-item, via passwordSchema, in
+// adminActivateUser() itself.
+export const bulkAdminActivateSchema = z.object({
+  activations: z.array(z.object({ userId: z.string().uuid(), password: z.string().min(1, "Password is required.") })).min(1, "Select at least one account."),
+});
+
 export const updateUserSchema = z.object({
   name: z.string().min(1).max(150).optional(),
   // Changing another user's sign-in email is Super Admin only — enforced in

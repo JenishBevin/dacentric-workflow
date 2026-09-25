@@ -7,6 +7,7 @@ import { env } from "../../lib/env";
 import { writeAudit } from "../../common/audit";
 import { AuditAction, AccountStatus, RoleCode, ModuleCode } from "@dacentric/types";
 import { AuthedUser } from "../../middleware/authenticate";
+import { passwordSchema } from "../../common/passwordSchema";
 
 export interface CreateUserInput {
   name: string;
@@ -130,6 +131,74 @@ export async function resendInvite(userId: string, actor: AuthedUser) {
   await prisma.invitation.updateMany({ where: { userId, acceptedAt: null }, data: { expiresAt: new Date(0) } });
   await sendInvite(user.id, user.name, user.workEmail, actor.id);
   await writeAudit({ actor, action: AuditAction.EDIT, entityType: "User", entityId: user.id, field: "invitation", metadata: { resent: true } });
+}
+
+/** Lets an admin skip the emailed activation link entirely — sets the
+ * password directly and flips the account straight to ACTIVE. Same
+ * Super-Admin-only carve-out as updateUser() for a Super Admin target, and
+ * any not-yet-accepted invitation is invalidated so the old emailed link
+ * (if one was ever sent) can't also be used afterward. */
+export async function adminActivateUser(userId: string, password: string, actor: AuthedUser) {
+  const existing = await prisma.user.findUnique({ where: { id: userId }, include: { roles: { include: { role: true } } } });
+  if (!existing) throw Errors.notFound("User");
+  if (existing.status !== AccountStatus.PENDING_ACTIVATION) {
+    throw Errors.badRequest("Only pending-activation accounts can be activated this way.");
+  }
+  const targetIsSuperAdmin = existing.roles.some((r) => r.role.code === RoleCode.SUPER_ADMIN);
+  if (targetIsSuperAdmin && !actor.roles.includes(RoleCode.SUPER_ADMIN)) {
+    throw Errors.forbidden("Only a Super Admin can activate a Super Admin account.");
+  }
+
+  // The single-user route already validates this via passwordSchema at the
+  // HTTP layer; the bulk route deliberately doesn't (see bulkAdminActivate
+  // Schema), so it's re-checked here — the one place both routes funnel
+  // through — so a weak password fails only this account, not the batch.
+  const complexity = passwordSchema.safeParse(password);
+  if (!complexity.success) {
+    throw Errors.badRequest(complexity.error.issues[0]?.message ?? "Password does not meet the complexity requirements.");
+  }
+
+  const passwordHash = await hashPassword(password);
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, status: AccountStatus.ACTIVE, failedLoginAttempts: 0, lockedUntil: null },
+    }),
+    prisma.invitation.updateMany({ where: { userId, acceptedAt: null }, data: { expiresAt: new Date(0) } }),
+  ]);
+
+  await writeAudit({
+    actor,
+    action: AuditAction.ACTIVATE,
+    entityType: "User",
+    entityId: userId,
+    beforeValue: { status: existing.status },
+    // Never write the plaintext password to the audit trail.
+    afterValue: { status: "ACTIVE", method: "admin-direct" },
+  });
+
+  return prisma.user.findUnique({ where: { id: userId }, select: SAFE_USER_SELECT });
+}
+
+export interface BulkActivateResult {
+  succeeded: string[];
+  failed: { id: string; error: string }[];
+}
+
+export async function bulkAdminActivateUsers(
+  activations: Array<{ userId: string; password: string }>,
+  actor: AuthedUser
+): Promise<BulkActivateResult> {
+  const result: BulkActivateResult = { succeeded: [], failed: [] };
+  for (const { userId, password } of activations) {
+    try {
+      await adminActivateUser(userId, password, actor);
+      result.succeeded.push(userId);
+    } catch (err) {
+      result.failed.push({ id: userId, error: err instanceof Error ? err.message : "Could not activate this account." });
+    }
+  }
+  return result;
 }
 
 export async function listUsers(filters: { status?: string; search?: string }) {

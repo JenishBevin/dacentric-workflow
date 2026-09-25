@@ -1,7 +1,19 @@
 import React, { useState } from "react";
-import { Plus, UploadCloud, RotateCcw, UserX, UserCheck, Trash2, AlertTriangle } from "lucide-react";
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useResendInvite, useBulkImportUsers, useUnlinkedEmployees } from "../../api/misc";
+import { Plus, UploadCloud, RotateCcw, UserX, UserCheck, Trash2, AlertTriangle, KeyRound } from "lucide-react";
+import {
+  useUsers,
+  useCreateUser,
+  useUpdateUser,
+  useDeleteUser,
+  useResendInvite,
+  useBulkImportUsers,
+  useUnlinkedEmployees,
+  useBulkAdminActivateUsers,
+  BulkActivateResult,
+} from "../../api/misc";
 import { Button, Input, PasswordInput, Label, Select, Badge, Skeleton, ErrorState, EmptyState, Checkbox } from "../../components/ui/primitives";
+import { BulkActionBar } from "../../components/ui/BulkActionBar";
+import { useSelection } from "../../hooks/useSelection";
 import { Drawer } from "../../components/ui/Drawer";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../context/ToastContext";
@@ -60,12 +72,17 @@ export default function UsersSettingsPage() {
   const deleteUser = useDeleteUser();
   const resendInvite = useResendInvite();
   const bulkImport = useBulkImportUsers();
+  const bulkActivate = useBulkAdminActivateUsers();
 
   const [newOpen, setNewOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserRow | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [activateTargets, setActivateTargets] = useState<UserRow[] | null>(null);
+
+  const pendingUsers = ((users as UserRow[] | undefined) ?? []).filter((u) => u.status === "PENDING_ACTIVATION");
+  const selection = useSelection(pendingUsers.map((u) => u.id));
 
   return (
     <div className="space-y-4">
@@ -95,6 +112,14 @@ export default function UsersSettingsPage() {
         </Select>
       </div>
 
+      {pendingUsers.length > 0 && (
+        <BulkActionBar count={selection.count} onClear={selection.clear}>
+          <Button variant="outline" size="sm" onClick={() => setActivateTargets(pendingUsers.filter((u) => selection.isSelected(u.id)))}>
+            <KeyRound className="h-3.5 w-3.5" /> Activate selected (skip email)
+          </Button>
+        </BulkActionBar>
+      )}
+
       {isLoading && <Skeleton className="h-64 w-full" />}
       {isError && <ErrorState message="Could not load users." onRetry={() => refetch()} />}
       {users && users.length === 0 && <EmptyState title="No users match these filters." />}
@@ -104,6 +129,11 @@ export default function UsersSettingsPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <tr>
+                {pendingUsers.length > 0 && (
+                  <th className="px-4 py-2.5">
+                    <Checkbox checked={selection.isAllSelected} onChange={selection.toggleAll} aria-label="Select all pending-activation accounts" />
+                  </th>
+                )}
                 <th className="px-4 py-2.5">Name</th>
                 <th className="px-4 py-2.5">Roles</th>
                 <th className="px-4 py-2.5">Modules</th>
@@ -114,6 +144,13 @@ export default function UsersSettingsPage() {
             <tbody>
               {(users as UserRow[]).map((u) => (
                 <tr key={u.id} className="border-b border-slate-100 last:border-0">
+                  {pendingUsers.length > 0 && (
+                    <td className="px-4 py-2.5">
+                      {u.status === "PENDING_ACTIVATION" && (
+                        <Checkbox checked={selection.isSelected(u.id)} onChange={() => selection.toggle(u.id)} aria-label={`Select ${u.name}`} />
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-2.5">
                     <p className="font-medium text-slate-800">{u.name}</p>
                     <p className="text-xs text-slate-400">{u.workEmail}</p>
@@ -155,6 +192,11 @@ export default function UsersSettingsPage() {
                           }}
                         >
                           <RotateCcw className="h-3.5 w-3.5" /> Resend
+                        </Button>
+                      )}
+                      {u.status === "PENDING_ACTIVATION" && (
+                        <Button variant="ghost" size="sm" onClick={() => setActivateTargets([u])}>
+                          <KeyRound className="h-3.5 w-3.5" /> Activate
                         </Button>
                       )}
                       <Button variant="ghost" size="sm" onClick={() => setEditUser(u)}>
@@ -215,6 +257,17 @@ export default function UsersSettingsPage() {
       <NewUserDrawer open={newOpen} onClose={() => setNewOpen(false)} onCreate={createUser} />
       {editUser && <EditUserDrawer user={editUser} onClose={() => setEditUser(null)} onUpdate={updateUser} />}
       <BulkImportModal open={bulkOpen} onClose={() => setBulkOpen(false)} onImport={bulkImport} />
+      {activateTargets && activateTargets.length > 0 && (
+        <ActivateAccountsModal
+          users={activateTargets}
+          onClose={() => setActivateTargets(null)}
+          onActivate={bulkActivate}
+          onDone={() => {
+            selection.clear();
+            setActivateTargets(null);
+          }}
+        />
+      )}
 
       <Modal
         open={!!deleteTarget}
@@ -576,6 +629,109 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
         <RoleModuleCheckboxes roles={roles} setRoles={setRoles} modules={modules} setModules={setModules} />
       </div>
     </Drawer>
+  );
+};
+
+/** Handles both the single-row "Activate" button and the bulk "Activate
+ * selected" action — `users` is just a 1-or-more-element list either way.
+ * Sets each account's password directly and skips the emailed activation
+ * link entirely. On a partial failure (e.g. one account no longer pending),
+ * the successfully-activated rows collapse to a checkmark so the admin can
+ * fix and retry just the ones that failed, without re-entering the rest. */
+const ActivateAccountsModal: React.FC<{
+  users: UserRow[];
+  onClose: () => void;
+  onActivate: ReturnType<typeof useBulkAdminActivateUsers>;
+  onDone: () => void;
+}> = ({ users, onClose, onActivate, onDone }) => {
+  const { push } = useToast();
+  const [passwords, setPasswords] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [succeededIds, setSucceededIds] = useState<Set<string>>(new Set());
+
+  const pending = users.filter((u) => !succeededIds.has(u.id));
+
+  async function submit() {
+    const activations = pending.map((u) => ({ userId: u.id, password: (passwords[u.id] ?? "").trim() }));
+    const missing = activations.filter((a) => !a.password);
+    if (missing.length > 0) {
+      push({ variant: "error", title: "Enter a password for every account before activating." });
+      return;
+    }
+    try {
+      const result: BulkActivateResult = await onActivate.mutateAsync(activations);
+      setSucceededIds((prev) => new Set([...prev, ...result.succeeded]));
+      setErrors(Object.fromEntries(result.failed.map((f) => [f.id, f.error])));
+      if (result.failed.length === 0) {
+        push({
+          variant: "success",
+          title: `${result.succeeded.length} account${result.succeeded.length === 1 ? "" : "s"} activated.`,
+          description: "Share each password with that person yourself.",
+        });
+        onDone();
+      } else {
+        push({
+          variant: result.succeeded.length ? "warning" : "error",
+          title: `${result.succeeded.length} activated, ${result.failed.length} failed.`,
+          description: result.failed[0].error,
+        });
+      }
+    } catch (err) {
+      push({ variant: "error", title: "Could not activate accounts", description: extractApiError(err).message });
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={users.length === 1 ? `Activate ${users[0].name}` : `Activate ${users.length} accounts`}
+      description="Sets a password directly and skips the emailed activation link — each account is active immediately. Share each password with that person yourself."
+      size={users.length > 1 ? "lg" : "sm"}
+    >
+      <div className="max-h-96 space-y-3 overflow-y-auto">
+        {users.map((u) => {
+          const done = succeededIds.has(u.id);
+          return (
+            <div key={u.id} className={`rounded-lg border p-3 ${done ? "border-emerald-200 bg-emerald-50" : "border-slate-200"}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">{u.name}</p>
+                  <p className="text-xs text-slate-400">{u.workEmail}</p>
+                </div>
+                {done && (
+                  <Badge tone="green">
+                    <UserCheck className="h-3 w-3" /> Activated
+                  </Badge>
+                )}
+              </div>
+              {!done && (
+                <div className="mt-2">
+                  <PasswordInput
+                    placeholder="Set a password…"
+                    value={passwords[u.id] ?? ""}
+                    onChange={(e) => setPasswords((p) => ({ ...p, [u.id]: e.target.value }))}
+                    minLength={8}
+                    error={errors[u.id]}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <p className="text-xs text-slate-400">8+ characters, with upper, lower, digit and symbol.</p>
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button variant="outline" onClick={onClose}>
+          {succeededIds.size > 0 ? "Close" : "Cancel"}
+        </Button>
+        {pending.length > 0 && (
+          <Button onClick={submit} loading={onActivate.isPending}>
+            {pending.length === 1 ? "Activate" : `Activate ${pending.length} account${pending.length === 1 ? "" : "s"}`}
+          </Button>
+        )}
+      </div>
+    </Modal>
   );
 };
 

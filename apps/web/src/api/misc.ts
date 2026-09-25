@@ -132,6 +132,29 @@ export function useBulkImportUsers() {
   return useMutation({ mutationFn: async (users: unknown[]) => (await api.post("/users/bulk-import", { users })).data.data, onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }) });
 }
 
+export interface BulkActivateResult {
+  succeeded: string[];
+  failed: { id: string; error: string }[];
+}
+
+/** Admin sets the password directly and skips the emailed activation link. */
+export function useAdminActivateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, password }: { userId: string; password: string }) => (await api.post(`/users/${userId}/activate`, { password })).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+}
+
+export function useBulkAdminActivateUsers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (activations: Array<{ userId: string; password: string }>) =>
+      (await api.post<{ data: BulkActivateResult }>("/users/bulk-activate", { activations })).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+}
+
 // --- Roles & permissions ---
 export function useRoles() {
   return useQuery({ queryKey: ["roles"], queryFn: async () => (await api.get("/roles")).data.data });
