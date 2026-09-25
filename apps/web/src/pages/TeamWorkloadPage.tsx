@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import { useTeamWorkload, useEmployeeWorkloadDetail } from "../api/misc";
 import { useDepartments, useTeams } from "../api/misc";
@@ -189,7 +190,11 @@ export default function TeamWorkloadPage() {
           <div className="space-y-2">
             {detail.tasks.length === 0 && <p className="text-sm text-slate-400">No open tasks.</p>}
             {detail.tasks.map((t: any) => (
-              <div key={t.id} className="rounded-lg border border-slate-200 p-3 text-sm">
+              <Link
+                key={t.id}
+                to={`/workflow/boards/${t.boardId}?task=${t.id}`}
+                className="block rounded-lg border border-slate-200 p-3 text-sm hover:border-brand-300 hover:bg-brand-50/40"
+              >
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-slate-800">{t.title}</p>
                   <PriorityBadge priority={t.priority} />
@@ -200,7 +205,7 @@ export default function TeamWorkloadPage() {
                   {t.dueDate && <span>Due {format(new Date(t.dueDate), "d MMM")}</span>}
                   {t.estimatedEffortHours != null && <span>{t.estimatedEffortHours}h</span>}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
