@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search, SlidersHorizontal, Download, Users, Settings as SettingsIcon, Plus } from "lucide-react";
+import { Search, SlidersHorizontal, Download, Users, Settings as SettingsIcon, Plus, ArrowUp, ArrowDown } from "lucide-react";
 import { Input, Select, Button, AvatarGroup } from "../ui/primitives";
 import { Board, EmployeeDirectoryEntry } from "../../lib/types";
 
@@ -8,6 +8,7 @@ interface Filters {
   assigneeUserId?: string;
   priority?: string;
   sortBy?: string;
+  sortDir?: "asc" | "desc";
   groupBy?: string;
 }
 
@@ -103,10 +104,21 @@ const FilterControls: React.FC<{ filters: Filters; onChange: (f: Filters) => voi
     <Select value={filters.sortBy ?? ""} onChange={(e) => onChange({ ...filters, sortBy: e.target.value || undefined })} className="!w-40">
       <option value="">Sort: Default</option>
       <option value="dueDate">Sort: Due date</option>
-      <option value="createdAt">Sort: Custom Date</option>
+      <option value="startDate">Sort: Date</option>
       <option value="priority">Sort: Priority</option>
       <option value="title">Sort: Title</option>
     </Select>
+    {filters.sortBy && (
+      <button
+        type="button"
+        onClick={() => onChange({ ...filters, sortDir: filters.sortDir === "desc" ? "asc" : "desc" })}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-500 hover:bg-slate-50"
+        aria-label={filters.sortDir === "desc" ? "Sort descending — click for ascending" : "Sort ascending — click for descending"}
+        title={filters.sortDir === "desc" ? "Descending" : "Ascending"}
+      >
+        {filters.sortDir === "desc" ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+      </button>
+    )}
     <Select value={filters.groupBy ?? "none"} onChange={(e) => onChange({ ...filters, groupBy: e.target.value })} className="!w-40">
       <option value="none">Group: None</option>
       <option value="assignee">Group: Assignee</option>

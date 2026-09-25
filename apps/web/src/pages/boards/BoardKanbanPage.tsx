@@ -29,19 +29,21 @@ interface Filters {
   assigneeUserId?: string;
   priority?: string;
   sortBy?: string;
+  sortDir?: "asc" | "desc";
   groupBy?: string;
 }
 
 const PRIORITY_ORDER: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
-function sortTasks(tasks: TaskSummary[], key?: string): TaskSummary[] {
+function sortTasks(tasks: TaskSummary[], key?: string, dir: "asc" | "desc" = "asc"): TaskSummary[] {
   if (!key || key === "none") return tasks;
   const list = [...tasks];
   if (key === "dueDate") list.sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
-  else if (key === "createdAt") list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  else if (key === "startDate") list.sort((a, b) => (a.startDate ?? "9999").localeCompare(b.startDate ?? "9999"));
   else if (key === "priority") list.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
   else if (key === "title") list.sort((a, b) => a.title.localeCompare(b.title));
   else if (key === "assignee") list.sort((a, b) => (a.assignees[0]?.name ?? "").localeCompare(b.assignees[0]?.name ?? ""));
+  if (dir === "desc") list.reverse();
   return list;
 }
 
@@ -219,9 +221,9 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
       map[task.stageId].push(task);
     }
     const key = filters.groupBy && filters.groupBy !== "none" ? filters.groupBy : filters.sortBy;
-    for (const stageId of Object.keys(map)) map[stageId] = sortTasks(map[stageId], key);
+    for (const stageId of Object.keys(map)) map[stageId] = sortTasks(map[stageId], key, filters.sortDir);
     return map;
-  }, [tasks, stages, filters.groupBy, filters.sortBy]);
+  }, [tasks, stages, filters.groupBy, filters.sortBy, filters.sortDir]);
 
   async function handleStageMenuAction(stage: BoardStage, action: "rename" | "wip" | "color" | "moveLeft" | "moveRight" | "delete") {
     if (action === "moveLeft" || action === "moveRight") {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, TouchSensor, useSensor, useSensors, closestCorners } from "@dnd-kit/core";
 import { StageColumn } from "./StageColumn";
 import { TaskCard } from "./TaskCard";
@@ -41,6 +41,25 @@ export const KanbanBoard: React.FC<Props> = ({
   const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
   const [moveSheetTask, setMoveSheetTask] = useState<TaskSummary | null>(null);
   const [wipConfirm, setWipConfirm] = useState<{ taskId: string; stageId: string; message: string } | null>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [rowHeight, setRowHeight] = useState<number>();
+
+  // Measured, not guessed: a fixed "100vh minus N px" assumes a fixed header
+  // height above this row, which varies by page (title length wrapping,
+  // filter row wrapping on narrow windows, banners) and left blank space
+  // when the guess ran high. Measuring this row's actual top and subtracting
+  // from the real viewport height gets the exact remaining space regardless
+  // of what's above it, and re-measures on resize since that can change.
+  useLayoutEffect(() => {
+    function measure() {
+      if (!rowRef.current) return;
+      const top = rowRef.current.getBoundingClientRect().top;
+      setRowHeight(Math.max(240, window.innerHeight - top - 24));
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -87,12 +106,17 @@ export const KanbanBoard: React.FC<Props> = ({
     <>
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {/* Self-contained viewport bound (no ancestor height chain to break
-            other pages, unlike an earlier attempt at this) — 380px is a
-            generous allowance for Header + page title + toolbar above this
-            row. Forced (not capped) to that height so short columns stretch
-            to fill the row instead of leaving blank space below them; each
-            column scrolls its own task list internally past that height. */}
-        <div className="flex h-[calc(100vh-380px)] gap-4 overflow-x-auto pb-4">
+            other pages, unlike an earlier attempt at this) — height is
+            measured (see rowHeight above), not guessed, so short columns
+            stretch to fill exactly the remaining space instead of leaving
+            blank space below them; each column scrolls its own task list
+            internally past that height. Falls back to a reasonable class
+            cap before the first measurement lands. */}
+        <div
+          ref={rowRef}
+          className="flex max-h-[70vh] gap-4 overflow-x-auto pb-4"
+          style={rowHeight ? { height: rowHeight, maxHeight: "none" } : undefined}
+        >
           {stages.map((stage) => (
             <StageColumn
               key={stage.id}
