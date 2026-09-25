@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MessageCircle, X, ArrowLeft, Plus, Paperclip, Send, Download, Search, Maximize2, Minimize2, Smile, Pencil, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { MessageCircle, X, ArrowLeft, Plus, Paperclip, Send, Download, Search, Maximize2, Minimize2, Smile, Pencil, Trash2, ListTodo, Trello, ExternalLink, UserPlus, Check, Users, UserMinus, Crown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import clsx from "clsx";
 import {
@@ -13,10 +14,14 @@ import {
   useEditChatMessage,
   useDeleteChatMessage,
   useDeleteConversation,
+  useAddParticipants,
+  useConversationDetail,
+  useRemoveParticipant,
   downloadChatAttachment,
 } from "../../api/chat";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
+import { useChatLauncher } from "../../context/ChatLauncherContext";
 import { extractApiError } from "../../lib/apiClient";
 import { Avatar, Spinner, EmptyState } from "../ui/primitives";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -43,7 +48,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-type View = { screen: "list" } | { screen: "new" } | { screen: "thread"; conversationId: string; otherName: string };
+type View = { screen: "list" } | { screen: "new" } | { screen: "thread"; conversationId: string; title: string; isGroup?: boolean };
 
 /** Floating 1:1 chat widget, mounted once at the layout level so it persists
  * across every page. Polling-based (no WebSocket infra) — matches the
@@ -62,9 +67,15 @@ export const ChatWidget: React.FC = () => {
   const [editDraft, setEditDraft] = useState("");
   const [pendingDeleteMessageId, setPendingDeleteMessageId] = useState<string | null>(null);
   const [pendingDeleteConversation, setPendingDeleteConversation] = useState(false);
+  const [showAddPeople, setShowAddPeople] = useState(false);
+  const [addPeopleSearch, setAddPeopleSearch] = useState("");
+  const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set());
+  const [showMembers, setShowMembers] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const stickerRef = useRef<HTMLDivElement>(null);
+  const addPeopleRef = useRef<HTMLDivElement>(null);
+  const membersRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: unreadCount } = useUnreadChatCount();
@@ -78,6 +89,21 @@ export const ChatWidget: React.FC = () => {
   const editMessage = useEditChatMessage(conversationId);
   const deleteMessage = useDeleteChatMessage(conversationId);
   const deleteConversation = useDeleteConversation();
+  const addParticipants = useAddParticipants(conversationId);
+  const { data: addPeopleCandidates } = useMessageableUsers(addPeopleSearch, open && view.screen === "thread" && showAddPeople);
+  const { data: conversationDetail } = useConversationDetail(open && view.screen === "thread" && view.isGroup ? conversationId : null);
+  const removeParticipant = useRemoveParticipant(conversationId);
+  const { pendingOpen, clearPendingOpen } = useChatLauncher();
+
+  // A "Discuss" button elsewhere in the app just created a group conversation
+  // and wants this globally-mounted widget to jump straight to it.
+  useEffect(() => {
+    if (!pendingOpen) return;
+    setOpen(true);
+    setView({ screen: "thread", conversationId: pendingOpen.conversationId, title: pendingOpen.title, isGroup: true });
+    clearPendingOpen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingOpen]);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -100,6 +126,29 @@ export const ChatWidget: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (addPeopleRef.current && !addPeopleRef.current.contains(e.target as Node)) setShowAddPeople(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (membersRef.current && !membersRef.current.contains(e.target as Node)) setShowMembers(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  useEffect(() => {
+    setShowAddPeople(false);
+    setAddPeopleSearch("");
+    setSelectedToAdd(new Set());
+    setShowMembers(false);
+  }, [conversationId]);
+
+  useEffect(() => {
     if (conversationId) markRead.mutate(conversationId);
     // Only re-run when the thread or its message count changes — marking
     // read on every render (e.g. from markRead's own mutation state) would
@@ -111,8 +160,8 @@ export const ChatWidget: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
   }, [messages?.length]);
 
-  function openConversation(id: string, name: string) {
-    setView({ screen: "thread", conversationId: id, otherName: name });
+  function openConversation(id: string, title: string, isGroup?: boolean) {
+    setView({ screen: "thread", conversationId: id, title, isGroup });
   }
 
   async function handleStartConversation(userId: string, name: string) {
@@ -166,6 +215,43 @@ export const ChatWidget: React.FC = () => {
     }
   }
 
+  function toggleSelectedToAdd(userId: string) {
+    setSelectedToAdd((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+
+  async function submitAddParticipants() {
+    if (selectedToAdd.size === 0) return;
+    try {
+      await addParticipants.mutateAsync([...selectedToAdd]);
+      push({ variant: "success", title: "Added to the discussion." });
+      setSelectedToAdd(new Set());
+      setAddPeopleSearch("");
+      setShowAddPeople(false);
+    } catch (err) {
+      push({ variant: "error", title: "Could not add people", description: extractApiError(err).message });
+    }
+  }
+
+  async function handleRemoveParticipant(userId: string) {
+    try {
+      await removeParticipant.mutateAsync(userId);
+      if (userId === user!.id) {
+        push({ variant: "success", title: "You left the discussion." });
+        setShowMembers(false);
+        setView({ screen: "list" });
+      } else {
+        push({ variant: "success", title: "Removed from the discussion." });
+      }
+    } catch (err) {
+      push({ variant: "error", title: "Could not remove", description: extractApiError(err).message });
+    }
+  }
+
   async function confirmDeleteConversation() {
     if (!conversationId) return;
     try {
@@ -202,7 +288,12 @@ export const ChatWidget: React.FC = () => {
   );
 
   return (
-    <div className="fixed bottom-20 right-4 z-40 sm:bottom-4" ref={panelRef}>
+    // z-[60] — deliberately above Drawer/Modal's z-50 (ui/Drawer.tsx,
+    // ui/Modal.tsx). The "Discuss" button opens this widget from inside an
+    // open Task Detail Drawer, which the user may keep open at the same
+    // time — without this, the widget opened correctly in state but
+    // rendered invisible underneath the still-open drawer.
+    <div className="fixed bottom-20 right-4 z-[60] sm:bottom-4" ref={panelRef}>
       {open && (
         <div
           className={clsx(
@@ -211,13 +302,31 @@ export const ChatWidget: React.FC = () => {
           )}
         >
           {view.screen === "thread" ? (
-            <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2.5">
+            <div className="relative flex items-center gap-2 border-b border-slate-100 px-3 py-2.5">
               <button onClick={() => setView({ screen: "list" })} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Back to conversations">
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <Avatar name={view.otherName} size="sm" />
-              <p className="truncate text-sm font-semibold text-slate-900">{view.otherName}</p>
+              <Avatar name={view.title} size="sm" />
+              <p className="truncate text-sm font-semibold text-slate-900">{view.title}</p>
               <div className="ml-auto flex items-center gap-1">
+                {view.isGroup && (
+                  <button
+                    onClick={() => setShowMembers((s) => !s)}
+                    className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-600"
+                    aria-label="See who's in this discussion"
+                  >
+                    <Users className="h-4 w-4" />
+                  </button>
+                )}
+                {view.isGroup && (
+                  <button
+                    onClick={() => setShowAddPeople((s) => !s)}
+                    className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-600"
+                    aria-label="Add people to this discussion"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </button>
+                )}
                 <button
                   onClick={() => setPendingDeleteConversation(true)}
                   className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-red-500"
@@ -230,6 +339,100 @@ export const ChatWidget: React.FC = () => {
               <button onClick={() => setOpen(false)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Close chat">
                 <X className="h-4 w-4" />
               </button>
+
+              {showAddPeople && view.isGroup && (
+                <div
+                  ref={addPeopleRef}
+                  className="absolute right-2 top-full z-10 mt-1 flex w-64 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+                >
+                  <div className="border-b border-slate-100 p-2">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                      <input
+                        autoFocus
+                        value={addPeopleSearch}
+                        onChange={(e) => setAddPeopleSearch(e.target.value)}
+                        placeholder="Search people…"
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:focus-ring"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {(addPeopleCandidates ?? []).length === 0 && (
+                      <p className="px-3 py-4 text-center text-xs text-slate-400">No people found</p>
+                    )}
+                    {(addPeopleCandidates ?? []).map((u: any) => {
+                      const isSelected = selectedToAdd.has(u.id);
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => toggleSelectedToAdd(u.id)}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-slate-50"
+                        >
+                          <Avatar name={u.name} size="xs" />
+                          <span className="min-w-0 flex-1 truncate text-slate-700">{u.name}</span>
+                          {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-brand-600" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-end border-t border-slate-100 p-2">
+                    <button
+                      type="button"
+                      onClick={submitAddParticipants}
+                      disabled={selectedToAdd.size === 0 || addParticipants.isPending}
+                      className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      Add{selectedToAdd.size > 0 ? ` (${selectedToAdd.size})` : ""}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {showMembers && view.isGroup && (
+                <div
+                  ref={membersRef}
+                  className="absolute right-2 top-full z-10 mt-1 flex w-64 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+                >
+                  <p className="border-b border-slate-100 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                    {conversationDetail ? `${conversationDetail.participants.length} people` : "People"}
+                  </p>
+                  <div className="max-h-56 overflow-y-auto">
+                    {!conversationDetail && (
+                      <div className="flex justify-center py-4">
+                        <Spinner className="h-4 w-4" />
+                      </div>
+                    )}
+                    {conversationDetail?.participants.map((p) => {
+                      const isCreator = p.userId === conversationDetail.createdById;
+                      const isSelf = p.userId === user.id;
+                      const canRemove = isSelf || conversationDetail.createdById === user.id;
+                      return (
+                        <div key={p.userId} className="flex items-center gap-2 px-3 py-1.5 text-sm">
+                          <Avatar name={p.name} size="xs" />
+                          <span className="min-w-0 flex-1 truncate text-slate-700">
+                            {p.name}
+                            {isSelf && <span className="text-slate-400"> (you)</span>}
+                          </span>
+                          {isCreator && <Crown className="h-3 w-3 shrink-0 text-amber-500" aria-label="Started this discussion" />}
+                          {canRemove && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveParticipant(p.userId)}
+                              disabled={removeParticipant.isPending}
+                              className="shrink-0 rounded p-0.5 text-slate-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                              aria-label={isSelf ? "Leave this discussion" : `Remove ${p.name}`}
+                            >
+                              <UserMinus className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
@@ -267,13 +470,13 @@ export const ChatWidget: React.FC = () => {
               {(conversations ?? []).map((c: any) => (
                 <button
                   key={c.id}
-                  onClick={() => openConversation(c.id, c.otherUser?.name ?? "Unknown user")}
+                  onClick={() => openConversation(c.id, c.title, c.isGroup)}
                   className="flex w-full items-center gap-2.5 border-b border-slate-50 px-3 py-2.5 text-left hover:bg-slate-50"
                 >
-                  <Avatar name={c.otherUser?.name ?? "?"} size="sm" />
+                  <Avatar name={c.title} size="sm" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-medium text-slate-800">{c.otherUser?.name ?? "Unknown user"}</p>
+                      <p className="truncate text-sm font-medium text-slate-800">{c.title}</p>
                       {c.lastMessage && (
                         <span className="shrink-0 text-[11px] text-slate-400">
                           {formatDistanceToNow(new Date(c.lastMessage.createdAt), { addSuffix: true })}
@@ -281,7 +484,11 @@ export const ChatWidget: React.FC = () => {
                       )}
                     </div>
                     <p className="truncate text-xs text-slate-500">
-                      {c.lastMessage ? c.lastMessage.body ?? (c.lastMessage.hasAttachments ? "📎 Attachment" : "") : "No messages yet"}
+                      {c.lastMessage
+                        ? c.lastMessage.kind === "CARD"
+                          ? "📋 Discussion started"
+                          : c.lastMessage.body ?? (c.lastMessage.hasAttachments ? "📎 Attachment" : "")
+                        : "No messages yet"}
                     </p>
                   </div>
                   {c.unreadCount > 0 && (
@@ -338,6 +545,29 @@ export const ChatWidget: React.FC = () => {
                   </div>
                 )}
                 {(messages ?? []).map((m: any) => {
+                  if (m.kind === "CARD" && m.metadata) {
+                    const card = m.metadata as { entityType: "TASK" | "BOARD"; code: string; title: string; subtitle?: string; path: string };
+                    return (
+                      <div key={m.id} className="group flex justify-center">
+                        <Link
+                          to={card.path}
+                          className="flex w-full max-w-[90%] items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-left hover:bg-brand-100"
+                        >
+                          <span className="mt-0.5 shrink-0 text-brand-600">
+                            {card.entityType === "TASK" ? <ListTodo className="h-4 w-4" /> : <Trello className="h-4 w-4" />}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-1 text-[11px] font-medium text-brand-500">
+                              {card.code}
+                              {card.subtitle && <span>· {card.subtitle}</span>}
+                            </span>
+                            <span className="block truncate text-sm font-medium text-slate-800">{card.title}</span>
+                          </span>
+                          <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-400 opacity-0 transition-opacity group-hover:opacity-100" />
+                        </Link>
+                      </div>
+                    );
+                  }
                   const isMine = m.sender.id === user.id;
                   const sticker = isStickerOnly(m.body) && !(m.attachments?.length > 0);
                   const isEditing = editingId === m.id;
@@ -536,7 +766,7 @@ export const ChatWidget: React.FC = () => {
       <ConfirmDialog
         open={!!pendingDeleteMessageId}
         title="Delete message"
-        message={`This will remove the message from your view only — ${view.screen === "thread" ? view.otherName : "the other person"} will still see it.`}
+        message={`This will remove the message from your view only — ${view.screen === "thread" ? (view.isGroup ? "the rest of the group" : view.title) : "the other person"} will still see it.`}
         confirmLabel="Delete for me"
         loading={deleteMessage.isPending}
         onConfirm={confirmDeleteMessage}
@@ -544,8 +774,8 @@ export const ChatWidget: React.FC = () => {
       />
       <ConfirmDialog
         open={pendingDeleteConversation}
-        title="Delete conversation"
-        message={`This removes your conversation with ${view.screen === "thread" ? view.otherName : "this person"} from your inbox only — they'll still see it, and it'll come back for you if they send a new message.`}
+        title={view.screen === "thread" && view.isGroup ? "Leave this view of the discussion" : "Delete conversation"}
+        message={`This removes ${view.screen === "thread" && view.isGroup ? `"${view.title}"` : `your conversation with ${view.screen === "thread" ? view.title : "this person"}`} from your inbox only — they'll still see it, and it'll come back for you if a new message arrives.`}
         confirmLabel="Delete for me"
         loading={deleteConversation.isPending}
         onConfirm={confirmDeleteConversation}

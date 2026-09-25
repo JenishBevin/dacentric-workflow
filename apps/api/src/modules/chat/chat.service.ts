@@ -2,6 +2,8 @@ import { prisma } from "../../lib/prisma";
 import { Errors } from "../../common/errors";
 import { AuthedUser } from "../../middleware/authenticate";
 import { getStorageAdapter, validateFile, scanFile } from "../../lib/storage";
+import { loadTaskWithAccess } from "../tasks/task-access";
+import { assertBoardVisible } from "../boards/board-access";
 
 /** Throws 404 (never 403) if the actor isn't a participant — never confirms
  *  a conversation's existence to someone outside it. */
@@ -62,6 +64,138 @@ export async function getOrCreateDirectConversation(actor: AuthedUser, otherUser
   });
 }
 
+/** The "Discuss" button's card metadata — the entity's own values captured
+ *  at the moment the discussion is started, so the card stays historically
+ *  accurate even if the task/board is later renamed or moved. */
+type DiscussCardMetadata = { entityType: "TASK" | "BOARD"; code: string; title: string; subtitle?: string; path: string };
+
+async function buildDiscussCard(
+  actor: AuthedUser,
+  entityType: "TASK" | "BOARD",
+  entityId: string
+): Promise<DiscussCardMetadata> {
+  if (entityType === "TASK") {
+    const ctx = await loadTaskWithAccess(entityId, actor);
+    return {
+      entityType: "TASK",
+      code: ctx.task.taskId,
+      title: ctx.task.title,
+      subtitle: ctx.task.stage?.name,
+      path: `/workflow/boards/${ctx.task.boardId}?task=${ctx.task.id}`,
+    };
+  }
+  await assertBoardVisible(entityId, actor);
+  const board = await prisma.board.findUniqueOrThrow({ where: { id: entityId } });
+  return { entityType: "BOARD", code: board.boardId, title: board.name, path: `/workflow/boards/${board.id}` };
+}
+
+/** Creates a named GROUP conversation seeded with a card describing the
+ *  task/project it was started from — the "Discuss" button. Unlike
+ *  getOrCreateDirectConversation, this is never deduped: every submission
+ *  makes a fresh thread, since each is a deliberately-named discussion. */
+export async function createGroupConversation(
+  actor: AuthedUser,
+  input: { name: string; userIds: string[]; entityType: "TASK" | "BOARD"; entityId: string }
+) {
+  const name = input.name.trim();
+  if (!name) throw Errors.badRequest("Enter a name for this discussion.");
+
+  const card = await buildDiscussCard(actor, input.entityType, input.entityId);
+
+  const participantIds = [...new Set([actor.id, ...input.userIds])];
+  const activeUsers = await prisma.user.count({ where: { id: { in: participantIds }, status: "ACTIVE" } });
+  if (activeUsers !== participantIds.length) throw Errors.badRequest("One or more selected people are no longer active.");
+
+  const conversation = await prisma.conversation.create({
+    data: {
+      type: "GROUP",
+      name,
+      createdById: actor.id,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      participants: { create: participantIds.map((userId) => ({ userId })) },
+      messages: { create: { senderId: actor.id, kind: "CARD", metadata: card as any } },
+    },
+  });
+
+  return conversation;
+}
+
+/** Discussions already started from this task/project — lets the "Discuss"
+ *  button reopen a prior one instead of only ever starting new ones. Only
+ *  discussions the actor is actually a participant of (same
+ *  never-confirm-existence-to-non-participants stance as the rest of chat). */
+export async function listGroupConversationsForEntity(actor: AuthedUser, entityType: "TASK" | "BOARD", entityId: string) {
+  const conversations = await prisma.conversation.findMany({
+    where: { type: "GROUP", entityType, entityId, participants: { some: { userId: actor.id } } },
+    include: { participants: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return conversations.map((c) => ({ id: c.id, name: c.name, participantCount: c.participants.length, createdAt: c.createdAt }));
+}
+
+/** Manually adding people to an already-started group ("+" in the thread
+ *  header) — org-wide, unlike the original candidate list the "Discuss"
+ *  popup shows (which is scoped to people already tagged on the task/
+ *  project); once a discussion exists, its creator/participants may
+ *  reasonably want to loop in anyone else. */
+export async function addParticipants(conversationId: string, actor: AuthedUser, userIds: string[]) {
+  await assertParticipant(conversationId, actor.id);
+  const conversation = await prisma.conversation.findUniqueOrThrow({ where: { id: conversationId }, include: { participants: true } });
+  if (conversation.type !== "GROUP") throw Errors.badRequest("Only group discussions can have people added to them.");
+
+  const existingIds = new Set(conversation.participants.map((p) => p.userId));
+  const newIds = [...new Set(userIds)].filter((id) => !existingIds.has(id));
+  if (newIds.length === 0) return conversation;
+
+  const activeUsers = await prisma.user.count({ where: { id: { in: newIds }, status: "ACTIVE" } });
+  if (activeUsers !== newIds.length) throw Errors.badRequest("One or more selected people are no longer active.");
+
+  await prisma.conversationParticipant.createMany({ data: newIds.map((userId) => ({ conversationId, userId })) });
+  return prisma.conversation.findUniqueOrThrow({ where: { id: conversationId }, include: { participants: true } });
+}
+
+/** Full "who's in this" detail for a thread — the list-of-conversations row
+ *  already carries participant names, but the widget doesn't keep that query
+ *  running once you're inside a thread, so an open thread needs its own
+ *  lookup to show/manage membership. */
+export async function getConversationDetail(conversationId: string, actor: AuthedUser) {
+  await assertParticipant(conversationId, actor.id);
+  const conversation = await prisma.conversation.findUniqueOrThrow({
+    where: { id: conversationId },
+    include: { participants: { include: { user: { select: { id: true, name: true } } } } },
+  });
+  return {
+    id: conversation.id,
+    name: conversation.name,
+    isGroup: conversation.type === "GROUP",
+    createdById: conversation.createdById,
+    participants: conversation.participants.map((p) => ({ userId: p.userId, name: p.user.name })),
+  };
+}
+
+/** Removing someone from a GROUP discussion. Anyone can remove themselves
+ *  ("leave"); removing someone else is limited to whoever started the
+ *  discussion — the same ownership the "group heading can be set by who
+ *  created this group" request implied for renaming. */
+export async function removeParticipant(conversationId: string, actor: AuthedUser, targetUserId: string) {
+  await assertParticipant(conversationId, actor.id);
+  const conversation = await prisma.conversation.findUniqueOrThrow({ where: { id: conversationId } });
+  if (conversation.type !== "GROUP") throw Errors.badRequest("Only group discussions support removing people.");
+  if (targetUserId !== actor.id && conversation.createdById !== actor.id) {
+    throw Errors.forbidden("Only the person who started this discussion can remove someone else.");
+  }
+
+  const existing = await prisma.conversationParticipant.findUnique({
+    where: { conversationId_userId: { conversationId, userId: targetUserId } },
+  });
+  if (!existing) return;
+
+  await prisma.conversationParticipant.delete({
+    where: { conversationId_userId: { conversationId, userId: targetUserId } },
+  });
+}
+
 export async function listConversations(actor: AuthedUser) {
   const participations = await prisma.conversationParticipant.findMany({
     where: { userId: actor.id },
@@ -74,6 +208,7 @@ export async function listConversations(actor: AuthedUser) {
 
   const rows = await Promise.all(
     participations.map(async (p) => {
+      const isGroup = p.conversation.type === "GROUP";
       const other = p.conversation.participants.find((cp) => cp.userId !== actor.id)?.user ?? null;
       const where = visibleMessagesWhere(p.conversationId, actor.id, p.clearedAt);
 
@@ -92,10 +227,14 @@ export async function listConversations(actor: AuthedUser) {
 
       return {
         id: p.conversation.id,
+        isGroup,
+        title: isGroup ? (p.conversation.name ?? "Group") : (other?.name ?? "Unknown user"),
+        participants: p.conversation.participants.map((cp) => ({ userId: cp.userId, name: cp.user.name })),
         otherUser: other,
         lastMessage: lastMessage
           ? {
               body: lastMessage.body,
+              kind: lastMessage.kind,
               hasAttachments: lastMessage.attachments.length > 0,
               senderId: lastMessage.senderId,
               createdAt: lastMessage.createdAt,

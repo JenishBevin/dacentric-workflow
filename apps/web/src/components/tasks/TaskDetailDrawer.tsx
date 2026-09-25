@@ -29,6 +29,7 @@ import { useToast } from "../../context/ToastContext";
 import { can, isAdmin, canSeeSecretAttachments } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { DiscussButton } from "../chat/DiscussButton";
 import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt, Plus, PauseCircle } from "lucide-react";
 import { format } from "date-fns";
 import clsx from "clsx";
@@ -352,6 +353,16 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
         task && (
           <div className="flex w-full items-center justify-between">
             <div className="flex gap-2">
+              <DiscussButton
+                entityType="TASK"
+                entityId={task.id}
+                defaultName={task.title}
+                candidates={[
+                  ...task.assignees.map((a) => ({ userId: a.userId, name: a.name })),
+                  ...task.watchers.map((w) => ({ userId: w.userId, name: w.name })),
+                  ...(task.createdBy ? [{ userId: task.createdBy.id, name: task.createdBy.name }] : []),
+                ].filter((p, i, arr) => p.userId !== user?.id && arr.findIndex((x) => x.userId === p.userId) === i)}
+              />
               {!readOnly && (
               <>
               {/* Enquiry List: Qualified is available any time before the enquiry

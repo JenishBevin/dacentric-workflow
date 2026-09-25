@@ -14,6 +14,7 @@ import { BoardSettingsDrawer } from "../../components/boards/BoardSettingsDrawer
 import { ProcurementPanel } from "../../components/procurement/ProcurementPanel";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { BulkActionBar } from "../../components/ui/BulkActionBar";
+import { DiscussButton } from "../../components/chat/DiscussButton";
 import { Button, Checkbox, Skeleton, ErrorState, Badge } from "../../components/ui/primitives";
 import { useSelection } from "../../hooks/useSelection";
 import { useToast } from "../../context/ToastContext";
@@ -309,6 +310,14 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
           {board.isArchived && <Badge tone="slate">Archived</Badge>}
         </div>
         <div className="flex items-center gap-2">
+          {panelView === "project" && (
+            <DiscussButton
+              entityType="BOARD"
+              entityId={board.id}
+              defaultName={board.name}
+              candidates={board.members.filter((m: any) => m.userId !== user?.id).map((m: any) => ({ userId: m.userId, name: m.name }))}
+            />
+          )}
           {board.procurementRecord && (
             <div className="flex rounded-lg border border-slate-300 p-0.5">
               <button

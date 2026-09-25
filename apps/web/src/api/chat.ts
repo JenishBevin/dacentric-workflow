@@ -37,6 +37,96 @@ export function useStartConversation() {
   });
 }
 
+export interface CreateGroupConversationInput {
+  name: string;
+  userIds: string[];
+  entityType: "TASK" | "BOARD";
+  entityId: string;
+}
+
+/** "Discuss" button — starts a named group conversation seeded with a
+ * task/project card. */
+export function useCreateGroupConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateGroupConversationInput) => (await api.post("/chat/conversations/group", input)).data.data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+      qc.invalidateQueries({ queryKey: ["chat-conversations-for-entity"] });
+    },
+  });
+}
+
+export interface DiscussConversationSummary {
+  id: string;
+  name: string | null;
+  participantCount: number;
+  createdAt: string;
+}
+
+/** Discussions already started from a task/project — lets the "Discuss"
+ * button offer "reopen" alongside "start new". */
+export function useGroupConversationsForEntity(entityType: "TASK" | "BOARD", entityId: string | undefined) {
+  return useQuery({
+    queryKey: ["chat-conversations-for-entity", entityType, entityId],
+    queryFn: async () =>
+      (await api.get<{ data: DiscussConversationSummary[] }>("/chat/conversations/for-entity", { params: { entityType, entityId } })).data.data,
+    enabled: !!entityId,
+  });
+}
+
+/** "+" in an open group thread — adds people beyond the original candidate
+ * list, org-wide (same directory as starting a new 1:1). */
+export function useAddParticipants(conversationId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userIds: string[]) => (await api.post(`/chat/conversations/${conversationId}/participants`, { userIds })).data.data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+      qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
+      qc.invalidateQueries({ queryKey: ["chat-conversation-detail", conversationId] });
+      qc.invalidateQueries({ queryKey: ["chat-conversations-for-entity"] });
+    },
+  });
+}
+
+export interface ConversationParticipant {
+  userId: string;
+  name: string;
+}
+
+export interface ConversationDetail {
+  id: string;
+  name: string | null;
+  isGroup: boolean;
+  createdById: string | null;
+  participants: ConversationParticipant[];
+}
+
+/** "Who's in this?" — an open thread's full membership, for a group's
+ * member-list/remove popover. */
+export function useConversationDetail(conversationId: string | null) {
+  return useQuery({
+    queryKey: ["chat-conversation-detail", conversationId],
+    queryFn: async () => (await api.get<{ data: ConversationDetail }>(`/chat/conversations/${conversationId}`)).data.data,
+    enabled: !!conversationId,
+  });
+}
+
+/** Removing someone from a group — either the creator removing another
+ * participant, or a participant removing themselves ("leave"). */
+export function useRemoveParticipant(conversationId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => api.delete(`/chat/conversations/${conversationId}/participants/${userId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+      qc.invalidateQueries({ queryKey: ["chat-conversation-detail", conversationId] });
+      qc.invalidateQueries({ queryKey: ["chat-conversations-for-entity"] });
+    },
+  });
+}
+
 export function useConversationMessages(conversationId: string | null) {
   return useQuery({
     queryKey: ["chat-messages", conversationId],

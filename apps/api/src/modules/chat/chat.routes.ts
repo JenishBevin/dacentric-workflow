@@ -38,6 +38,62 @@ chatRouter.post(
   })
 );
 
+// "Discuss" button — creates a named GROUP conversation seeded with a
+// task/project card, instead of the plain 1:1 DM above.
+chatRouter.post(
+  "/conversations/group",
+  validate(
+    z.object({
+      name: z.string().trim().min(1, "Enter a name for this discussion.").max(150),
+      userIds: z.array(z.string().uuid()).min(1, "Select at least one person."),
+      entityType: z.enum(["TASK", "BOARD"]),
+      entityId: z.string().uuid(),
+    })
+  ),
+  asyncHandler(async (req, res) => {
+    const conversation = await chatService.createGroupConversation(req.user!, (req as any).validatedBody);
+    return created(res, conversation);
+  })
+);
+
+// Discussions already started from a given task/project — lets the
+// "Discuss" button offer "reopen" alongside "start new".
+chatRouter.get(
+  "/conversations/for-entity",
+  asyncHandler(async (req, res) => {
+    const { entityType, entityId } = req.query as Record<string, string>;
+    if ((entityType !== "TASK" && entityType !== "BOARD") || !entityId) {
+      return ok(res, []);
+    }
+    return ok(res, await chatService.listGroupConversationsForEntity(req.user!, entityType, entityId));
+  })
+);
+
+chatRouter.post(
+  "/conversations/:conversationId/participants",
+  validate(z.object({ userIds: z.array(z.string().uuid()).min(1, "Select at least one person.") })),
+  asyncHandler(async (req, res) => {
+    const conversation = await chatService.addParticipants(req.params.conversationId, req.user!, (req as any).validatedBody.userIds);
+    return ok(res, conversation);
+  })
+);
+
+chatRouter.delete(
+  "/conversations/:conversationId/participants/:userId",
+  asyncHandler(async (req, res) => {
+    await chatService.removeParticipant(req.params.conversationId, req.user!, req.params.userId);
+    return ok(res, { message: "Removed from the discussion." });
+  })
+);
+
+// "Who's in this?" — a group thread's full membership, fetched only while
+// that thread is open (the conversations list already carries this per row,
+// but that query isn't running once you're inside a thread).
+chatRouter.get(
+  "/conversations/:conversationId",
+  asyncHandler(async (req, res) => ok(res, await chatService.getConversationDetail(req.params.conversationId, req.user!)))
+);
+
 chatRouter.get(
   "/conversations/:conversationId/messages",
   asyncHandler(async (req, res) => {
