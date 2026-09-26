@@ -7,6 +7,7 @@ import { useBoards } from "../api/boards";
 import { Select, Input, Badge, Avatar, Skeleton, EmptyState, ErrorState, Label } from "../components/ui/primitives";
 import { PriorityBadge } from "../components/workflow/badges";
 import { Drawer } from "../components/ui/Drawer";
+import { boardPath } from "../lib/boardPath";
 import { format } from "date-fns";
 import { Users } from "lucide-react";
 
@@ -192,7 +193,7 @@ export default function TeamWorkloadPage() {
             {detail.tasks.map((t: any) => (
               <Link
                 key={t.id}
-                to={`/workflow/boards/${t.boardId}?task=${t.id}`}
+                to={`${boardPath(t.board, t.boardId)}?task=${t.id}`}
                 className="block rounded-lg border border-slate-200 p-3 text-sm hover:border-brand-300 hover:bg-brand-50/40"
               >
                 <div className="flex items-center justify-between">

@@ -9,6 +9,7 @@ import { useWorkTimer, formatDuration } from "../../hooks/useWorkTimer";
 import { myAvatarUrl } from "../../api/profile";
 import { api } from "../../lib/apiClient";
 import { useToast } from "../../context/ToastContext";
+import { boardPath } from "../../lib/boardPath";
 import clsx from "clsx";
 
 const WorkTimerBadge: React.FC = () => {
@@ -134,7 +135,7 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
           const match = (data.data as any[]).find((b) => b.boardId.toLowerCase() === compact.toLowerCase());
           if (match) {
             setSearch("");
-            navigate(`/workflow/boards/${match.id}`);
+            navigate(boardPath(match.name, match.id));
             return;
           }
         } else if (isClaimId) {
@@ -158,7 +159,7 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
           );
           if (match) {
             setSearch("");
-            navigate(`/workflow/boards/${match.boardId}?task=${match.id}`);
+            navigate(`${boardPath(match.board?.name, match.boardId)}?task=${match.id}`);
             return;
           }
         }
