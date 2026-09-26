@@ -44,6 +44,11 @@ export const StageColumn: React.FC<Props> = ({
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  // The header count matches what's actually rendered below it (all cards
+  // in this stage) — openCount is a separate, deliberately narrower figure
+  // used only for the WIP-limit badge, since "Mark complete" can complete a
+  // task without moving it to a terminal stage, and a stale completed card
+  // sitting in a WIP-limited column shouldn't count against that limit.
   const openCount = tasks.filter((t) => !t.isCompleted).length;
   const overLimit = stage.wipLimit ? openCount >= stage.wipLimit : false;
   const nearLimit = stage.wipLimit ? openCount >= stage.wipLimit - 1 && !overLimit : false;
@@ -54,7 +59,7 @@ export const StageColumn: React.FC<Props> = ({
         <div className="flex min-w-0 items-center gap-2">
           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: stage.color }} />
           <p className="truncate text-sm font-semibold text-slate-800">{stage.name}</p>
-          <span className="shrink-0 text-xs text-slate-400">{openCount}</span>
+          <span className="shrink-0 text-xs text-slate-400">{tasks.length}</span>
           {stage.wipLimit && (
             <span
               className={clsx(
