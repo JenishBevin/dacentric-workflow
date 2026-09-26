@@ -70,6 +70,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
   const [assignees, setAssignees] = useState<{ userId: string; name: string }[]>([]);
   const [watchers, setWatchers] = useState<{ userId: string; name: string }[]>([]);
   const [approver, setApprover] = useState<{ userId: string; name: string }[]>([]);
+  const [salesperson, setSalesperson] = useState<{ userId: string; name: string }[]>([]);
   const [checklist, setChecklist] = useState<string[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
@@ -119,6 +120,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
     setAssignees([]);
     setWatchers([]);
     setApprover([]);
+    setSalesperson([]);
     setChecklist([]);
     setNewChecklistItem("");
     setSaveTemplateOpen(false);
@@ -216,6 +218,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
         linkedRecordType: linkedRecord?.type,
         requiresApproval: values.requiresApproval,
         approverUserId: values.requiresApproval ? approver[0]?.userId : undefined,
+        salespersonUserId: salesperson[0]?.userId,
         recurring: values.recurringEnabled
           ? {
               frequency: values.frequency,
@@ -319,6 +322,10 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
             <Label>Watchers</Label>
             <PeoplePicker selected={watchers} onChange={setWatchers} excludeUserIds={assignees.map((a) => a.userId)} placeholder="Add a watcher…" />
           </div>
+          <div className="mt-3">
+            <Label>Salesperson</Label>
+            <PeoplePicker selected={salesperson} onChange={(p) => setSalesperson(p.slice(-1))} placeholder="Search for a salesperson…" />
+          </div>
         </section>
 
         <section className="grid grid-cols-3 gap-3">
@@ -327,8 +334,13 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
             <Input type="date" {...register("startDate")} />
           </div>
           <div>
-            <Label>Due Date</Label>
-            <Input type="date" min={startDate || undefined} {...register("dueDate")} />
+            <Label required>Due Date</Label>
+            <Input
+              type="date"
+              min={startDate || undefined}
+              error={errors.dueDate?.message}
+              {...register("dueDate", { required: "Due date is required." })}
+            />
           </div>
           <div>
             <Label>Estimated Effort (hrs)</Label>

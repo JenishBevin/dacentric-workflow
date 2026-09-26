@@ -266,6 +266,8 @@ export interface TaskSummary {
   estimatedEffortHours: number | null;
   createdById: string;
   createdBy?: { id: string; name: string };
+  salespersonUserId?: string | null;
+  salesperson?: { id: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
   version: number;

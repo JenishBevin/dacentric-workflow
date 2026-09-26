@@ -722,6 +722,15 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
               />
               <p className="mt-1 text-[11px] text-slate-400">Watchers get activity notifications but never count toward workload or My Tasks.</p>
             </div>
+            <div>
+              <Label>Salesperson</Label>
+              <PeoplePicker
+                selected={task.salesperson ? [{ userId: task.salesperson.id, name: task.salesperson.name }] : []}
+                onChange={(people) => saveField({ salespersonUserId: people.slice(-1)[0]?.userId ?? null })}
+                disabled={!canEdit}
+                placeholder="Search for a salesperson…"
+              />
+            </div>
           </section>
 
           {/* Dates */}

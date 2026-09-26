@@ -156,6 +156,7 @@ model User {
   boardMemberships     BoardMember[]
   ownedBoards          Board[]              @relation("BoardCreatedBy")
   createdTasks         Task[]               @relation("TaskCreatedBy")
+  salesTasks           Task[]               @relation("TaskSalesperson")
   taskAssignments      TaskAssignee[]
   taskWatching         TaskWatcher[]
   comments             Comment[]
@@ -729,6 +730,12 @@ model Task {
   estimatedEffortHours Float?
   createdById      String
   createdBy        User                @relation("TaskCreatedBy", fields: [createdById], references: [id])
+
+  // Optional — the salesperson associated with this enquiry/estimation/
+  // project, for reporting/attribution only; not an approval or workflow
+  // gate like approverUserId.
+  salespersonUserId String?
+  salesperson       User?              @relation("TaskSalesperson", fields: [salespersonUserId], references: [id])
 
   taskType         TaskType            @default(STANDARD)
   seriesId         String?

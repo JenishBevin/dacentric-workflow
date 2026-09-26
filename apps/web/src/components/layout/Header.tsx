@@ -73,6 +73,10 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
   const [createOpen, setCreateOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
+  // "" = paste a full ID as before; ENQ/EST/PRJ = pick the record type and
+  // type only the last 4 digits — the current year fills in the rest, since
+  // that's what almost every search is for.
+  const [idPrefix, setIdPrefix] = useState<"" | "ENQ" | "EST" | "PRJ">("");
   const ref = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -102,10 +106,22 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
     const q = search.trim();
     if (!q) return;
 
-    // Collapse stray internal whitespace (e.g. a typo like "QPTS/QN/2026- 0006")
-    // before matching against an ID pattern — none of these codes contain
-    // meaningful spaces, unlike a project-name search.
-    const compact = q.replace(/\s+/g, "");
+    let compact: string;
+    if (idPrefix) {
+      // Prefix mode: the box only holds the last 4 digits — reconstruct the
+      // full ID with the current year, then fall through to the exact same
+      // lookup logic below as if that full ID had been pasted in directly.
+      const digits = q.replace(/\D/g, "");
+      if (!digits) return;
+      const year = new Date().getFullYear();
+      const seq = digits.padStart(4, "0");
+      compact = idPrefix === "PRJ" ? `QPTS-PRJ-${year}-${seq}` : idPrefix === "ENQ" ? `QPTS-ENQ-${year}-${seq}` : `QPTS/QN/${year}-${seq}`;
+    } else {
+      // Collapse stray internal whitespace (e.g. a typo like "QPTS/QN/2026- 0006")
+      // before matching against an ID pattern — none of these codes contain
+      // meaningful spaces, unlike a project-name search.
+      compact = q.replace(/\s+/g, "");
+    }
 
     if (ID_LOOKUP_PATTERN.test(compact)) {
       setSearching(true);
@@ -146,10 +162,11 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
             return;
           }
         }
+        const typeLabel = idPrefix === "PRJ" ? "project" : idPrefix === "ENQ" ? "enquiry" : idPrefix === "EST" ? "estimation" : isProjectId ? "project" : isClaimId ? "claim" : "task";
         push({
           variant: "error",
           title: "Not found",
-          description: `No ${isProjectId ? "project" : isClaimId ? "claim" : "task"} found for "${q}".`,
+          description: `No ${typeLabel} found for "${idPrefix ? compact : q}".`,
         });
       } catch {
         push({ variant: "error", title: "Search failed", description: "Could not look up that ID right now." });
@@ -183,15 +200,35 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
             </React.Fragment>
           ))}
         </nav>
-        <form onSubmit={submitSearch} className="hidden min-w-0 max-w-md flex-1 sm:block">
-          <div className="relative">
+        <form onSubmit={submitSearch} className="hidden min-w-0 max-w-lg flex-1 items-center gap-1.5 sm:flex">
+          <select
+            value={idPrefix}
+            onChange={(e) => {
+              setIdPrefix(e.target.value as "" | "ENQ" | "EST" | "PRJ");
+              setSearch("");
+              searchRef.current?.focus();
+            }}
+            aria-label="Search by ID type"
+            className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-2 pr-6 text-xs text-slate-600 focus-visible:focus-ring"
+          >
+            <option value="">Full ID</option>
+            <option value="ENQ">Enquiry</option>
+            <option value="EST">Estimation</option>
+            <option value="PRJ">Project</option>
+          </select>
+          <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               ref={searchRef}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setSearch(idPrefix ? e.target.value.replace(/\D/g, "").slice(0, 4) : e.target.value)}
               disabled={searching}
-              placeholder="Search by Task ID (WF-000001), Project ID (QPTS-PRJ-2026-0001) or Claim ID (CLM-000001)…"
+              inputMode={idPrefix ? "numeric" : "text"}
+              placeholder={
+                idPrefix
+                  ? `Last 4 digits of this year's ${idPrefix === "PRJ" ? "Project" : idPrefix === "ENQ" ? "Enquiry" : "Estimation"} ID, e.g. 0007`
+                  : "Search by Task ID (WF-000001), Project ID (QPTS-PRJ-2026-0001) or Claim ID (CLM-000001)…"
+              }
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-14 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:focus-ring disabled:opacity-60"
             />
             <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">

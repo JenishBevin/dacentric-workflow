@@ -32,6 +32,7 @@ export interface CreateTaskInput {
   watcherUserIds?: string[];
   requiresApproval?: boolean;
   approverUserId?: string;
+  salespersonUserId?: string;
   recurring?: {
     frequency: string;
     customIntervalDays?: number;
@@ -185,6 +186,7 @@ async function assertActiveWorkflowUsers(userIds: string[]) {
 export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
   await assertActiveWorkflowUsers(input.assigneeUserIds);
   if (input.approverUserId) await assertActiveWorkflowUsers([input.approverUserId]);
+  if (input.salespersonUserId) await assertActiveWorkflowUsers([input.salespersonUserId]);
 
   const boardId = input.boardId ?? (await getOrCreatePersonalBoard(actor)).id;
 
@@ -219,6 +221,7 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
         createdById: actor.id,
         requiresApproval: input.requiresApproval ?? false,
         approverUserId: input.requiresApproval ? input.approverUserId : null,
+        salespersonUserId: input.salespersonUserId ?? null,
         taskId: placeholderId,
         taskType: seriesId ? TaskType.RECURRING_INSTANCE : TaskType.STANDARD,
         seriesId,
@@ -330,6 +333,8 @@ function serializeTask(task: any) {
     estimatedEffortHours: task.estimatedEffortHours,
     createdById: task.createdById,
     createdBy: task.createdBy ? { id: task.createdBy.id, name: task.createdBy.name } : undefined,
+    salespersonUserId: task.salespersonUserId,
+    salesperson: task.salesperson ? { id: task.salesperson.id, name: task.salesperson.name } : null,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     version: task.version,
@@ -400,6 +405,7 @@ const TASK_DETAIL_INCLUDE = {
   service: true,
   customer: { select: { id: true, customerId: true, name: true } },
   createdBy: true,
+  salesperson: { select: { id: true, name: true } },
   assignees: { include: { user: true } },
   watchers: { include: { user: true } },
   checklistItems: { include: { owner: true }, orderBy: { position: "asc" as const } },
@@ -502,12 +508,13 @@ export async function updateTask(taskId: string, input: Record<string, any>, act
   }
 
   if (input.approverUserId) await assertActiveWorkflowUsers([input.approverUserId]);
+  if (input.salespersonUserId) await assertActiveWorkflowUsers([input.salespersonUserId]);
 
   const before = { ...ctx.task };
   const data: any = { version: { increment: 1 }, isHighlighted: false };
   const changedFields: string[] = [];
 
-  for (const key of ["title", "priority", "startDate", "dueDate", "estimatedEffortHours", "dependencyEnforced", "customerId"]) {
+  for (const key of ["title", "priority", "startDate", "dueDate", "estimatedEffortHours", "dependencyEnforced", "customerId", "salespersonUserId"]) {
     if (input[key] !== undefined) {
       data[key] = input[key];
       changedFields.push(key);

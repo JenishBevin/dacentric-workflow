@@ -14,7 +14,7 @@ export const createTaskSchema = z
     priority: z.nativeEnum(TaskPriority).default(TaskPriority.MEDIUM),
     assigneeUserIds: z.array(z.string().uuid()).min(1, "At least one assignee is required."),
     startDate: isoDate.optional().nullable(),
-    dueDate: isoDate.optional().nullable(),
+    dueDate: isoDate,
     estimatedEffortHours: z.number().positive().optional().nullable(),
     checklist: z.array(z.object({ text: z.string().min(1), ownerId: z.string().uuid().optional() })).optional(),
     tagIds: z.array(z.string().uuid()).optional(),
@@ -23,6 +23,7 @@ export const createTaskSchema = z
     watcherUserIds: z.array(z.string().uuid()).optional(),
     requiresApproval: z.boolean().optional(),
     approverUserId: z.string().uuid().optional(),
+    salespersonUserId: z.string().uuid().optional(),
     recurring: z
       .object({
         frequency: z.nativeEnum(RecurrenceFrequency),
@@ -55,6 +56,7 @@ export const updateTaskSchema = z
     estimatedEffortHours: z.number().positive().optional().nullable(),
     requiresApproval: z.boolean().optional(),
     approverUserId: z.string().uuid().optional().nullable(),
+    salespersonUserId: z.string().uuid().optional().nullable(),
     dependencyEnforced: z.boolean().optional(),
     customerId: z.string().uuid().optional().nullable(),
     version: z.number().int().optional(),
