@@ -95,6 +95,24 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
   }
   const statusDistribution = Array.from(countByStageName, ([stage, count]) => ({ stage, count }));
 
+  // Board name (not just id) so the frontend can route Recent Activity clicks
+  // through boardPath() — Enquiry List/Estimation need their dedicated routes
+  // or the sidebar highlights "Projects" instead (see Header.tsx's boardPath).
+  const activityBoardIds = [...new Set(recentActivity.map((a) => a.boardId).filter((id): id is string => !!id))];
+  const activityBoards = activityBoardIds.length
+    ? await prisma.board.findMany({ where: { id: { in: activityBoardIds } }, select: { id: true, name: true } })
+    : [];
+  const boardNameById = new Map(activityBoards.map((b) => [b.id, b.name]));
+  const recentActivityWithBoard = recentActivity.map((a) => ({
+    ...a,
+    boardName: a.boardId ? (boardNameById.get(a.boardId) ?? null) : null,
+    // The dedicated taskId column is only set for sub-entity actions
+    // (Comment/TaskAttachment/ChecklistItem/...) — a direct Task action
+    // (create/edit/move/assign/delete) only ever sets entityId, so this is
+    // the one place that needs to know both conventions to link back to it.
+    linkedTaskId: a.entityType === "Task" ? a.entityId : a.taskId,
+  }));
+
   return {
     totalOpenTasks: totalOpen,
     overdueTasks: overdue,
@@ -106,7 +124,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     pendingLost,
     priorityDistribution: priorityBreakdown.map((p) => ({ priority: p.priority, count: p._count._all })),
     statusDistribution,
-    recentActivity,
+    recentActivity: recentActivityWithBoard,
   };
 }
 
