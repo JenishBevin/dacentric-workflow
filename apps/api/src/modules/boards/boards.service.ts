@@ -432,7 +432,7 @@ export async function listServices() {
     // Must match listBoards()'s filtering exactly, or the tile count and the
     // list it links to disagree — completed projects have moved to History,
     // so they don't count here either.
-    include: { _count: { select: { boards: { where: { isDeleted: false, isCompleted: false } } } } },
+    include: { _count: { select: { boards: { where: { isDeleted: false, isCompleted: false, isArchived: false } } } } },
     orderBy: { position: "asc" },
   });
   return services.map((s) => ({ id: s.id, name: s.name, projectCount: s._count.boards }));
