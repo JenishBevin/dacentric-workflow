@@ -44,10 +44,16 @@ export function assertCanEditBoard(role: BoardRole) {
   }
 }
 
+/** Gates Mark Complete / Archive / Delete / Save-as-Template. Board Owner or
+ *  a system-level Admin always passes; so does anyone granted org-wide
+ *  ARCHIVE_DELETE_BOARD in Roles & Permissions (e.g. Management) — otherwise
+ *  that setting would have no actual effect, the same reasoning as
+ *  assertCanDeleteTask's ALL-scope check for tasks. */
 export function assertIsBoardOwnerOrAdmin(role: BoardRole, user: AuthedUser) {
-  if (role !== "OWNER" && !isSystemLevelAdmin(user.roles)) {
-    throw Errors.forbidden("Only the board Owner or an Administrator can do this.");
-  }
+  if (role === "OWNER") return;
+  if (isSystemLevelAdmin(user.roles)) return;
+  if (getPermissionScope(user.permissions, PermissionKey.ARCHIVE_DELETE_BOARD) === "ALL") return;
+  throw Errors.forbidden("Only the board Owner or an Administrator can do this.");
 }
 
 export function canComment(role: BoardRole) {

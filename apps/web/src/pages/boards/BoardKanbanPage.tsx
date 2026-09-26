@@ -205,6 +205,10 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   }
 
   const canManageBoard = isAdmin(user) || board?.members.some((m: any) => m.userId === user?.id && m.role === "OWNER") || can(user, "EDIT_BOARD");
+  // Mark Complete / Archive / Delete are gated server-side by ARCHIVE_DELETE_BOARD
+  // (see assertIsBoardOwnerOrAdmin), not EDIT_BOARD — a distinct permission so
+  // e.g. Management can close out projects without general board-edit rights.
+  const canCompleteBoard = canManageBoard || can(user, "ARCHIVE_DELETE_BOARD", "ALL");
   const canAddStage = isSuperAdmin(user);
   const canCreateTask = can(user, "CREATE_TASK");
   const canMoveTasks = can(user, "MOVE_TASK");
@@ -404,7 +408,11 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         onOpenMembers={() => openSettings("members")}
         onOpenSettings={() => openSettings("general")}
         onAddStage={() => openSettings("stages")}
-        canManage={canManageBoard}
+        // Wider than canManageBoard on purpose: this just reveals the gear
+        // icon to reach Settings, where the "Danger Zone" (Archive/Delete)
+        // buttons live — anyone without true EDIT_BOARD rights still gets a
+        // clean 403 from the backend on every other field in there.
+        canManage={canCompleteBoard}
         canAddStage={canAddStage}
         canExport={canExport}
       />
@@ -475,7 +483,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         />
       )}
 
-      {canManageBoard && board.name !== "Enquiry List" && board.name !== "Estimation" && board.name !== "Accounts" && !board.isCompleted && (
+      {canCompleteBoard && board.name !== "Enquiry List" && board.name !== "Estimation" && board.name !== "Accounts" && !board.isCompleted && (
         <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
           <p className="text-xs text-slate-500">Once every task on this project is done, mark it Completed to move it into Project/Task History.</p>
           <Button variant="outline" size="sm" onClick={() => setConfirmComplete(true)}>

@@ -69,7 +69,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.VIEW_WORKFLOW]: "ALL",
     [PermissionKey.CREATE_BOARD]: "NONE",
     [PermissionKey.EDIT_BOARD]: "NONE",
-    [PermissionKey.ARCHIVE_DELETE_BOARD]: "NONE",
+    // Mark Complete / Archive / Delete Project and Save-as-Template are all
+    // gated by this one permission (assertIsBoardOwnerOrAdmin) — Management
+    // otherwise had no way to close out a project themselves, even with
+    // full org-wide visibility into it everywhere else.
+    [PermissionKey.ARCHIVE_DELETE_BOARD]: "ALL",
     [PermissionKey.CONFIGURE_STAGES]: "NONE",
     [PermissionKey.MANAGE_BOARD_MEMBERS]: "NONE",
     [PermissionKey.CREATE_TASK]: "NONE",
