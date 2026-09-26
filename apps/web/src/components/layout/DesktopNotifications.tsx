@@ -37,16 +37,28 @@ export const DesktopNotifications: React.FC = () => {
       seenIds.current.add(n.id);
       if (n.isRead || Notification.permission !== "granted") continue;
 
-      const popup = new Notification(n.title, {
-        body: new Date(n.createdAt).toLocaleString(),
-        icon: qplusIcon,
-        tag: n.id,
-      });
-      popup.onclick = () => {
-        window.focus();
-        if (n.taskId) navigate(`/workflow/boards/${n.boardId ?? ""}?task=${n.taskId}`);
-        popup.close();
-      };
+      // "Notification" existing on window doesn't guarantee the constructor
+      // itself is usable — most mobile browsers report support and grant
+      // permission, but throw "Illegal constructor" on `new Notification()`,
+      // requiring ServiceWorkerRegistration.showNotification() instead. That
+      // throw happens inside this effect on every poll tick once there's an
+      // unread item, which (with no error boundary at the time) took down
+      // the whole app. Skip silently on platforms where it isn't supported,
+      // rather than crash — this is a nice-to-have popup, not core behavior.
+      try {
+        const popup = new Notification(n.title, {
+          body: new Date(n.createdAt).toLocaleString(),
+          icon: qplusIcon,
+          tag: n.id,
+        });
+        popup.onclick = () => {
+          window.focus();
+          if (n.taskId) navigate(`/workflow/boards/${n.boardId ?? ""}?task=${n.taskId}`);
+          popup.close();
+        };
+      } catch (err) {
+        console.warn("Desktop notification popup not supported on this platform:", err);
+      }
     }
   }, [data, navigate]);
 
