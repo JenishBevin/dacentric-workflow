@@ -43,7 +43,6 @@ interface FormValues {
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   startDate: string;
   dueDate: string;
-  estimatedEffortHours: string;
   requiresApproval: boolean;
   approverUserId?: string;
   recurringEnabled: boolean;
@@ -211,7 +210,6 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
         watcherUserIds: watchers.map((w) => w.userId),
         startDate: values.startDate || undefined,
         dueDate: values.dueDate || undefined,
-        estimatedEffortHours: values.estimatedEffortHours ? Number(values.estimatedEffortHours) : undefined,
         checklist: checklist.map((text) => ({ text })),
         tagIds,
         linkedRecordId: linkedRecord?.id,
@@ -328,7 +326,7 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
           </div>
         </section>
 
-        <section className="grid grid-cols-3 gap-3">
+        <section className="grid grid-cols-2 gap-3">
           <div>
             <Label>Start Date</Label>
             <Input type="date" {...register("startDate")} />
@@ -341,10 +339,6 @@ export const NewTaskDrawer: React.FC<Props> = ({ open, onClose, board, initialSt
               error={errors.dueDate?.message}
               {...register("dueDate", { required: "Due date is required." })}
             />
-          </div>
-          <div>
-            <Label>Estimated Effort (hrs)</Label>
-            <Input type="number" min={0} step={0.5} {...register("estimatedEffortHours")} />
           </div>
         </section>
 

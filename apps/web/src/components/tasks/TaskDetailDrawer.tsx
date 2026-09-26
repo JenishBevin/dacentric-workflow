@@ -741,7 +741,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
           </section>
 
           {/* Dates */}
-          <section className="grid grid-cols-3 gap-3">
+          <section className="grid grid-cols-2 gap-3">
             <div>
               <Label>Start Date</Label>
               <Input
@@ -758,17 +758,6 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
                 disabled={!canEdit}
                 defaultValue={task.dueDate?.slice(0, 10) ?? ""}
                 onBlur={(e) => saveField({ dueDate: e.target.value || null })}
-              />
-            </div>
-            <div>
-              <Label>Estimated Effort (hrs)</Label>
-              <Input
-                type="number"
-                min={0}
-                step={0.5}
-                disabled={!canEdit}
-                defaultValue={task.estimatedEffortHours ?? ""}
-                onBlur={(e) => saveField({ estimatedEffortHours: e.target.value ? Number(e.target.value) : null })}
               />
             </div>
           </section>
