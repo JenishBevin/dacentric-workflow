@@ -69,6 +69,10 @@ export async function getTeamWorkload(actor: AuthedUser, filters: WorkloadFilter
       const taskWhere: any = {
         isDeleted: false,
         assignees: { some: { userId: emp.user.id } },
+        // Parked on a follow-up stage (e.g. Estimation's "Submitted", waiting
+        // on the client) — not active work, so it shouldn't count toward
+        // workload until it moves again.
+        stage: { isFollowUpStage: false },
         ...(filters.boardId ? { boardId: filters.boardId } : {}),
       };
 
@@ -120,7 +124,12 @@ export async function getEmployeeWorkloadDetail(employeeId: string, actor: Authe
   if (!employee?.user) throw Errors.notFound("Employee");
 
   const tasks = await prisma.task.findMany({
-    where: { isDeleted: false, isCompleted: false, assignees: { some: { userId: employee.user.id } } },
+    where: {
+      isDeleted: false,
+      isCompleted: false,
+      assignees: { some: { userId: employee.user.id } },
+      stage: { isFollowUpStage: false },
+    },
     include: { board: true, stage: true },
     orderBy: { dueDate: "asc" },
   });

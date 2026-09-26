@@ -53,6 +53,7 @@ export const updateTaskSchema = z
     priority: z.nativeEnum(TaskPriority).optional(),
     startDate: isoDate.optional().nullable(),
     dueDate: isoDate.optional().nullable(),
+    followUpDate: isoDate.optional().nullable(),
     estimatedEffortHours: z.number().positive().optional().nullable(),
     requiresApproval: z.boolean().optional(),
     approverUserId: z.string().uuid().optional().nullable(),

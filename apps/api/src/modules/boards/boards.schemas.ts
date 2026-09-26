@@ -43,6 +43,7 @@ export const createStageSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   wipLimit: z.number().int().positive().optional().nullable(),
   isTerminal: z.boolean().optional(),
+  isFollowUpStage: z.boolean().optional(),
 });
 
 export const updateStageSchema = z.object({
@@ -50,6 +51,7 @@ export const updateStageSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   wipLimit: z.number().int().positive().optional().nullable(),
   isTerminal: z.boolean().optional(),
+  isFollowUpStage: z.boolean().optional(),
 });
 
 export const reorderStagesSchema = z.object({

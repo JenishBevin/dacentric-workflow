@@ -94,6 +94,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tagQuery, setTagQuery] = useState("");
+  const [followUpInput, setFollowUpInput] = useState("");
   const [wipConfirm, setWipConfirm] = useState<{ stageId: string; message: string } | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -145,6 +146,12 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
     } catch (err) {
       push({ variant: "error", title: "Could not save changes", description: extractApiError(err).message });
     }
+  }
+
+  async function submitFollowUp() {
+    if (!followUpInput) return;
+    await saveField({ followUpDate: followUpInput });
+    setFollowUpInput("");
   }
 
   async function performMove(stageId: string, confirmWipOverride = false) {
@@ -765,6 +772,29 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
               />
             </div>
           </section>
+
+          {task.stage?.isFollowUpStage && (
+            <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <Label>Follow-up</Label>
+              <p className="text-sm text-slate-700">
+                {task.followUpDate ? (
+                  <>
+                    Next follow-up: <strong>{format(new Date(task.followUpDate), "d MMM yyyy")}</strong>
+                  </>
+                ) : (
+                  "No follow-up date set yet — waiting on the client since this task moved here."
+                )}
+              </p>
+              {canEdit && (
+                <div className="flex items-center gap-2">
+                  <Input type="date" value={followUpInput} onChange={(e) => setFollowUpInput(e.target.value)} className="max-w-[10rem]" />
+                  <Button size="sm" disabled={!followUpInput || updateTask.isPending} onClick={submitFollowUp}>
+                    Set Follow-up Date
+                  </Button>
+                </div>
+              )}
+            </section>
+          )}
 
           <section>
             <ChecklistSection task={task} canEdit={canCollab} />

@@ -205,6 +205,17 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
                   />
                   Done stage
                 </label>
+                <label
+                  className="flex shrink-0 items-center gap-1 text-[11px] text-slate-500"
+                  title="Tasks here don't count toward assignees' Team Workload, and get follow-up-date reminders instead"
+                >
+                  <input
+                    type="checkbox"
+                    defaultChecked={stage.isFollowUpStage}
+                    onChange={(e) => updateStage.mutate({ stageId: stage.id, isFollowUpStage: e.target.checked } as any)}
+                  />
+                  Follow-up stage
+                </label>
                 <button
                   disabled={idx === 0}
                   onClick={() => {

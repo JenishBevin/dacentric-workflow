@@ -244,6 +244,7 @@ export interface BoardStage {
   position: number;
   wipLimit: number | null;
   isTerminal: boolean;
+  isFollowUpStage: boolean;
 }
 
 export interface TaskSummary {
@@ -254,7 +255,7 @@ export interface TaskSummary {
   boardId: string;
   board?: { id: string; name: string };
   stageId: string;
-  stage?: { id: string; name: string; color: string; isTerminal: boolean };
+  stage?: { id: string; name: string; color: string; isTerminal: boolean; isFollowUpStage: boolean };
   serviceId?: string | null;
   service?: { id: string; name: string };
   customerId?: string | null;
@@ -262,6 +263,7 @@ export interface TaskSummary {
   priority: TaskPriority;
   startDate: string | null;
   dueDate: string | null;
+  followUpDate: string | null;
   dueDateStatus: DueDateStatus;
   estimatedEffortHours: number | null;
   createdById: string;

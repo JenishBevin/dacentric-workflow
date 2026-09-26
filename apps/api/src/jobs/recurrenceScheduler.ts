@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { env } from "../lib/env";
 import { processAllDueSeries } from "../modules/recurrence/recurrence.service";
 import { runDueDateNotifications } from "./dueDateNotifier";
+import { runFollowUpNotifications } from "./followUpNotifier";
 
 /**
  * Backend scheduled processing for recurring task instances (Section 23:
@@ -33,6 +34,16 @@ export function startBackgroundJobs(): void {
     }
   });
 
+  // Once every 24h for follow-up-date reminders.
+  cron.schedule("0 6 * * *", async () => {
+    try {
+      await runFollowUpNotifications();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[notifications] follow-up job failed:", err);
+    }
+  });
+
   // eslint-disable-next-line no-console
-  console.log(`[jobs] Recurrence scheduler active (${env.recurrenceCron}); due-date notifier active (06:00 daily).`);
+  console.log(`[jobs] Recurrence scheduler active (${env.recurrenceCron}); due-date notifier active (06:00 daily); follow-up notifier active (06:00 daily).`);
 }

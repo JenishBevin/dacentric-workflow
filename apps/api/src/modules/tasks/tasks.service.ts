@@ -321,7 +321,9 @@ function serializeTask(task: any) {
     boardId: task.boardId,
     board: task.board ? { id: task.board.id, name: task.board.name } : undefined,
     stageId: task.stageId,
-    stage: task.stage ? { id: task.stage.id, name: task.stage.name, color: task.stage.color, isTerminal: task.stage.isTerminal } : undefined,
+    stage: task.stage
+      ? { id: task.stage.id, name: task.stage.name, color: task.stage.color, isTerminal: task.stage.isTerminal, isFollowUpStage: task.stage.isFollowUpStage }
+      : undefined,
     serviceId: task.serviceId,
     service: task.service ? { id: task.service.id, name: task.service.name } : undefined,
     customerId: task.customerId ?? null,
@@ -330,6 +332,7 @@ function serializeTask(task: any) {
     startDate: task.startDate,
     dueDate: task.dueDate,
     dueDateStatus: computeDueDateStatus(task.dueDate, task.isCompleted),
+    followUpDate: task.followUpDate,
     estimatedEffortHours: task.estimatedEffortHours,
     createdById: task.createdById,
     createdBy: task.createdBy ? { id: task.createdBy.id, name: task.createdBy.name } : undefined,
@@ -519,6 +522,13 @@ export async function updateTask(taskId: string, input: Record<string, any>, act
       data[key] = input[key];
       changedFields.push(key);
     }
+  }
+  if (input.followUpDate !== undefined) {
+    if (input.followUpDate && !ctx.task.stage.isFollowUpStage) {
+      throw Errors.badRequest("This task's current stage doesn't have follow-up tracking enabled.");
+    }
+    data.followUpDate = input.followUpDate;
+    changedFields.push("followUpDate");
   }
   if (input.description !== undefined) {
     data.description = sanitizeDescription(input.description);
@@ -723,6 +733,10 @@ export async function moveTask(
       approvalStatus: targetStage.isTerminal ? TaskApprovalStatus.APPROVED : ctx.task.approvalStatus,
       isHighlighted: false,
       restoreStageId,
+      // Leaving a follow-up stage closes out its reminder cycle — a stale
+      // date shouldn't linger (or keep firing the daily reminder job) once
+      // the task has actually moved on.
+      followUpDate: ctx.task.stage?.isFollowUpStage ? null : ctx.task.followUpDate,
       version: { increment: 1 },
     },
     include: TASK_DETAIL_INCLUDE as any,

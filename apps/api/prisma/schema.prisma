@@ -417,6 +417,10 @@ model BoardStage {
   position  Int
   wipLimit  Int?
   isTerminal Boolean @default(false) // "Done"-type stage that triggers approval gate
+  // Tasks parked here (e.g. Estimation's "Submitted", waiting on the client)
+  // are excluded from assignees' Team Workload count, and get the
+  // follow-up-date reminder UI/notifications instead of counting as active work.
+  isFollowUpStage Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -727,6 +731,11 @@ model Task {
   priority         TaskPriority        @default(MEDIUM)
   startDate        DateTime?
   dueDate          DateTime?
+  // Only meaningful while the task sits on a stage with isFollowUpStage —
+  // the daily reminder job notifies assignees once this date arrives, and
+  // cleared automatically if the task moves to a different stage (see
+  // moveTask()), so a stale date from a closed-out follow-up never lingers.
+  followUpDate     DateTime?
   estimatedEffortHours Float?
   createdById      String
   createdBy        User                @relation("TaskCreatedBy", fields: [createdById], references: [id])
@@ -937,6 +946,7 @@ enum NotificationEvent {
   TASK_ACTIVITY
   CHECKLIST_ASSIGNED
   ACCOUNT_LOCKED
+  TASK_FOLLOW_UP_DUE
 }
 
 model Notification {
