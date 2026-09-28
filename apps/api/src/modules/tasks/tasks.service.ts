@@ -469,7 +469,9 @@ export async function listBoardTasks(
   const { assertBoardVisible } = await import("../boards/board-access");
   await assertBoardVisible(boardId, actor);
 
-  const where: any = { boardId, isDeleted: false };
+  // A Lost request Management has approved has moved to Project/Task History
+  // (restoring it from there resets lostApprovalStatus, bringing it back).
+  const where: any = { boardId, isDeleted: false, lostApprovalStatus: { not: TaskApprovalStatus.APPROVED } };
   if (filters.assigneeUserId) where.assignees = { some: { userId: filters.assigneeUserId } };
   if (filters.priority) where.priority = filters.priority;
   if (filters.tagId) where.tags = { some: { tagId: filters.tagId } };
