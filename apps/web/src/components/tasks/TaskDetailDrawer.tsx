@@ -54,6 +54,17 @@ function defaultQuotationRef(estimationId?: string | null): string {
   return estimationId ? estimationId.replace(/^QPTS-/, "QPTS/QN/") : "";
 }
 
+// Stage names are editable, so "Submitted" may have been renamed (e.g.
+// "Submitted / Follow-up") — try the exact name, then any name containing
+// "submit", then whichever stage the board flags as its follow-up stage.
+function findSubmittedStage(stages: any[]) {
+  return (
+    stages.find((s) => s.name.trim().toLowerCase() === "submitted") ??
+    stages.find((s) => s.name.toLowerCase().includes("submit")) ??
+    stages.find((s) => s.isFollowUpStage)
+  );
+}
+
 interface Props {
   taskId: string | null;
   onClose: () => void;
@@ -467,7 +478,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
                       size="sm"
                       loading={moveTask.isPending}
                       onClick={async () => {
-                        const submittedStage = stages.find((s: any) => s.name.trim().toLowerCase() === "submitted");
+                        const submittedStage = findSubmittedStage(stages);
                         if (!submittedStage) {
                           push({ variant: "error", title: 'No "Submitted" stage found on this board.' });
                           return;
@@ -559,7 +570,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
                   size="sm"
                   loading={moveTask.isPending}
                   onClick={async () => {
-                    const submittedStage = stages.find((s: any) => s.name.trim().toLowerCase() === "submitted");
+                    const submittedStage = findSubmittedStage(stages);
                     if (!submittedStage) {
                       push({ variant: "error", title: 'No "Submitted" stage found on this board.' });
                       return;
