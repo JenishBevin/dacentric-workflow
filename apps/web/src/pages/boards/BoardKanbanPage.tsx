@@ -8,6 +8,7 @@ import { KanbanToolbar } from "../../components/kanban/KanbanToolbar";
 import { KanbanBoard } from "../../components/kanban/KanbanBoard";
 import { TaskListView } from "../../components/kanban/TaskListView";
 import { BulkMoveToStageSheet } from "../../components/kanban/BulkMoveToStageSheet";
+import { FollowUpMoveDialog, FollowUpChoice } from "../../components/kanban/FollowUpMoveDialog";
 import { NewTaskDrawer } from "../../components/kanban/NewTaskDrawer";
 import { TaskDetailDrawer } from "../../components/tasks/TaskDetailDrawer";
 import { BoardSettingsDrawer } from "../../components/boards/BoardSettingsDrawer";
@@ -104,6 +105,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   const setBoardCompleted = useSetBoardCompleted();
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkFollowUpStageId, setBulkFollowUpStageId] = useState<string | null>(null);
   const selection = useSelection((tasks ?? []).map((t) => t.id));
 
   function reportBulkResult(result: { succeeded: string[]; failed: { id: string; error: string }[] }, verb: string) {
@@ -129,12 +131,18 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
     }
   }
 
-  async function performBulkMove(stageId: string) {
+  async function performBulkMove(stageId: string, followUp?: FollowUpChoice) {
+    // Follow-up stages need a date (and optionally an owner) first — ask, then move.
+    if (!followUp && stages.find((s) => s.id === stageId)?.isFollowUpStage) {
+      setBulkFollowUpStageId(stageId);
+      return;
+    }
     try {
-      const result = await bulkMoveTasks.mutateAsync({ taskIds: [...selection.selectedIds], stageId });
+      const result = await bulkMoveTasks.mutateAsync({ taskIds: [...selection.selectedIds], stageId, ...followUp });
       reportBulkResult(result, "moved");
       selection.clear();
       setBulkMoveOpen(false);
+      setBulkFollowUpStageId(null);
     } catch (err) {
       push({ variant: "error", title: "Could not move tasks", description: extractApiError(err).message });
     }
@@ -538,7 +546,16 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
         onClose={() => setBulkMoveOpen(false)}
         count={selection.count}
         stages={stages}
-        onSelect={performBulkMove}
+        onSelect={(stageId) => performBulkMove(stageId)}
+      />
+
+      <FollowUpMoveDialog
+        open={!!bulkFollowUpStageId}
+        stageName={stages.find((s) => s.id === bulkFollowUpStageId)?.name ?? "follow-up stage"}
+        count={selection.count}
+        loading={bulkMoveTasks.isPending}
+        onCancel={() => setBulkFollowUpStageId(null)}
+        onConfirm={(choice) => bulkFollowUpStageId && performBulkMove(bulkFollowUpStageId, choice)}
       />
 
       <ConfirmDialog

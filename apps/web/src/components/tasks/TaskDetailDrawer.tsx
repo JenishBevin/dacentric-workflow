@@ -30,6 +30,7 @@ import { can, isAdmin, canSeeSecretAttachments } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { DiscussButton } from "../chat/DiscussButton";
+import { FollowUpMoveDialog, FollowUpChoice } from "../kanban/FollowUpMoveDialog";
 import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt, Plus, PauseCircle } from "lucide-react";
 import { format } from "date-fns";
 import clsx from "clsx";
@@ -95,7 +96,8 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
   const [description, setDescription] = useState("");
   const [tagQuery, setTagQuery] = useState("");
   const [followUpInput, setFollowUpInput] = useState("");
-  const [wipConfirm, setWipConfirm] = useState<{ stageId: string; message: string } | null>(null);
+  const [wipConfirm, setWipConfirm] = useState<{ stageId: string; message: string; followUp?: FollowUpChoice } | null>(null);
+  const [followUpPromptStageId, setFollowUpPromptStageId] = useState<string | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [lostRejectOpen, setLostRejectOpen] = useState(false);
@@ -154,15 +156,22 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
     setFollowUpInput("");
   }
 
-  async function performMove(stageId: string, confirmWipOverride = false) {
+  async function performMove(stageId: string, confirmWipOverride = false, followUp?: FollowUpChoice) {
     if (!taskId) return;
+    // Follow-up stages need a date (and optionally an owner) first — ask, then move.
+    if (!followUp && !confirmWipOverride && board?.stages.find((s: any) => s.id === stageId)?.isFollowUpStage) {
+      setFollowUpPromptStageId(stageId);
+      return;
+    }
     try {
-      await moveTask.mutateAsync({ taskId, stageId, confirmWipOverride, version: task?.version });
+      await moveTask.mutateAsync({ taskId, stageId, confirmWipOverride, version: task?.version, ...followUp });
       setWipConfirm(null);
+      setFollowUpPromptStageId(null);
     } catch (err) {
       const apiErr = extractApiError(err);
       if (apiErr.code === "CONFLICT" && /WIP limit/i.test(apiErr.message)) {
-        setWipConfirm({ stageId, message: apiErr.message });
+        setFollowUpPromptStageId(null);
+        setWipConfirm({ stageId, message: apiErr.message, followUp });
       } else {
         push({ variant: "error", title: "Could not move task", description: apiErr.message });
       }
@@ -782,6 +791,18 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
                   </Button>
                 </div>
               )}
+              <div>
+                <Label>Follow-up assignee</Label>
+                <PeoplePicker
+                  selected={task.followUpAssignee ? [{ userId: task.followUpAssignee.id, name: task.followUpAssignee.name }] : []}
+                  onChange={(people) => saveField({ followUpAssigneeUserId: people.slice(-1)[0]?.userId ?? null })}
+                  disabled={!canEdit}
+                  placeholder="Who is chasing the client?"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {task.followUpAssignee ? "Counted in their Follow-up workload." : "No one named — counted against the task's assignees' Follow-up workload."}
+                </p>
+              </div>
             </section>
           )}
 
@@ -896,6 +917,18 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
         </div>
       )}
 
+      <FollowUpMoveDialog
+        open={!!followUpPromptStageId}
+        stageName={board?.stages.find((s: any) => s.id === followUpPromptStageId)?.name ?? "follow-up stage"}
+        defaultAssignee={(() => {
+          const primary = task?.assignees.find((a) => a.isPrimary) ?? task?.assignees[0];
+          return primary ? { userId: primary.userId, name: primary.name } : null;
+        })()}
+        loading={moveTask.isPending}
+        onCancel={() => setFollowUpPromptStageId(null)}
+        onConfirm={(choice) => followUpPromptStageId && performMove(followUpPromptStageId, false, choice)}
+      />
+
       <ConfirmDialog
         open={!!wipConfirm}
         title="WIP limit reached"
@@ -904,7 +937,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
         destructive={false}
         loading={moveTask.isPending}
         onCancel={() => setWipConfirm(null)}
-        onConfirm={() => wipConfirm && performMove(wipConfirm.stageId, true)}
+        onConfirm={() => wipConfirm && performMove(wipConfirm.stageId, true, wipConfirm.followUp)}
       />
 
       <ConfirmDialog

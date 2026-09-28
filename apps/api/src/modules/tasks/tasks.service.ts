@@ -166,7 +166,7 @@ async function resolveTaskAuditValue(field: string, value: unknown): Promise<unk
     const customer = await prisma.customer.findUnique({ where: { id: value }, select: { name: true, customerId: true } });
     return customer ? `${customer.name} (${customer.customerId})` : value;
   }
-  if (field === "approverUserId") {
+  if (field === "approverUserId" || field === "followUpAssigneeUserId" || field === "salespersonUserId") {
     const user = await prisma.user.findUnique({ where: { id: value }, select: { name: true } });
     return user?.name ?? value;
   }
@@ -340,6 +340,8 @@ function serializeTask(task: any) {
     createdBy: task.createdBy ? { id: task.createdBy.id, name: task.createdBy.name } : undefined,
     salespersonUserId: task.salespersonUserId,
     salesperson: task.salesperson ? { id: task.salesperson.id, name: task.salesperson.name } : null,
+    followUpAssigneeUserId: task.followUpAssigneeUserId,
+    followUpAssignee: task.followUpAssignee ? { id: task.followUpAssignee.id, name: task.followUpAssignee.name } : null,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     version: task.version,
@@ -411,6 +413,7 @@ const TASK_DETAIL_INCLUDE = {
   customer: { select: { id: true, customerId: true, name: true } },
   createdBy: true,
   salesperson: { select: { id: true, name: true } },
+  followUpAssignee: { select: { id: true, name: true } },
   assignees: { include: { user: true } },
   watchers: { include: { user: true } },
   checklistItems: { include: { owner: true }, orderBy: { position: "asc" as const } },
@@ -534,6 +537,16 @@ export async function updateTask(taskId: string, input: Record<string, any>, act
     data.followUpDate = input.followUpDate;
     changedFields.push("followUpDate");
   }
+  if (input.followUpAssigneeUserId !== undefined) {
+    if (input.followUpAssigneeUserId) {
+      if (!ctx.task.stage.isFollowUpStage) {
+        throw Errors.badRequest("This task's current stage doesn't have follow-up tracking enabled.");
+      }
+      await assertActiveWorkflowUsers([input.followUpAssigneeUserId]);
+    }
+    data.followUpAssigneeUserId = input.followUpAssigneeUserId;
+    changedFields.push("followUpAssigneeUserId");
+  }
   if (input.description !== undefined) {
     data.description = sanitizeDescription(input.description);
     changedFields.push("description");
@@ -639,7 +652,8 @@ export async function moveTask(
   actor: AuthedUser,
   confirmWipOverride = false,
   expectedVersion?: number,
-  skipEditCheck = false
+  skipEditCheck = false,
+  followUp?: { date?: Date | null; assigneeUserId?: string | null }
 ) {
   const ctx = await loadTaskWithAccess(taskId, actor);
   // A Lost-approval decision is executed by the Management approver, not the
@@ -654,6 +668,21 @@ export async function moveTask(
 
   const targetStage = await prisma.boardStage.findFirst({ where: { id: targetStageId, boardId: ctx.task.boardId } });
   if (!targetStage) throw Errors.badRequest("Target stage does not belong to this board.");
+
+  // Parking a task on a follow-up stage (e.g. "Submitted") needs a next
+  // follow-up date, and can name who is chasing the client — that person's
+  // Follow-up workload (separate from regular workload) carries the task.
+  // Leaving a follow-up stage closes the cycle, so both are cleared.
+  let followUpData: { followUpDate?: Date | null; followUpAssigneeUserId?: string | null } = {};
+  if (targetStage.isFollowUpStage) {
+    if (!followUp?.date) {
+      throw Errors.badRequest(`Choose a follow-up date before moving this task to "${targetStage.name}".`);
+    }
+    if (followUp.assigneeUserId) await assertActiveWorkflowUsers([followUp.assigneeUserId]);
+    followUpData = { followUpDate: followUp.date, followUpAssigneeUserId: followUp.assigneeUserId ?? null };
+  } else if (ctx.task.stage?.isFollowUpStage) {
+    followUpData = { followUpDate: null, followUpAssigneeUserId: null };
+  }
 
   // --- Accounts sign-off gate — see awardTask()'s "Stage 2" ---
   if (targetStage.isTerminal && (ctx.task.board as any)?.accountsApprovalStatus === "PENDING") {
@@ -740,10 +769,10 @@ export async function moveTask(
       approvalStatus: targetStage.isTerminal ? TaskApprovalStatus.APPROVED : ctx.task.approvalStatus,
       isHighlighted: false,
       restoreStageId,
-      // Leaving a follow-up stage closes out its reminder cycle — a stale
-      // date shouldn't linger (or keep firing the daily reminder job) once
-      // the task has actually moved on.
-      followUpDate: ctx.task.stage?.isFollowUpStage ? null : ctx.task.followUpDate,
+      // Set on entering a follow-up stage, cleared on leaving one (see
+      // followUpData above) so a stale date/assignee never lingers or keeps
+      // firing the daily reminder job once the task has moved on.
+      ...followUpData,
       version: { increment: 1 },
     },
     include: TASK_DETAIL_INCLUDE as any,
@@ -1267,12 +1296,13 @@ export async function bulkMoveTasks(
   taskIds: string[],
   stageId: string,
   actor: AuthedUser,
-  confirmWipOverride = false
+  confirmWipOverride = false,
+  followUp?: { date?: Date | null; assigneeUserId?: string | null }
 ): Promise<BulkResult> {
   const result: BulkResult = { succeeded: [], failed: [] };
   for (const taskId of taskIds) {
     try {
-      await moveTask(taskId, stageId, actor, confirmWipOverride);
+      await moveTask(taskId, stageId, actor, confirmWipOverride, undefined, false, followUp);
       result.succeeded.push(taskId);
     } catch (err) {
       result.failed.push({ id: taskId, error: err instanceof Error ? err.message : "Could not move this task." });

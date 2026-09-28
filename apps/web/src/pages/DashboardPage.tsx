@@ -15,6 +15,7 @@ import { can } from "../lib/permissions";
 import clsx from "clsx";
 import { StatCard, BoardOverviewCard, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./dashboard/shared";
 import DashboardManagementPage from "./dashboard/DashboardManagementPage";
+import { FollowUpWorkloadCard } from "./dashboard/FollowUpWorkloadCard";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -200,8 +201,10 @@ export default function DashboardPage() {
               </Card>
             )}
 
+            {canViewWorkload && <FollowUpWorkloadCard />}
+
             {/* Upcoming Deadlines */}
-            <Card className="p-4">
+            <Card className={clsx("p-4", canViewWorkload && "lg:col-span-2")}>
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-sm font-semibold text-slate-800">Upcoming Deadlines</p>
                 <Link to="/workflow/my-tasks" className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">

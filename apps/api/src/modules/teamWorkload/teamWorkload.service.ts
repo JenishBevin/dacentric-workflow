@@ -114,6 +114,103 @@ export async function getTeamWorkload(actor: AuthedUser, filters: WorkloadFilter
   return filtered;
 }
 
+// Follow-up workload — deliberately a separate ledger from getTeamWorkload():
+// tasks parked on a follow-up stage never count toward regular workload, and
+// instead count here against whoever is chasing the client. Tasks parked
+// before a follow-up owner could be named fall back to their assignees.
+function followUpTaskWhere(userId: string) {
+  return {
+    isDeleted: false,
+    isCompleted: false,
+    stage: { isFollowUpStage: true },
+    OR: [{ followUpAssigneeUserId: userId }, { followUpAssigneeUserId: null, assignees: { some: { userId } } }],
+  };
+}
+
+export async function getFollowUpWorkload(actor: AuthedUser, filters: { departmentId?: string; teamId?: string }) {
+  const scopedIds = await resolveScopedEmployeeIds(actor);
+
+  const employees = await prisma.employee.findMany({
+    where: {
+      isActive: true,
+      ...(scopedIds === "ALL" ? {} : { id: { in: scopedIds } }),
+      ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+      ...(filters.teamId ? { teams: { some: { id: filters.teamId } } } : {}),
+      user: { isNot: null },
+    },
+    include: { user: true, department: true, teams: true },
+  });
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date(startOfToday);
+  endOfToday.setHours(23, 59, 59, 999);
+  const endOfWeek = new Date(startOfToday);
+  endOfWeek.setDate(endOfWeek.getDate() + (7 - endOfWeek.getDay()));
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  const rows = await Promise.all(
+    employees.map(async (emp) => {
+      if (!emp.user) return null;
+      const where: any = followUpTaskWhere(emp.user.id);
+      const [openFollowUps, overdue, dueToday, dueThisWeek, noDate] = await Promise.all([
+        prisma.task.count({ where }),
+        prisma.task.count({ where: { ...where, followUpDate: { lt: startOfToday } } }),
+        prisma.task.count({ where: { ...where, followUpDate: { gte: startOfToday, lte: endOfToday } } }),
+        prisma.task.count({ where: { ...where, followUpDate: { gte: startOfToday, lte: endOfWeek } } }),
+        prisma.task.count({ where: { ...where, followUpDate: null } }),
+      ]);
+      return {
+        employeeId: emp.id,
+        userId: emp.user.id,
+        name: emp.fullName,
+        department: emp.department?.name ?? null,
+        team: emp.teams.map((t) => t.name).join(", ") || null,
+        openFollowUps,
+        overdue,
+        dueToday,
+        dueThisWeek,
+        noDate,
+      };
+    })
+  );
+
+  return (rows.filter(Boolean) as NonNullable<(typeof rows)[number]>[])
+    .filter((r) => r.openFollowUps > 0)
+    .sort((a, b) => b.overdue - a.overdue || b.openFollowUps - a.openFollowUps);
+}
+
+export async function getEmployeeFollowUpDetail(employeeId: string, actor: AuthedUser) {
+  const scopedIds = await resolveScopedEmployeeIds(actor);
+  if (scopedIds !== "ALL" && !scopedIds.includes(employeeId)) {
+    throw Errors.forbidden("You do not have permission to view this employee's follow-ups.");
+  }
+
+  const employee = await prisma.employee.findUnique({ where: { id: employeeId }, include: { user: true } });
+  if (!employee?.user) throw Errors.notFound("Employee");
+
+  const tasks = await prisma.task.findMany({
+    where: followUpTaskWhere(employee.user.id) as any,
+    include: { board: true, stage: true, customer: { select: { name: true } } },
+    orderBy: [{ followUpDate: { sort: "asc", nulls: "first" } }],
+  });
+
+  return {
+    employee: { id: employee.id, name: employee.fullName, department: employee.departmentId },
+    tasks: tasks.map((t) => ({
+      taskId: t.taskId,
+      id: t.id,
+      title: t.title,
+      board: t.board.name,
+      boardId: t.boardId,
+      stage: t.stage.name,
+      customer: t.customer?.name ?? null,
+      followUpDate: t.followUpDate,
+      priority: t.priority,
+    })),
+  };
+}
+
 export async function getEmployeeWorkloadDetail(employeeId: string, actor: AuthedUser) {
   const scopedIds = await resolveScopedEmployeeIds(actor);
   if (scopedIds !== "ALL" && !scopedIds.includes(employeeId)) {

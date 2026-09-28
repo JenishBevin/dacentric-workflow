@@ -23,6 +23,7 @@ const AccountsPage = lazy(() => import("./pages/boards/AccountsPage"));
 const ProcurementListPage = lazy(() => import("./pages/procurement/ProcurementListPage"));
 const MyTasksPage = lazy(() => import("./pages/MyTasksPage"));
 const TeamWorkloadPage = lazy(() => import("./pages/TeamWorkloadPage"));
+const FollowUpWorkloadPage = lazy(() => import("./pages/FollowUpWorkloadPage"));
 const TimeLogsPage = lazy(() => import("./pages/TimeLogsPage"));
 const RecentActivityPage = lazy(() => import("./pages/RecentActivityPage"));
 const HistoryPage = lazy(() => import("./pages/HistoryPage"));
@@ -94,6 +95,7 @@ export default function App() {
           <Route path="/workflow/procurement/:boardId" element={<BoardKanbanPage />} />
           <Route path="/workflow/my-tasks" element={<MyTasksPage />} />
           <Route path="/workflow/team" element={<TeamWorkloadPage />} />
+          <Route path="/workflow/follow-ups" element={<FollowUpWorkloadPage />} />
           <Route path="/workflow/time-logs" element={<TimeLogsPage />} />
           <Route path="/workflow/activity" element={<RecentActivityPage />} />
           <Route path="/workflow/history" element={<HistoryPage />} />

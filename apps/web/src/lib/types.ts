@@ -264,6 +264,8 @@ export interface TaskSummary {
   startDate: string | null;
   dueDate: string | null;
   followUpDate: string | null;
+  followUpAssigneeUserId?: string | null;
+  followUpAssignee?: { id: string; name: string } | null;
   dueDateStatus: DueDateStatus;
   estimatedEffortHours: number | null;
   createdById: string;
@@ -350,6 +352,19 @@ export interface AuditLogItem {
   beforeValue?: unknown;
   afterValue?: unknown;
   createdAt: string;
+}
+
+export interface FollowUpWorkloadRow {
+  employeeId: string;
+  userId: string;
+  name: string;
+  department: string | null;
+  team: string | null;
+  openFollowUps: number;
+  overdue: number;
+  dueToday: number;
+  dueThisWeek: number;
+  noDate: number;
 }
 
 export interface WorkloadRow {

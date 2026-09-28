@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/apiClient";
-import { EmployeeDirectoryEntry, WorkloadRow } from "../lib/types";
+import { EmployeeDirectoryEntry, FollowUpWorkloadRow, WorkloadRow } from "../lib/types";
 
 // --- Employee directory (assignee/watcher/approver pickers) ---
 export function useEmployeeDirectory(search = "") {
@@ -201,6 +201,20 @@ export function useEmployeeWorkloadDetail(employeeId: string | undefined) {
   return useQuery({
     queryKey: ["employee-workload", employeeId],
     queryFn: async () => (await api.get(`/team-workload/employee/${employeeId}`)).data.data,
+    enabled: !!employeeId,
+  });
+}
+
+export function useFollowUpWorkload(filters: Record<string, unknown> = {}) {
+  return useQuery({
+    queryKey: ["team-workload", "follow-ups", filters],
+    queryFn: async () => (await api.get<{ data: FollowUpWorkloadRow[] }>("/team-workload/follow-ups", { params: filters })).data.data,
+  });
+}
+export function useEmployeeFollowUpDetail(employeeId: string | undefined) {
+  return useQuery({
+    queryKey: ["team-workload", "follow-ups", "employee", employeeId],
+    queryFn: async () => (await api.get(`/team-workload/follow-ups/employee/${employeeId}`)).data.data,
     enabled: !!employeeId,
   });
 }

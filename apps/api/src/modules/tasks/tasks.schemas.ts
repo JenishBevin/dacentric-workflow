@@ -54,6 +54,7 @@ export const updateTaskSchema = z
     startDate: isoDate.optional().nullable(),
     dueDate: isoDate.optional().nullable(),
     followUpDate: isoDate.optional().nullable(),
+    followUpAssigneeUserId: z.string().uuid().optional().nullable(),
     estimatedEffortHours: z.number().positive().optional().nullable(),
     requiresApproval: z.boolean().optional(),
     approverUserId: z.string().uuid().optional().nullable(),
@@ -71,6 +72,9 @@ export const moveTaskSchema = z.object({
   stageId: z.string().uuid(),
   confirmWipOverride: z.boolean().optional(),
   version: z.number().int().optional(),
+  // Required (enforced in moveTask) when the target stage is a follow-up stage.
+  followUpDate: isoDate.optional(),
+  followUpAssigneeUserId: z.string().uuid().optional().nullable(),
 });
 
 export const setAssigneesSchema = z.object({
@@ -158,6 +162,8 @@ export const bulkMoveTasksSchema = z.object({
   taskIds: z.array(z.string().uuid()).min(1, "Select at least one task."),
   stageId: z.string().uuid(),
   confirmWipOverride: z.boolean().optional(),
+  followUpDate: isoDate.optional(),
+  followUpAssigneeUserId: z.string().uuid().optional().nullable(),
 });
 
 export const taskFilterSchema = z.object({

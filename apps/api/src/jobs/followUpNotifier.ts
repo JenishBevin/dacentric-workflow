@@ -25,7 +25,10 @@ export async function runFollowUpNotifications(): Promise<void> {
   });
 
   for (const task of dueTasks) {
-    await notifyMany(task.assignees.map((a) => a.userId), {
+    // The named follow-up owner is the one chasing the client; tasks parked
+    // before that existed fall back to their assignees.
+    const recipients = task.followUpAssigneeUserId ? [task.followUpAssigneeUserId] : task.assignees.map((a) => a.userId);
+    await notifyMany(recipients, {
       event: NotificationEvent.TASK_FOLLOW_UP_DUE,
       title: `Follow up on ${task.taskId} today`,
       taskId: task.id,

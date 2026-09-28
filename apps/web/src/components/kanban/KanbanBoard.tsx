@@ -8,6 +8,7 @@ import { useMoveTask } from "../../api/tasks";
 import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { FollowUpMoveDialog, FollowUpChoice } from "./FollowUpMoveDialog";
 
 interface Props {
   stages: BoardStage[];
@@ -40,7 +41,8 @@ export const KanbanBoard: React.FC<Props> = ({
   const moveTask = useMoveTask();
   const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
   const [moveSheetTask, setMoveSheetTask] = useState<TaskSummary | null>(null);
-  const [wipConfirm, setWipConfirm] = useState<{ taskId: string; stageId: string; message: string } | null>(null);
+  const [wipConfirm, setWipConfirm] = useState<{ taskId: string; stageId: string; message: string; followUp?: FollowUpChoice } | null>(null);
+  const [followUpPrompt, setFollowUpPrompt] = useState<{ taskId: string; stageId: string } | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const [rowHeight, setRowHeight] = useState<number>();
 
@@ -74,17 +76,28 @@ export const KanbanBoard: React.FC<Props> = ({
     return task?.stageId ?? null;
   }
 
-  async function performMove(taskId: string, stageId: string, confirmWipOverride = false) {
+  async function performMove(taskId: string, stageId: string, confirmWipOverride = false, followUp?: FollowUpChoice) {
     try {
-      await moveTask.mutateAsync({ taskId, stageId, confirmWipOverride });
+      await moveTask.mutateAsync({ taskId, stageId, confirmWipOverride, ...followUp });
+      setFollowUpPrompt(null);
     } catch (err) {
       const apiErr = extractApiError(err);
       if (apiErr.code === "CONFLICT" && /WIP limit/i.test(apiErr.message)) {
-        setWipConfirm({ taskId, stageId, message: apiErr.message });
+        setFollowUpPrompt(null);
+        setWipConfirm({ taskId, stageId, message: apiErr.message, followUp });
       } else {
         push({ variant: "error", title: "Could not move task", description: apiErr.message });
       }
     }
+  }
+
+  // Follow-up stages need a date (and optionally an owner) first — ask, then move.
+  function requestMove(taskId: string, stageId: string) {
+    if (stages.find((s) => s.id === stageId)?.isFollowUpStage) {
+      setFollowUpPrompt({ taskId, stageId });
+      return;
+    }
+    performMove(taskId, stageId);
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -99,7 +112,7 @@ export const KanbanBoard: React.FC<Props> = ({
     const targetStageId = findStageOfDroppableId(String(over.id));
     const task = allTasks.find((t) => t.id === active.id);
     if (!task || !targetStageId || targetStageId === task.stageId) return;
-    performMove(task.id, targetStageId);
+    requestMove(task.id, targetStageId);
   }
 
   return (
@@ -148,9 +161,22 @@ export const KanbanBoard: React.FC<Props> = ({
         task={moveSheetTask}
         stages={stages}
         onSelect={(stageId) => {
-          if (moveSheetTask) performMove(moveSheetTask.id, stageId);
+          if (moveSheetTask) requestMove(moveSheetTask.id, stageId);
           setMoveSheetTask(null);
         }}
+      />
+
+      <FollowUpMoveDialog
+        open={!!followUpPrompt}
+        stageName={stages.find((s) => s.id === followUpPrompt?.stageId)?.name ?? "follow-up stage"}
+        defaultAssignee={(() => {
+          const a = allTasks.find((t) => t.id === followUpPrompt?.taskId)?.assignees;
+          const primary = a?.find((x) => x.isPrimary) ?? a?.[0];
+          return primary ? { userId: primary.userId, name: primary.name } : null;
+        })()}
+        loading={moveTask.isPending}
+        onCancel={() => setFollowUpPrompt(null)}
+        onConfirm={(choice) => followUpPrompt && performMove(followUpPrompt.taskId, followUpPrompt.stageId, false, choice)}
       />
 
       <ConfirmDialog
@@ -162,7 +188,7 @@ export const KanbanBoard: React.FC<Props> = ({
         loading={moveTask.isPending}
         onCancel={() => setWipConfirm(null)}
         onConfirm={async () => {
-          if (wipConfirm) await performMove(wipConfirm.taskId, wipConfirm.stageId, true);
+          if (wipConfirm) await performMove(wipConfirm.taskId, wipConfirm.stageId, true, wipConfirm.followUp);
           setWipConfirm(null);
         }}
       />

@@ -140,8 +140,8 @@ tasksRouter.post(
   requirePermission(PermissionKey.MOVE_TASK, "OWN"),
   validate(bulkMoveTasksSchema),
   asyncHandler(async (req, res) => {
-    const { taskIds, stageId, confirmWipOverride } = (req as any).validatedBody;
-    return ok(res, await tasksService.bulkMoveTasks(taskIds, stageId, req.user!, confirmWipOverride));
+    const { taskIds, stageId, confirmWipOverride, followUpDate, followUpAssigneeUserId } = (req as any).validatedBody;
+    return ok(res, await tasksService.bulkMoveTasks(taskIds, stageId, req.user!, confirmWipOverride, { date: followUpDate, assigneeUserId: followUpAssigneeUserId }));
   })
 );
 
@@ -180,8 +180,11 @@ tasksRouter.post(
   requirePermission(PermissionKey.MOVE_TASK, "OWN"),
   validate(moveTaskSchema),
   asyncHandler(async (req, res) => {
-    const { stageId, confirmWipOverride, version } = (req as any).validatedBody;
-    return ok(res, await tasksService.moveTask(req.params.taskId, stageId, req.user!, confirmWipOverride, version));
+    const { stageId, confirmWipOverride, version, followUpDate, followUpAssigneeUserId } = (req as any).validatedBody;
+    return ok(
+      res,
+      await tasksService.moveTask(req.params.taskId, stageId, req.user!, confirmWipOverride, version, false, { date: followUpDate, assigneeUserId: followUpAssigneeUserId })
+    );
   })
 );
 

@@ -8,6 +8,7 @@ import {
   Calculator,
   ListChecks,
   Users2,
+  PhoneCall,
   Clock3,
   Shield,
   Tags,
@@ -74,6 +75,7 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
     { to: "/workflow/boards", label: "Projects", icon: Trello, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
     { to: "/workflow/my-tasks", label: "My Tasks", icon: ListChecks, visible: !isStaff, badge: myTaskCount || undefined },
     { to: "/workflow/team", label: "Team Workload", icon: Users2, visible: !isStaff && can(user, "VIEW_TEAM_WORKLOAD") },
+    { to: "/workflow/follow-ups", label: "Follow-up Workload", icon: PhoneCall, visible: !isStaff && can(user, "VIEW_TEAM_WORKLOAD") },
     { to: "/workflow/history", label: "Project/Task History", icon: Archive, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
   ];
 

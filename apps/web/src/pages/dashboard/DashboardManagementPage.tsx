@@ -9,6 +9,7 @@ import { PriorityBadge, DueDateBadge } from "../../components/workflow/badges";
 import { TaskDetailDrawer } from "../../components/tasks/TaskDetailDrawer";
 import { useAuth } from "../../context/AuthContext";
 import clsx from "clsx";
+import { FollowUpWorkloadCard } from "./FollowUpWorkloadCard";
 import { StatCard, BoardOverviewCard, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./shared";
 
 const PRIORITY_ORDER = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
@@ -174,8 +175,10 @@ export default function DashboardManagementPage() {
               </div>
             </Card>
 
+            <FollowUpWorkloadCard limit={8} />
+
             {/* Due This Week — org-wide, not just "my" tasks */}
-            <Card className="p-4">
+            <Card className="p-4 lg:col-span-2">
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-sm font-semibold text-slate-800">Due This Week — All Projects</p>
                 <button onClick={() => setOpenStat("DUE_THIS_WEEK")} className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">

@@ -157,6 +157,7 @@ model User {
   ownedBoards          Board[]              @relation("BoardCreatedBy")
   createdTasks         Task[]               @relation("TaskCreatedBy")
   salesTasks           Task[]               @relation("TaskSalesperson")
+  followUpTasks        Task[]               @relation("TaskFollowUpAssignee")
   taskAssignments      TaskAssignee[]
   taskWatching         TaskWatcher[]
   comments             Comment[]
@@ -736,6 +737,13 @@ model Task {
   // cleared automatically if the task moves to a different stage (see
   // moveTask()), so a stale date from a closed-out follow-up never lingers.
   followUpDate     DateTime?
+  // Who is chasing the client while the task sits on a follow-up stage. Their
+  // "Follow-up workload" (separate from regular workload) is counted against
+  // this person; cleared together with followUpDate when the task moves on.
+  // Tasks parked before this existed have none and fall back to their
+  // assignees in the follow-up workload view.
+  followUpAssigneeUserId String?
+  followUpAssignee       User?     @relation("TaskFollowUpAssignee", fields: [followUpAssigneeUserId], references: [id])
   estimatedEffortHours Float?
   createdById      String
   createdBy        User                @relation("TaskCreatedBy", fields: [createdById], references: [id])

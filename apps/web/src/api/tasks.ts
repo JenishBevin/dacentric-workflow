@@ -92,8 +92,22 @@ export function useDeleteTask() {
 export function useMoveTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ taskId, stageId, confirmWipOverride, version }: { taskId: string; stageId: string; confirmWipOverride?: boolean; version?: number }) =>
-      (await api.post<{ data: TaskSummary }>(`/tasks/${taskId}/move`, { stageId, confirmWipOverride, version })).data.data,
+    mutationFn: async ({
+      taskId,
+      stageId,
+      confirmWipOverride,
+      version,
+      followUpDate,
+      followUpAssigneeUserId,
+    }: {
+      taskId: string;
+      stageId: string;
+      confirmWipOverride?: boolean;
+      version?: number;
+      followUpDate?: string;
+      followUpAssigneeUserId?: string | null;
+    }) =>
+      (await api.post<{ data: TaskSummary }>(`/tasks/${taskId}/move`, { stageId, confirmWipOverride, version, followUpDate, followUpAssigneeUserId })).data.data,
     onSuccess: (task) => invalidateTaskEverywhere(qc, task.id, task.boardId),
   });
 }
@@ -114,8 +128,19 @@ export function useBulkDeleteTasks() {
 export function useBulkMoveTasks() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ taskIds, stageId, confirmWipOverride }: { taskIds: string[]; stageId: string; confirmWipOverride?: boolean }) =>
-      (await api.post<{ data: BulkResult }>("/tasks/bulk-move", { taskIds, stageId, confirmWipOverride })).data.data,
+    mutationFn: async ({
+      taskIds,
+      stageId,
+      confirmWipOverride,
+      followUpDate,
+      followUpAssigneeUserId,
+    }: {
+      taskIds: string[];
+      stageId: string;
+      confirmWipOverride?: boolean;
+      followUpDate?: string;
+      followUpAssigneeUserId?: string | null;
+    }) => (await api.post<{ data: BulkResult }>("/tasks/bulk-move", { taskIds, stageId, confirmWipOverride, followUpDate, followUpAssigneeUserId })).data.data,
     onSuccess: () => invalidateTaskEverywhere(qc),
   });
 }

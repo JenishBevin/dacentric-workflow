@@ -2,7 +2,7 @@ import { Router } from "express";
 import { asyncHandler, ok } from "../../common/http";
 import { authenticate } from "../../middleware/authenticate";
 import { requirePermission } from "../../middleware/authorize";
-import { getTeamWorkload, getEmployeeWorkloadDetail } from "./teamWorkload.service";
+import { getTeamWorkload, getEmployeeWorkloadDetail, getFollowUpWorkload, getEmployeeFollowUpDetail } from "./teamWorkload.service";
 import { PermissionKey } from "@dacentric/types";
 
 export const teamWorkloadRouter = Router();
@@ -23,6 +23,21 @@ teamWorkloadRouter.get(
     });
     return ok(res, rows);
   })
+);
+
+teamWorkloadRouter.get(
+  "/follow-ups",
+  requirePermission(PermissionKey.VIEW_TEAM_WORKLOAD, "OWN"),
+  asyncHandler(async (req, res) => {
+    const q = req.query as Record<string, string>;
+    return ok(res, await getFollowUpWorkload(req.user!, { departmentId: q.departmentId, teamId: q.teamId }));
+  })
+);
+
+teamWorkloadRouter.get(
+  "/follow-ups/employee/:employeeId",
+  requirePermission(PermissionKey.VIEW_TEAM_WORKLOAD, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await getEmployeeFollowUpDetail(req.params.employeeId, req.user!)))
 );
 
 teamWorkloadRouter.get(

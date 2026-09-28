@@ -10,6 +10,7 @@ import { BulkActionBar } from "../components/ui/BulkActionBar";
 import { PriorityBadge, DueDateBadge, ChecklistProgress } from "../components/workflow/badges";
 import { MoveToStageSheet, MovableTask } from "../components/kanban/MoveToStageSheet";
 import { BulkMoveToStageSheet } from "../components/kanban/BulkMoveToStageSheet";
+import { FollowUpMoveDialog, FollowUpChoice } from "../components/kanban/FollowUpMoveDialog";
 import { NewTaskDrawer } from "../components/kanban/NewTaskDrawer";
 import { TaskDetailDrawer } from "../components/tasks/TaskDetailDrawer";
 import { Modal } from "../components/ui/Modal";
@@ -60,6 +61,7 @@ export default function MyTasksPage() {
   const { data: moveBoard } = useBoardDetail(moveItem?.boardId);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [followUpPrompt, setFollowUpPrompt] = useState<{ scope: "single" | "bulk"; stageId: string } | null>(null);
 
   const allItems = useMemo(() => (groups ? Object.values(groups).flat() : []) as MyTaskItem[], [groups]);
   const itemById = useMemo(() => new Map(allItems.map((i) => [i.id, i])), [allItems]);
@@ -91,12 +93,18 @@ export default function MyTasksPage() {
     }
   }
 
-  async function performBulkMove(stageId: string) {
+  async function performBulkMove(stageId: string, followUp?: FollowUpChoice) {
+    // Follow-up stages need a date (and optionally an owner) first — ask, then move.
+    if (!followUp && bulkMoveBoard?.stages.find((s: any) => s.id === stageId)?.isFollowUpStage) {
+      setFollowUpPrompt({ scope: "bulk", stageId });
+      return;
+    }
     try {
-      const result = await bulkMoveTasks.mutateAsync({ taskIds: [...selection.selectedIds], stageId });
+      const result = await bulkMoveTasks.mutateAsync({ taskIds: [...selection.selectedIds], stageId, ...followUp });
       reportBulkResult(result, "moved");
       selection.clear();
       setBulkMoveOpen(false);
+      setFollowUpPrompt(null);
     } catch (err) {
       push({ variant: "error", title: "Could not move tasks", description: extractApiError(err).message });
     }
@@ -142,11 +150,16 @@ export default function MyTasksPage() {
     }
   }
 
-  async function performMove(stageId: string) {
+  async function performMove(stageId: string, followUp?: FollowUpChoice) {
     if (!moveItem) return;
+    if (!followUp && moveBoard?.stages.find((s: any) => s.id === stageId)?.isFollowUpStage) {
+      setFollowUpPrompt({ scope: "single", stageId });
+      return;
+    }
     try {
-      await moveTask.mutateAsync({ taskId: moveItem.id, stageId });
+      await moveTask.mutateAsync({ taskId: moveItem.id, stageId, ...followUp });
       setMoveItem(null);
+      setFollowUpPrompt(null);
     } catch (err) {
       push({ variant: "error", title: "Could not move task", description: extractApiError(err).message });
     }
@@ -299,7 +312,7 @@ export default function MyTasksPage() {
         onClose={() => setMoveItem(null)}
         task={moveItem as MovableTask | null}
         stages={[...(moveBoard?.stages ?? [])].sort((a: any, b: any) => a.position - b.position)}
-        onSelect={performMove}
+        onSelect={(stageId) => performMove(stageId)}
       />
 
       <BulkMoveToStageSheet
@@ -307,7 +320,23 @@ export default function MyTasksPage() {
         onClose={() => setBulkMoveOpen(false)}
         count={selection.count}
         stages={[...(bulkMoveBoard?.stages ?? [])].sort((a: any, b: any) => a.position - b.position)}
-        onSelect={performBulkMove}
+        onSelect={(stageId) => performBulkMove(stageId)}
+      />
+
+      <FollowUpMoveDialog
+        open={!!followUpPrompt}
+        stageName={
+          ((followUpPrompt?.scope === "bulk" ? bulkMoveBoard : moveBoard)?.stages.find((s: any) => s.id === followUpPrompt?.stageId)?.name as string | undefined) ??
+          "follow-up stage"
+        }
+        count={followUpPrompt?.scope === "bulk" ? selection.count : 1}
+        loading={moveTask.isPending || bulkMoveTasks.isPending}
+        onCancel={() => setFollowUpPrompt(null)}
+        onConfirm={(choice) => {
+          if (!followUpPrompt) return;
+          if (followUpPrompt.scope === "bulk") performBulkMove(followUpPrompt.stageId, choice);
+          else performMove(followUpPrompt.stageId, choice);
+        }}
       />
 
       <ConfirmDialog
