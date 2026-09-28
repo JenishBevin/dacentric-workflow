@@ -588,6 +588,8 @@ export const ChatWidget: React.FC = () => {
                     );
                   }
                   const isMine = m.sender.id === user.id;
+                  // In a group, say who each message is from — otherwise there's no telling the members apart.
+                  const showSenderName = !!view.isGroup && !isMine;
                   const sticker = isStickerOnly(m.body) && !(m.attachments?.length > 0);
                   const isEditing = editingId === m.id;
                   const canEdit = isMine && !(m.attachments?.length > 0) && Date.now() - new Date(m.createdAt).getTime() < EDIT_WINDOW_MS;
@@ -645,6 +647,7 @@ export const ChatWidget: React.FC = () => {
                         </div>
                       ) : sticker ? (
                         <div className="max-w-[80%]">
+                          {showSenderName && <p className="mb-0.5 text-xs font-semibold text-brand-600">{m.sender.name}</p>}
                           <p className="text-4xl leading-none">{m.body}</p>
                           <p className={clsx("mt-1 text-[10px] text-slate-400", isMine ? "text-right" : "text-left")}>
                             {m.editedAt && <span className="italic">edited · </span>}
@@ -653,6 +656,7 @@ export const ChatWidget: React.FC = () => {
                         </div>
                       ) : (
                         <div className={clsx("max-w-[80%] rounded-xl px-3 py-2 text-sm", isMine ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800")}>
+                          {showSenderName && <p className="mb-0.5 text-xs font-semibold text-brand-600">{m.sender.name}</p>}
                           {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
                           {m.attachments?.length > 0 && (
                             <div className={clsx("space-y-1", m.body && "mt-1.5")}>
