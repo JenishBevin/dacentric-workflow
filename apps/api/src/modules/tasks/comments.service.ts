@@ -4,6 +4,7 @@ import { notifyMany } from "../notifications/notifications.service";
 import { loadTaskWithAccess, assertCanCollaborate } from "./task-access";
 import { AuthedUser } from "../../middleware/authenticate";
 import { AuditAction, NotificationEvent } from "@dacentric/types";
+import { clearTaskHighlight, clearBoardHighlight } from "../../common/highlight";
 
 export async function addComment(taskId: string, body: string, mentionedUserIds: string[] | undefined, actor: AuthedUser) {
   const ctx = await loadTaskWithAccess(taskId, actor);
@@ -19,6 +20,8 @@ export async function addComment(taskId: string, body: string, mentionedUserIds:
   });
 
   await writeAudit({ actor, action: AuditAction.CREATE, entityType: "Comment", entityId: comment.id, boardId: ctx.task.boardId, taskId, afterValue: { body } });
+  await clearTaskHighlight(taskId);
+  await clearBoardHighlight(ctx.task.boardId);
 
   const watchers = await prisma.taskWatcher.findMany({ where: { taskId } });
   const notifyIds = new Set([...validMentions, ...watchers.map((w) => w.userId)]);

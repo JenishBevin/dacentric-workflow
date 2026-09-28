@@ -4,6 +4,7 @@ import { loadTaskWithAccess, assertCanCollaborate } from "./task-access";
 import { AuthedUser } from "../../middleware/authenticate";
 import { AuditAction } from "@dacentric/types";
 import { Errors } from "../../common/errors";
+import { clearTaskHighlight, clearBoardHighlight } from "../../common/highlight";
 
 /**
  * Watchers/followers (Section 24, Business Rule 10/11): notified of
@@ -25,6 +26,8 @@ export async function addWatcher(taskId: string, userId: string, actor: AuthedUs
     update: {},
   });
   await writeAudit({ actor, action: AuditAction.CREATE, entityType: "TaskWatcher", entityId: watcher.id, boardId: ctx.task.boardId, taskId, afterValue: { userId } });
+  await clearTaskHighlight(taskId);
+  await clearBoardHighlight(ctx.task.boardId);
   return watcher;
 }
 
@@ -33,4 +36,6 @@ export async function removeWatcher(taskId: string, userId: string, actor: Authe
   assertCanCollaborate(ctx);
   await prisma.taskWatcher.delete({ where: { taskId_userId: { taskId, userId } } });
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "TaskWatcher", entityId: taskId, boardId: ctx.task.boardId, taskId, afterValue: { userId } });
+  await clearTaskHighlight(taskId);
+  await clearBoardHighlight(ctx.task.boardId);
 }

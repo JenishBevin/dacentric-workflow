@@ -5,6 +5,7 @@ import { loadTaskWithAccess, assertCanCollaborate } from "./task-access";
 import { AuthedUser } from "../../middleware/authenticate";
 import { AuditAction, NotificationEvent } from "@dacentric/types";
 import { Errors } from "../../common/errors";
+import { clearTaskHighlight, clearBoardHighlight } from "../../common/highlight";
 
 export async function addChecklistItem(taskId: string, text: string, ownerId: string | undefined, actor: AuthedUser) {
   const ctx = await loadTaskWithAccess(taskId, actor);
@@ -16,6 +17,8 @@ export async function addChecklistItem(taskId: string, text: string, ownerId: st
   });
 
   await writeAudit({ actor, action: AuditAction.CREATE, entityType: "ChecklistItem", entityId: item.id, boardId: ctx.task.boardId, taskId, afterValue: { text, ownerId } });
+  await clearTaskHighlight(taskId);
+  await clearBoardHighlight(ctx.task.boardId);
 
   if (ownerId) {
     await notify({ userId: ownerId, event: NotificationEvent.CHECKLIST_ASSIGNED, title: `You were assigned a checklist item on ${ctx.task.taskId}`, taskId, boardId: ctx.task.boardId });
@@ -46,6 +49,8 @@ export async function updateChecklistItem(
   });
 
   await writeAudit({ actor, action: AuditAction.EDIT, entityType: "ChecklistItem", entityId: itemId, boardId: ctx.task.boardId, taskId, beforeValue: before, afterValue: input });
+  await clearTaskHighlight(taskId);
+  await clearBoardHighlight(ctx.task.boardId);
 
   if (input.ownerId && input.ownerId !== before.ownerId) {
     await notify({ userId: input.ownerId, event: NotificationEvent.CHECKLIST_ASSIGNED, title: `You were assigned a checklist item on ${ctx.task.taskId}`, taskId, boardId: ctx.task.boardId });
@@ -59,4 +64,6 @@ export async function deleteChecklistItem(taskId: string, itemId: string, actor:
   assertCanCollaborate(ctx);
   const item = await prisma.checklistItem.delete({ where: { id: itemId } });
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "ChecklistItem", entityId: itemId, boardId: ctx.task.boardId, taskId, beforeValue: item });
+  await clearTaskHighlight(taskId);
+  await clearBoardHighlight(ctx.task.boardId);
 }

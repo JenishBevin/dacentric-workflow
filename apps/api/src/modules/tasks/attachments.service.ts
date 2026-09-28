@@ -5,6 +5,7 @@ import { AuthedUser } from "../../middleware/authenticate";
 import { AuditAction } from "@dacentric/types";
 import { getStorageAdapter, validateFile, scanFile } from "../../lib/storage";
 import { Errors } from "../../common/errors";
+import { clearTaskHighlight, clearBoardHighlight } from "../../common/highlight";
 
 export async function uploadAttachment(taskId: string, file: Express.Multer.File, actor: AuthedUser) {
   const ctx = await loadTaskWithAccess(taskId, actor);
@@ -41,6 +42,8 @@ export async function uploadAttachment(taskId: string, file: Express.Multer.File
     taskId,
     afterValue: { fileName: file.originalname, sizeBytes: file.size },
   });
+  await clearTaskHighlight(taskId);
+  await clearBoardHighlight(ctx.task.boardId);
 
   return attachment;
 }
@@ -84,4 +87,6 @@ export async function deleteAttachment(taskId: string, attachmentId: string, act
   await prisma.taskAttachment.delete({ where: { id: attachmentId } });
 
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "TaskAttachment", entityId: attachmentId, boardId: ctx.task.boardId, taskId, beforeValue: { fileName: attachment.fileName } });
+  await clearTaskHighlight(taskId);
+  await clearBoardHighlight(ctx.task.boardId);
 }

@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { prisma } from "../../lib/prisma";
 import { Errors } from "../../common/errors";
 import { writeAudit } from "../../common/audit";
+import { clearBoardHighlight } from "../../common/highlight";
 import { notify, notifyMany } from "../notifications/notifications.service";
 import { sanitizeDescription } from "../../common/richtext";
 import { loadTaskWithAccess, assertCanEditTask, assertCanDeleteTask } from "./task-access";
@@ -249,6 +250,7 @@ export async function createTask(input: CreateTaskInput, actor: AuthedUser) {
   });
 
   await recordStatusHistory(task.id, stage.name, actor);
+  await clearBoardHighlight(boardId);
 
   if (input.dependencies?.length) {
     for (const dep of input.dependencies) {
@@ -546,6 +548,7 @@ export async function updateTask(taskId: string, input: Record<string, any>, act
   }
 
   const updated = await prisma.task.update({ where: { id: taskId }, data, include: TASK_DETAIL_INCLUDE as any });
+  await clearBoardHighlight(ctx.task.boardId);
 
   for (const field of changedFields) {
     await writeAudit({
@@ -585,6 +588,7 @@ export async function setAssignees(taskId: string, assigneeUserIds: string[], ac
     }),
     prisma.task.update({ where: { id: taskId }, data: { version: { increment: 1 }, isHighlighted: false } }),
   ]);
+  await clearBoardHighlight(ctx.task.boardId);
 
   const namedUsers = await prisma.user.findMany({ where: { id: { in: [...new Set([...before, ...assigneeUserIds])] } }, select: { id: true, name: true } });
   const nameOf = (id: string) => namedUsers.find((u) => u.id === id)?.name ?? id;
@@ -620,6 +624,7 @@ export async function quickEdit(taskId: string, input: { priority?: string; dueD
     data: { priority: input.priority as any, dueDate: input.dueDate, isHighlighted: false, version: { increment: 1 } },
     include: TASK_DETAIL_INCLUDE as any,
   });
+  await clearBoardHighlight(ctx.task.boardId);
   await writeAudit({ actor, action: AuditAction.EDIT, entityType: "Task", entityId: taskId, boardId: ctx.task.boardId, field: "quickEdit", afterValue: input });
   return serializeTask(updated);
 }
@@ -743,6 +748,7 @@ export async function moveTask(
     },
     include: TASK_DETAIL_INCLUDE as any,
   });
+  await clearBoardHighlight(ctx.task.boardId);
 
   await writeAudit({
     actor,

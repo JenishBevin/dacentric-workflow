@@ -6,6 +6,7 @@ import { getBoardRole, assertBoardVisible, assertCanEditBoard, assertIsBoardOwne
 import { getPermissionScope, scopeAtLeast } from "../../common/permissions";
 import { AuditAction, BoardType, RoleCode, PermissionKey, formatProjectId } from "@dacentric/types";
 import { nextYearlySequence } from "../../common/sequence";
+import { clearBoardHighlight } from "../../common/highlight";
 
 export const DEFAULT_STAGES = [
   { name: "Backlog", color: "#94a3b8" },
@@ -682,6 +683,7 @@ export async function addStage(boardId: string, input: { name: string; color?: s
   });
 
   await writeAudit({ actor, action: AuditAction.CREATE, entityType: "BoardStage", entityId: stage.id, boardId, afterValue: input });
+  await clearBoardHighlight(boardId);
   return stage;
 }
 
@@ -693,6 +695,7 @@ export async function updateStage(boardId: string, stageId: string, input: any, 
   const stage = await prisma.boardStage.update({ where: { id: stageId }, data: input });
 
   await writeAudit({ actor, action: AuditAction.EDIT, entityType: "BoardStage", entityId: stageId, boardId, beforeValue: before, afterValue: input });
+  await clearBoardHighlight(boardId);
   return stage;
 }
 
@@ -721,6 +724,7 @@ export async function deleteStage(boardId: string, stageId: string, actor: Authe
 
   const stage = await prisma.boardStage.delete({ where: { id: stageId } });
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "BoardStage", entityId: stageId, boardId, beforeValue: stage });
+  await clearBoardHighlight(boardId);
 }
 
 export async function reorderStages(boardId: string, orderedStageIds: string[], actor: AuthedUser) {
@@ -731,6 +735,7 @@ export async function reorderStages(boardId: string, orderedStageIds: string[], 
     orderedStageIds.map((id, idx) => prisma.boardStage.update({ where: { id }, data: { position: idx } }))
   );
   await writeAudit({ actor, action: AuditAction.EDIT, entityType: "BoardStage", entityId: boardId, boardId, field: "order", afterValue: orderedStageIds });
+  await clearBoardHighlight(boardId);
 }
 
 // ---------------------------------------------------------------------------
@@ -748,6 +753,7 @@ export async function addMember(boardId: string, userId: string, role: string, a
   });
 
   await writeAudit({ actor, action: AuditAction.CREATE, entityType: "BoardMember", entityId: member.id, boardId, afterValue: { userId, role } });
+  await clearBoardHighlight(boardId);
   return member;
 }
 
@@ -765,6 +771,7 @@ export async function updateMemberRole(boardId: string, userId: string, role: st
 
   const member = await prisma.boardMember.update({ where: { boardId_userId: { boardId, userId } }, data: { role } });
   await writeAudit({ actor, action: AuditAction.EDIT, entityType: "BoardMember", entityId: member.id, boardId, field: "role", afterValue: role });
+  await clearBoardHighlight(boardId);
   return member;
 }
 
@@ -782,6 +789,7 @@ export async function removeMember(boardId: string, userId: string, actor: Authe
 
   await prisma.boardMember.delete({ where: { boardId_userId: { boardId, userId } } });
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "BoardMember", entityId: target.id, boardId, beforeValue: { userId, role: target.role } });
+  await clearBoardHighlight(boardId);
 }
 
 export async function listTemplates() {
