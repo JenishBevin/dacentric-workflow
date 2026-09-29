@@ -38,10 +38,15 @@ export async function assertBoardVisible(boardId: string, user: AuthedUser) {
   return role;
 }
 
-export function assertCanEditBoard(role: BoardRole) {
-  if (role !== "OWNER" && role !== "EDITOR") {
-    throw Errors.forbidden("Only board Owners and Editors can make this change.");
-  }
+/** Board Owner/Editor always passes; so does a system-level Admin or anyone
+ *  granted org-wide EDIT_BOARD in Roles & Permissions (e.g. Management) —
+ *  otherwise that setting would have no actual effect, the same reasoning as
+ *  assertIsBoardOwnerOrAdmin's ALL-scope check for ARCHIVE_DELETE_BOARD. */
+export function assertCanEditBoard(role: BoardRole, user?: AuthedUser) {
+  if (role === "OWNER" || role === "EDITOR") return;
+  if (user && isSystemLevelAdmin(user.roles)) return;
+  if (user && getPermissionScope(user.permissions, PermissionKey.EDIT_BOARD) === "ALL") return;
+  throw Errors.forbidden("Only board Owners and Editors can make this change.");
 }
 
 /** Gates Mark Complete / Archive / Delete / Save-as-Template. Board Owner or

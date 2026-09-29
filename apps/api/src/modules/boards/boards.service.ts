@@ -445,7 +445,7 @@ export async function updateBoard(
   actor: AuthedUser
 ) {
   const role = await assertBoardVisible(boardId, actor);
-  assertCanEditBoard(role);
+  assertCanEditBoard(role, actor);
 
   const existing = await prisma.board.findUniqueOrThrow({ where: { id: boardId } });
   if (input.version !== undefined && input.version !== existing.version) {
@@ -488,7 +488,7 @@ export async function updateBoard(
 
 export async function duplicateBoard(boardId: string, actor: AuthedUser) {
   const role = await assertBoardVisible(boardId, actor);
-  assertCanEditBoard(role);
+  assertCanEditBoard(role, actor);
 
   const original = await prisma.board.findUniqueOrThrow({
     where: { id: boardId },
@@ -670,7 +670,7 @@ export async function bulkArchiveBoards(boardIds: string[], archived: boolean, a
 
 export async function addStage(boardId: string, input: { name: string; color?: string; wipLimit?: number | null; isTerminal?: boolean }, actor: AuthedUser) {
   const role = await assertBoardVisible(boardId, actor);
-  assertCanEditBoard(role);
+  assertCanEditBoard(role, actor);
   // Adding a stage is Super Admin only — hidden from the UI for anyone else
   // too, but that's just UX.
   if (!actor.roles.includes(RoleCode.SUPER_ADMIN)) {
@@ -696,7 +696,7 @@ export async function addStage(boardId: string, input: { name: string; color?: s
 
 export async function updateStage(boardId: string, stageId: string, input: any, actor: AuthedUser) {
   const role = await assertBoardVisible(boardId, actor);
-  assertCanEditBoard(role);
+  assertCanEditBoard(role, actor);
 
   const before = await prisma.boardStage.findFirstOrThrow({ where: { id: stageId, boardId } });
   const stage = await prisma.boardStage.update({ where: { id: stageId }, data: input });
@@ -708,7 +708,7 @@ export async function updateStage(boardId: string, stageId: string, input: any, 
 
 export async function deleteStage(boardId: string, stageId: string, actor: AuthedUser) {
   const role = await assertBoardVisible(boardId, actor);
-  assertCanEditBoard(role);
+  assertCanEditBoard(role, actor);
 
   const remainingStages = await prisma.boardStage.findMany({ where: { boardId, id: { not: stageId } }, orderBy: { position: "asc" } });
   if (remainingStages.length === 0) {
@@ -736,7 +736,7 @@ export async function deleteStage(boardId: string, stageId: string, actor: Authe
 
 export async function reorderStages(boardId: string, orderedStageIds: string[], actor: AuthedUser) {
   const role = await assertBoardVisible(boardId, actor);
-  assertCanEditBoard(role);
+  assertCanEditBoard(role, actor);
 
   await prisma.$transaction(
     orderedStageIds.map((id, idx) => prisma.boardStage.update({ where: { id }, data: { position: idx } }))
@@ -751,7 +751,7 @@ export async function reorderStages(boardId: string, orderedStageIds: string[], 
 
 export async function addMember(boardId: string, userId: string, role: string, actor: AuthedUser) {
   const myRole = await assertBoardVisible(boardId, actor);
-  assertCanEditBoard(myRole);
+  assertCanEditBoard(myRole, actor);
 
   const member = await prisma.boardMember.upsert({
     where: { boardId_userId: { boardId, userId } },
@@ -766,7 +766,7 @@ export async function addMember(boardId: string, userId: string, role: string, a
 
 export async function updateMemberRole(boardId: string, userId: string, role: string, actor: AuthedUser) {
   const myRole = await assertBoardVisible(boardId, actor);
-  assertCanEditBoard(myRole);
+  assertCanEditBoard(myRole, actor);
 
   if (role !== "OWNER") {
     const ownerCount = await prisma.boardMember.count({ where: { boardId, role: "OWNER" } });
@@ -784,7 +784,7 @@ export async function updateMemberRole(boardId: string, userId: string, role: st
 
 export async function removeMember(boardId: string, userId: string, actor: AuthedUser) {
   const myRole = await assertBoardVisible(boardId, actor);
-  assertCanEditBoard(myRole);
+  assertCanEditBoard(myRole, actor);
 
   const target = await prisma.boardMember.findUnique({ where: { boardId_userId: { boardId, userId } } });
   if (!target) throw Errors.notFound("Board member");
@@ -998,7 +998,7 @@ export interface UpdateProcurementInput {
 
 export async function updateProcurementRecord(boardId: string, input: UpdateProcurementInput, actor: AuthedUser) {
   const role = await assertBoardVisible(boardId, actor);
-  assertCanEditBoard(role);
+  assertCanEditBoard(role, actor);
 
   const existing = await prisma.procurementRecord.findUnique({ where: { boardId } });
   if (!existing) throw Errors.notFound("Procurement record");

@@ -694,11 +694,11 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
                 <button
                   type="button"
                   onClick={() => navigate(`${boardPath(task.board?.name, task.boardId)}?settings=general`)}
-                  className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-600 hover:border-brand-300 hover:bg-brand-50/40"
+                  className="flex w-full flex-col items-start gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-600 hover:border-brand-300 hover:bg-brand-50/40"
                   title="Set for the whole project — opens Project Settings"
                 >
-                  <span>{projectServiceName ?? "No service"}</span>
-                  <span className="shrink-0 text-xs font-medium text-brand-600">Edit in Project Settings</span>
+                  <span className="truncate">{projectServiceName ?? "No service"}</span>
+                  <span className="text-xs font-medium text-brand-600">Edit in Project Settings</span>
                 </button>
               )}
             </div>

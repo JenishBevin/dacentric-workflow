@@ -68,7 +68,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.LOGIN]: "ALL",
     [PermissionKey.VIEW_WORKFLOW]: "ALL",
     [PermissionKey.CREATE_BOARD]: "NONE",
-    [PermissionKey.EDIT_BOARD]: "NONE",
+    // Edit project details (name, description, customer, service, etc. in
+    // Project Settings -> General) — requested again (2026-09-29) after the
+    // task-level grant still left assertCanEditBoard's Owner/Editor-only
+    // check blocking Management. wired via assertCanEditBoard's ALL-scope
+    // check, the same reasoning as ARCHIVE_DELETE_BOARD below.
+    [PermissionKey.EDIT_BOARD]: "ALL",
     // Mark Complete / Archive / Delete Project and Save-as-Template are all
     // gated by this one permission (assertIsBoardOwnerOrAdmin) — Management
     // otherwise had no way to close out a project themselves, even with
