@@ -73,6 +73,11 @@ export async function getTeamWorkload(actor: AuthedUser, filters: WorkloadFilter
         // on the client) — not active work, so it shouldn't count toward
         // workload until it moves again.
         stage: { isFollowUpStage: false },
+        // Marking the whole project Completed doesn't touch its individual
+        // tasks' own isCompleted flag, so a task left open at that moment
+        // would otherwise count toward workload forever even after the
+        // project moved to Project/Task History.
+        board: { isCompleted: false, isArchived: false, isDeleted: false },
         ...(filters.boardId ? { boardId: filters.boardId } : {}),
       };
 
@@ -123,6 +128,10 @@ function followUpTaskWhere(userId: string) {
     isDeleted: false,
     isCompleted: false,
     stage: { isFollowUpStage: true },
+    // Same reasoning as getTeamWorkload's taskWhere — a project being marked
+    // Completed doesn't complete its individual tasks, so exclude tasks
+    // whose project has already moved to Project/Task History.
+    board: { isCompleted: false, isArchived: false, isDeleted: false },
     OR: [{ followUpAssigneeUserId: userId }, { followUpAssigneeUserId: null, assignees: { some: { userId } } }],
   };
 }
@@ -226,6 +235,9 @@ export async function getEmployeeWorkloadDetail(employeeId: string, actor: Authe
       isCompleted: false,
       assignees: { some: { userId: employee.user.id } },
       stage: { isFollowUpStage: false },
+      // Keep this in sync with getTeamWorkload's taskWhere — otherwise this
+      // drill-down list wouldn't match the summary count it's opened from.
+      board: { isCompleted: false, isArchived: false, isDeleted: false },
     },
     include: { board: true, stage: true },
     orderBy: { dueDate: "asc" },
