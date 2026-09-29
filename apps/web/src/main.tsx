@@ -11,7 +11,17 @@ import "./index.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false },
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      // Background poll so one person's changes (e.g. moving a task, editing
+      // a project) show up for everyone else viewing the same screen without
+      // a manual reload — same interval chat already polls conversations at.
+      // Only ticks for actively-mounted queries and pauses when the tab is
+      // hidden/backgrounded (refetchIntervalInBackground defaults to false),
+      // so it doesn't run up API calls for screens nobody is looking at.
+      refetchInterval: 15000,
+    },
   },
 });
 
