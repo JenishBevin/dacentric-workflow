@@ -22,7 +22,7 @@ import { DependenciesSection } from "./DependenciesSection";
 import { ActivitySection } from "./ActivitySection";
 import { PriorityBadge, ApprovalStatusBadge } from "../workflow/badges";
 import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask, useAwardTask, useMarkTaskLost, useLostApprovalMutations, useRejectAccountsTask, useSaveEstimationQuote } from "../../api/tasks";
-import { useBoardDetail } from "../../api/boards";
+import { useBoardDetail, useServices } from "../../api/boards";
 import { useTags, useCreateTag } from "../../api/misc";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
@@ -361,6 +361,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
   }
 
   const stages = [...(board?.stages ?? [])].sort((a: any, b: any) => a.position - b.position);
+  const { data: services } = useServices();
 
   return (
     <Drawer
@@ -661,19 +662,28 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
           <section
             className={clsx(
               "grid gap-3",
-              ["grid-cols-2", "grid-cols-3", "grid-cols-4"][(task.service ? 1 : 0) + (task.customer ? 1 : 0)]
+              ["grid-cols-3", "grid-cols-4"][task.customer ? 1 : 0]
             )}
           >
             <div>
               <Label>Project</Label>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{task.board?.name}</p>
             </div>
-            {task.service && (
-              <div>
-                <Label>Service</Label>
-                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{task.service.name}</p>
-              </div>
-            )}
+            <div>
+              <Label>Service</Label>
+              <Select
+                value={task.serviceId ?? ""}
+                disabled={!canEdit}
+                onChange={(e) => saveField({ serviceId: e.target.value || null })}
+              >
+                <option value="">No service</option>
+                {services?.map((s: any) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
             {task.customer && (
               <div>
                 <Label>Customer</Label>

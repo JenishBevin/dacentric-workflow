@@ -61,6 +61,7 @@ export const updateTaskSchema = z
     salespersonUserId: z.string().uuid().optional().nullable(),
     dependencyEnforced: z.boolean().optional(),
     customerId: z.string().uuid().optional().nullable(),
+    serviceId: z.string().uuid().optional().nullable(),
     version: z.number().int().optional(),
   })
   .refine((v) => !v.startDate || !v.dueDate || v.dueDate >= v.startDate, {

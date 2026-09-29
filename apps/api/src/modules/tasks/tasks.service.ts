@@ -170,6 +170,10 @@ async function resolveTaskAuditValue(field: string, value: unknown): Promise<unk
     const user = await prisma.user.findUnique({ where: { id: value }, select: { name: true } });
     return user?.name ?? value;
   }
+  if (field === "serviceId") {
+    const service = await prisma.service.findUnique({ where: { id: value }, select: { name: true } });
+    return service?.name ?? value;
+  }
   return value;
 }
 
@@ -519,12 +523,16 @@ export async function updateTask(taskId: string, input: Record<string, any>, act
 
   if (input.approverUserId) await assertActiveWorkflowUsers([input.approverUserId]);
   if (input.salespersonUserId) await assertActiveWorkflowUsers([input.salespersonUserId]);
+  if (input.serviceId) {
+    const service = await prisma.service.findUnique({ where: { id: input.serviceId } });
+    if (!service) throw Errors.badRequest("Selected service could not be found.");
+  }
 
   const before = { ...ctx.task };
   const data: any = { version: { increment: 1 }, isHighlighted: false };
   const changedFields: string[] = [];
 
-  for (const key of ["title", "priority", "startDate", "dueDate", "estimatedEffortHours", "dependencyEnforced", "customerId", "salespersonUserId"]) {
+  for (const key of ["title", "priority", "startDate", "dueDate", "estimatedEffortHours", "dependencyEnforced", "customerId", "salespersonUserId", "serviceId"]) {
     if (input[key] !== undefined) {
       data[key] = input[key];
       changedFields.push(key);
