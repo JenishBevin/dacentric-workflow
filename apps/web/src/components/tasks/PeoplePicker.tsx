@@ -30,7 +30,17 @@ export const PeoplePicker: React.FC<Props> = ({ selected, onChange, placeholder,
   return (
     <div>
       {!disabled && (
-        <Input placeholder={placeholder ?? "Search people…"} value={query} onChange={(e) => setQuery(e.target.value)} />
+        <Input
+          placeholder={placeholder ?? "Search people…"}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          // Typing a name and moving on without clicking a suggestion added
+          // nobody, but the typed text stayed in the box looking selected —
+          // clear it once focus leaves so an unselected search doesn't look
+          // like a saved pick. Deferred so a genuine suggestion click (which
+          // blurs the input first) still lands before this fires.
+          onBlur={() => setTimeout(() => setQuery(""), 150)}
+        />
       )}
       {query && employees && employees.length > 0 && (
         <div className="mt-1 max-h-36 overflow-y-auto rounded-lg border border-slate-200">
