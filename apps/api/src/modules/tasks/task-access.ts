@@ -50,12 +50,15 @@ export function assertCanEditTask(ctx: TaskAccessContext) {
   throw Errors.forbidden("You do not have edit rights on this task.");
 }
 
-/** Collaboration rights (checklist/comments/attachments) — Viewer excluded, Commenter allowed for comments only.
+/** Collaboration rights (checklist/comments/attachments/watchers) — Viewer excluded, Commenter allowed for comments only.
  *  Someone assigned to the task always qualifies, even if they're only a Viewer of its board (e.g. an
- *  org-wide-visibility role that was never added as a member) — same as assertCanEditTask. */
+ *  org-wide-visibility role that was never added as a member) — same as assertCanEditTask. So does anyone
+ *  granted company-wide (ALL-scope) MANAGE_TASK_COLLAB in Roles & Permissions (e.g. Management) — otherwise
+ *  that setting would have no actual effect, the same reasoning as assertCanEditTask's EDIT_TASK check. */
 export function assertCanCollaborate(ctx: TaskAccessContext) {
   if (ctx.isAdmin) return;
   if (ctx.isAssignee) return;
+  if (getPermissionScope(ctx.permissions, PermissionKey.MANAGE_TASK_COLLAB) === "ALL") return;
   if (ctx.boardRole === "VIEWER") throw Errors.forbidden("Viewers have read-only access.");
   if (!ctx.boardRole && !ctx.isAssignee) throw Errors.forbidden();
 }

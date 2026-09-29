@@ -76,12 +76,18 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Partial<Record<Permissio
     [PermissionKey.ARCHIVE_DELETE_BOARD]: "ALL",
     [PermissionKey.CONFIGURE_STAGES]: "NONE",
     [PermissionKey.MANAGE_BOARD_MEMBERS]: "NONE",
-    [PermissionKey.CREATE_TASK]: "NONE",
-    [PermissionKey.EDIT_TASK]: "NONE",
-    [PermissionKey.DELETE_TASK]: "NONE",
-    [PermissionKey.ASSIGN_TASK]: "NONE",
-    [PermissionKey.MOVE_TASK]: "NONE",
-    [PermissionKey.MANAGE_TASK_COLLAB]: "NONE",
+    // Full task authority everywhere, org-wide — not just view/approve/export.
+    // Requested explicitly (2026-09-29): Management should be able to create,
+    // edit, move, assign, delete and collaborate on (comments/checklist/
+    // attachments/watchers) any task, not only ones on boards they're a
+    // member of. Board-level authority (create/edit/configure boards,
+    // manage board members) is deliberately untouched.
+    [PermissionKey.CREATE_TASK]: "ALL",
+    [PermissionKey.EDIT_TASK]: "ALL",
+    [PermissionKey.DELETE_TASK]: "ALL",
+    [PermissionKey.ASSIGN_TASK]: "ALL",
+    [PermissionKey.MOVE_TASK]: "ALL",
+    [PermissionKey.MANAGE_TASK_COLLAB]: "ALL",
     [PermissionKey.VIEW_TEAM_WORKLOAD]: "ALL",
     [PermissionKey.APPROVE_TASK]: "ALL",
     // Can create/import Customer Master records now that every role has
