@@ -27,6 +27,7 @@ import { useTags, useCreateTag } from "../../api/misc";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { can, isAdmin, canSeeSecretAttachments } from "../../lib/permissions";
+import { boardPath } from "../../lib/boardPath";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { DiscussButton } from "../chat/DiscussButton";
@@ -362,6 +363,11 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
 
   const stages = [...(board?.stages ?? [])].sort((a: any, b: any) => a.position - b.position);
   const { data: services } = useServices();
+  // On these pipeline boards, a task's own service is meaningful (it becomes the project's service when
+  // Awarded), so it's directly editable. On an actual Project board it isn't — the whole project's service
+  // is a separate field (Project Settings), so that's what's shown here, read-only, with a shortcut to it.
+  const isPipelineBoard = ["Enquiry List", "Estimation", "Accounts", "Personal Tasks"].includes(task?.board?.name ?? "");
+  const projectServiceName = services?.find((s: any) => s.id === board?.serviceId)?.name;
 
   return (
     <Drawer
@@ -671,18 +677,30 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
             </div>
             <div>
               <Label>Service</Label>
-              <Select
-                value={task.serviceId ?? ""}
-                disabled={!canEdit}
-                onChange={(e) => saveField({ serviceId: e.target.value || null })}
-              >
-                <option value="">No service</option>
-                {services?.map((s: any) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </Select>
+              {isPipelineBoard ? (
+                <Select
+                  value={task.serviceId ?? ""}
+                  disabled={!canEdit}
+                  onChange={(e) => saveField({ serviceId: e.target.value || null })}
+                >
+                  <option value="">No service</option>
+                  {services?.map((s: any) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate(`${boardPath(task.board?.name, task.boardId)}?settings=general`)}
+                  className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-600 hover:border-brand-300 hover:bg-brand-50/40"
+                  title="Set for the whole project — opens Project Settings"
+                >
+                  <span>{projectServiceName ?? "No service"}</span>
+                  <span className="shrink-0 text-xs font-medium text-brand-600">Edit in Project Settings</span>
+                </button>
+              )}
             </div>
             {task.customer && (
               <div>
