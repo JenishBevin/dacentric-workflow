@@ -14,6 +14,7 @@ import {
   useRemoveBoardMember,
   useArchiveBoard,
   useDeleteBoard,
+  useServices,
 } from "../../api/boards";
 import { useEmployeeDirectory } from "../../api/misc";
 import { CustomerPicker } from "../customers/CustomerPicker";
@@ -50,6 +51,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
   const removeMember = useRemoveBoardMember(board.id);
   const archiveBoard = useArchiveBoard();
   const deleteBoard = useDeleteBoard();
+  const { data: services } = useServices();
 
   const [name, setName] = useState(board.name);
   const [description, setDescription] = useState(board.description ?? "");
@@ -117,6 +119,30 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
               </Button>
             </div>
           )}
+
+          <div className="rounded-lg border border-slate-200 p-3 text-sm">
+            <p className="mb-1.5 font-medium text-slate-700">Service</p>
+            <Select
+              value={board.serviceId ?? ""}
+              onChange={async (e) => {
+                const serviceId = e.target.value || null;
+                try {
+                  await updateBoard.mutateAsync({ serviceId });
+                  push({ variant: "success", title: "Project's service updated." });
+                } catch (err) {
+                  push({ variant: "error", title: "Could not update service", description: extractApiError(err).message });
+                }
+              }}
+            >
+              <option value="">No service</option>
+              {services?.map((s: any) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-slate-400">Which tile/column this project is filed under on the Projects page.</p>
+          </div>
 
           <div className="rounded-lg border border-slate-200 p-3 text-sm">
             <p className="mb-1.5 font-medium text-slate-700">Customer</p>

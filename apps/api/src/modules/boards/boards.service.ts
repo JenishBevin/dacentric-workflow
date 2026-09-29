@@ -441,7 +441,7 @@ export async function listServices() {
 
 export async function updateBoard(
   boardId: string,
-  input: { name?: string; description?: string | null; linkedRecordType?: string | null; linkedRecordId?: string | null; customerId?: string | null; version?: number },
+  input: { name?: string; description?: string | null; linkedRecordType?: string | null; linkedRecordId?: string | null; customerId?: string | null; serviceId?: string | null; version?: number },
   actor: AuthedUser
 ) {
   const role = await assertBoardVisible(boardId, actor);
@@ -450,6 +450,10 @@ export async function updateBoard(
   const existing = await prisma.board.findUniqueOrThrow({ where: { id: boardId } });
   if (input.version !== undefined && input.version !== existing.version) {
     throw Errors.conflict("This board was updated by someone else. Please refresh.");
+  }
+  if (input.serviceId) {
+    const service = await prisma.service.findUnique({ where: { id: input.serviceId } });
+    if (!service) throw Errors.badRequest("Selected service could not be found.");
   }
 
   const updated = await prisma.board.update({
@@ -461,6 +465,9 @@ export async function updateBoard(
       linkedRecordId: input.linkedRecordId === null ? null : input.linkedRecordId,
       boardType: input.linkedRecordId === null ? BoardType.STANDALONE : undefined,
       customerId: input.customerId === undefined ? undefined : input.customerId,
+      // Re-files the project under a different service — the Projects page's tiles/columns group by this,
+      // so this is what actually moves a project between e.g. "Others" and "AMC", not any task's own service.
+      serviceId: input.serviceId === undefined ? undefined : input.serviceId,
       isHighlighted: false,
       version: { increment: 1 },
     },

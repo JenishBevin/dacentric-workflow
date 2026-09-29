@@ -35,6 +35,7 @@ export const updateBoardSchema = z.object({
   linkedRecordType: z.nativeEnum(LinkedRecordType).optional().nullable(),
   linkedRecordId: z.string().uuid().optional().nullable(),
   customerId: z.string().uuid().optional().nullable(),
+  serviceId: z.string().uuid().optional().nullable(),
   version: z.number().int().optional(),
 });
 
