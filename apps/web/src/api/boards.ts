@@ -108,7 +108,7 @@ export interface ProcurementRecord {
   lineItems: Array<{ description: string; quantity: number; unitCost: number }> | null;
   expectedDeliveryDate: string | null;
   actualDeliveryDate: string | null;
-  status: "PENDING" | "ORDERED" | "DELIVERED" | "CANCELLED";
+  status: "PENDING" | "ORDERED" | "DELIVERED" | "CANCELLED" | "NA";
   notes: string | null;
   updatedAt: string;
   createdAt: string;

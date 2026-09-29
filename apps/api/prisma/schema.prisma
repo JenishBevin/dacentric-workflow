@@ -1194,6 +1194,7 @@ enum ProcurementStatus {
   ORDERED
   DELIVERED
   CANCELLED
+  NA
 }
 
 // Backs every year-scoped id (Project, Estimation, Enquiry) — a single

@@ -98,6 +98,6 @@ export const updateProcurementSchema = z.object({
     .nullable(),
   expectedDeliveryDate: isoDate.optional().nullable(),
   actualDeliveryDate: isoDate.optional().nullable(),
-  status: z.enum(["PENDING", "ORDERED", "DELIVERED", "CANCELLED"]).optional(),
+  status: z.enum(["PENDING", "ORDERED", "DELIVERED", "CANCELLED", "NA"]).optional(),
   notes: z.string().max(4000).optional().nullable(),
 });

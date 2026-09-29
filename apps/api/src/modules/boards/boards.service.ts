@@ -992,7 +992,7 @@ export interface UpdateProcurementInput {
   lineItems?: Array<{ description: string; quantity: number; unitCost: number }> | null;
   expectedDeliveryDate?: Date | null;
   actualDeliveryDate?: Date | null;
-  status?: "PENDING" | "ORDERED" | "DELIVERED" | "CANCELLED";
+  status?: "PENDING" | "ORDERED" | "DELIVERED" | "CANCELLED" | "NA";
   notes?: string | null;
 }
 

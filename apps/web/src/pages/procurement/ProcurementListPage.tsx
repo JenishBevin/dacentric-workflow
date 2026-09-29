@@ -6,17 +6,19 @@ import { Skeleton, ErrorState, EmptyState, Badge, Input } from "../../components
 import { extractApiError } from "../../lib/apiClient";
 import { format } from "date-fns";
 
-const STATUS_TONE: Record<string, "amber" | "indigo" | "green" | "red"> = {
+const STATUS_TONE: Record<string, "amber" | "indigo" | "green" | "red" | "slate"> = {
   PENDING: "amber",
   ORDERED: "indigo",
   DELIVERED: "green",
   CANCELLED: "red",
+  NA: "slate",
 };
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pending",
   ORDERED: "Ordered",
   DELIVERED: "Delivered",
   CANCELLED: "Cancelled",
+  NA: "N/A",
 };
 
 /**

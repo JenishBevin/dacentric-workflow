@@ -17,6 +17,7 @@ const STATUS_OPTIONS = [
   { value: "ORDERED", label: "Ordered" },
   { value: "DELIVERED", label: "Delivered" },
   { value: "CANCELLED", label: "Cancelled" },
+  { value: "NA", label: "N/A" },
 ];
 
 function toDateInput(value: string | null | undefined) {
@@ -103,7 +104,19 @@ export function ProcurementPanel({ boardId }: { boardId: string }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-slate-400">{record.procurementId}</span>
-          <Badge tone={record.status === "DELIVERED" ? "green" : record.status === "CANCELLED" ? "red" : record.status === "ORDERED" ? "indigo" : "amber"}>
+          <Badge
+            tone={
+              record.status === "DELIVERED"
+                ? "green"
+                : record.status === "CANCELLED"
+                  ? "red"
+                  : record.status === "ORDERED"
+                    ? "indigo"
+                    : record.status === "NA"
+                      ? "slate"
+                      : "amber"
+            }
+          >
             {STATUS_OPTIONS.find((o) => o.value === record.status)?.label ?? record.status}
           </Badge>
         </div>
