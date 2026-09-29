@@ -174,6 +174,9 @@ export function useUpdateBoard(boardId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["boards"] });
       qc.invalidateQueries({ queryKey: ["board", boardId] });
+      // Changing a project's service moves it between the Projects page's service tiles/counts — that list is
+      // cached under its own key, not the "boards" prefix, so it was going stale until a manual reload.
+      qc.invalidateQueries({ queryKey: ["services"] });
     },
   });
 }
