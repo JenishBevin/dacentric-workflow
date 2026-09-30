@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
-import { DatabaseBackup, Download, Upload, AlertTriangle, ShieldAlert } from "lucide-react";
-import { downloadBackup, useRestoreBackup } from "../../api/backup";
-import { Button, EmptyState, Input, Label } from "../../components/ui/primitives";
+import { DatabaseBackup, Download, Upload, AlertTriangle, ShieldAlert, Wrench } from "lucide-react";
+import { downloadBackup, useRestoreBackup, usePreviewIdCleanup, useApplyIdCleanup, IdCleanupResult } from "../../api/backup";
+import { Button, EmptyState, Input, Label, Badge } from "../../components/ui/primitives";
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../context/AuthContext";
 import { isSuperAdmin } from "../../lib/permissions";
@@ -26,6 +26,11 @@ export default function BackupSettingsPage() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+
+  const [previewRequested, setPreviewRequested] = useState(false);
+  const { data: preview, isLoading: previewLoading, refetch: refetchPreview } = usePreviewIdCleanup(previewRequested);
+  const applyCleanup = useApplyIdCleanup();
+  const [applied, setApplied] = useState<IdCleanupResult | null>(null);
 
   if (!isSuperAdmin(user)) {
     return (
@@ -57,6 +62,25 @@ export default function BackupSettingsPage() {
     setPendingFile(file);
     setConfirmText("");
     setConfirmOpen(true);
+  }
+
+  async function handleCheckIds() {
+    setApplied(null);
+    if (!previewRequested) {
+      setPreviewRequested(true);
+    } else {
+      await refetchPreview();
+    }
+  }
+
+  async function handleApplyIdFix() {
+    try {
+      const result = await applyCleanup.mutateAsync();
+      setApplied(result);
+      push({ variant: "success", title: `Fixed ${result.changes.length} id${result.changes.length === 1 ? "" : "s"}.` });
+    } catch (err) {
+      push({ variant: "error", title: "Could not apply fix", description: extractApiError(err).message });
+    }
   }
 
   async function handleRestore() {
@@ -114,6 +138,69 @@ export default function BackupSettingsPage() {
             <Upload className="h-4 w-4" /> Upload Backup
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+            <Wrench className="h-5 w-5" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-900">Fix imported IDs</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              A bulk-imported Estimation or Project ID that has a stray space in it (e.g. from the source spreadsheet) won't turn up in the header search
+              bar. This checks for any and removes just the extra spaces — nothing else about the record changes.
+            </p>
+          </div>
+          <Button variant="outline" onClick={handleCheckIds} loading={previewLoading}>
+            Check for spaced IDs
+          </Button>
+        </div>
+
+        {previewRequested && !previewLoading && preview && (
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            {preview.changes.length === 0 && preview.conflicts.length === 0 ? (
+              <p className="text-sm text-slate-500">No spaced IDs found — nothing to fix.</p>
+            ) : (
+              <>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-700">
+                    Found {preview.changes.length} id{preview.changes.length === 1 ? "" : "s"} to fix
+                    {preview.conflicts.length > 0 && `, ${preview.conflicts.length} skipped (needs manual review)`}
+                  </p>
+                  {!applied && preview.changes.length > 0 && (
+                    <Button size="sm" loading={applyCleanup.isPending} onClick={handleApplyIdFix}>
+                      Fix {preview.changes.length} id{preview.changes.length === 1 ? "" : "s"}
+                    </Button>
+                  )}
+                  {applied && <Badge tone="green">Fixed</Badge>}
+                </div>
+                <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2 text-xs">
+                  {preview.changes.map((c, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-slate-50">
+                      <Badge tone="slate">{c.kind}</Badge>
+                      <span className="min-w-0 flex-1 truncate text-slate-400" title={c.label}>
+                        {c.label}
+                      </span>
+                      <span className="font-mono text-slate-500 line-through">{c.before}</span>
+                      <span className="font-mono font-medium text-slate-800">{c.after}</span>
+                    </div>
+                  ))}
+                  {preview.conflicts.map((c, i) => (
+                    <div key={`conflict-${i}`} className="flex items-center gap-2 rounded bg-red-50 px-1.5 py-1">
+                      <Badge tone="red">Conflict</Badge>
+                      <span className="min-w-0 flex-1 truncate text-slate-400" title={c.label}>
+                        {c.label}
+                      </span>
+                      <span className="font-mono text-slate-500">{c.before}</span>
+                      <span className="text-red-600">would collide — left as-is</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <Modal

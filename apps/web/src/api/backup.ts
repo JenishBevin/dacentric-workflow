@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../lib/apiClient";
 import { downloadExport } from "./misc";
 
@@ -25,5 +25,39 @@ export function useRestoreBackup() {
       form.append("confirmText", confirmText);
       return (await api.post<{ data: RestoreBackupResult }>("/backup/import", form, { headers: { "Content-Type": "multipart/form-data" } })).data.data;
     },
+  });
+}
+
+export interface IdCleanupChange {
+  kind: "Estimation" | "Project";
+  label: string;
+  before: string;
+  after: string;
+}
+export interface IdCleanupConflict {
+  kind: "Estimation" | "Project";
+  label: string;
+  before: string;
+  wouldBecome: string;
+}
+export interface IdCleanupResult {
+  changes: IdCleanupChange[];
+  conflicts: IdCleanupConflict[];
+}
+
+/** One-off tool: previews (does not write) the Estimation/Project IDs a
+ * bulk import left with a stray space in them — see cleanUpImportedIds on
+ * the backend for the full story. Not auto-run; only fetches when asked. */
+export function usePreviewIdCleanup(enabled: boolean) {
+  return useQuery({
+    queryKey: ["id-cleanup-preview"],
+    queryFn: async () => (await api.get<{ data: IdCleanupResult }>("/backup/fix-imported-ids")).data.data,
+    enabled,
+  });
+}
+
+export function useApplyIdCleanup() {
+  return useMutation({
+    mutationFn: async () => (await api.post<{ data: IdCleanupResult }>("/backup/fix-imported-ids")).data.data,
   });
 }

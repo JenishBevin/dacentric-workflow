@@ -67,3 +67,29 @@ backupRouter.post(
     return ok(res, result);
   })
 );
+
+// One-off maintenance tool — see cleanUpImportedIds's own doc comment.
+// GET previews (writes nothing); POST applies and audit-logs the change.
+backupRouter.get(
+  "/fix-imported-ids",
+  asyncHandler(async (req, res) => {
+    requireSuperAdmin(req);
+    return ok(res, await backupService.cleanUpImportedIds(false));
+  })
+);
+
+backupRouter.post(
+  "/fix-imported-ids",
+  asyncHandler(async (req, res) => {
+    requireSuperAdmin(req);
+    const result = await backupService.cleanUpImportedIds(true);
+    await writeAudit({
+      actor: req.user!,
+      action: AuditAction.EDIT,
+      entityType: "Database",
+      entityId: "fix-imported-ids",
+      afterValue: { changed: result.changes.length, conflicts: result.conflicts.length },
+    });
+    return ok(res, result);
+  })
+);

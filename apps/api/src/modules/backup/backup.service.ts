@@ -148,3 +148,71 @@ export async function restoreBackup(file: BackupFile) {
 
   return { restoredModels: order, skippedUnknownModels: unknownModels };
 }
+
+export interface IdCleanupChange {
+  kind: "Estimation" | "Project";
+  label: string; // the board/estimation's own name/title, for context
+  before: string;
+  after: string;
+}
+export interface IdCleanupConflict {
+  kind: "Estimation" | "Project";
+  label: string;
+  before: string;
+  wouldBecome: string;
+}
+export interface IdCleanupResult {
+  changes: IdCleanupChange[];
+  conflicts: IdCleanupConflict[];
+}
+
+/**
+ * One-off maintenance tool (Settings -> Backup & Restore -> "Fix imported
+ * IDs"): a bulk import of the Estimations/Awarded Projects sheet takes
+ * Estimation ID and Project ID verbatim from the spreadsheet cell (see
+ * importEstimationsFromExcel in tasks.service.ts) rather than
+ * auto-generating them, since it's backfilling real historical reference
+ * numbers — so a stray space typed into the source spreadsheet lands
+ * straight in the stored id and silently breaks the header search bar's
+ * exact-match lookup (it compacts whatever you type before comparing, but
+ * can't compact what's actually stored). `apply: false` only reports what
+ * it would change; `apply: true` writes it. A collision (two different
+ * original ids that would collapse to the same clean value) is reported
+ * and left untouched rather than guessed at.
+ */
+export async function cleanUpImportedIds(apply: boolean): Promise<IdCleanupResult> {
+  const changes: IdCleanupChange[] = [];
+  const conflicts: IdCleanupConflict[] = [];
+
+  const estimations = await prisma.estimationRecord.findMany({
+    where: { estimationId: { contains: " " } },
+    select: { id: true, estimationId: true, task: { select: { title: true } } },
+  });
+  for (const e of estimations) {
+    const clean = e.estimationId.replace(/\s+/g, "");
+    const collision = await prisma.estimationRecord.findFirst({ where: { estimationId: clean, id: { not: e.id } } });
+    if (collision) {
+      conflicts.push({ kind: "Estimation", label: e.task.title, before: e.estimationId, wouldBecome: clean });
+      continue;
+    }
+    changes.push({ kind: "Estimation", label: e.task.title, before: e.estimationId, after: clean });
+    if (apply) await prisma.estimationRecord.update({ where: { id: e.id }, data: { estimationId: clean } });
+  }
+
+  const boards = await prisma.board.findMany({
+    where: { boardId: { contains: " " } },
+    select: { id: true, boardId: true, name: true },
+  });
+  for (const b of boards) {
+    const clean = b.boardId.replace(/\s+/g, "");
+    const collision = await prisma.board.findFirst({ where: { boardId: clean, id: { not: b.id } } });
+    if (collision) {
+      conflicts.push({ kind: "Project", label: b.name, before: b.boardId, wouldBecome: clean });
+      continue;
+    }
+    changes.push({ kind: "Project", label: b.name, before: b.boardId, after: clean });
+    if (apply) await prisma.board.update({ where: { id: b.id }, data: { boardId: clean } });
+  }
+
+  return { changes, conflicts };
+}
