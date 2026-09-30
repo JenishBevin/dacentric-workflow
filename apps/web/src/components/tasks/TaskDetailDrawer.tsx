@@ -790,7 +790,15 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
             <AttachmentsSection taskId={task.id} canDelete={canCollab} />
           </section>
 
-          {task.board?.name === "Estimation" && canSeeSecretAttachments(user) && <SecretAttachmentsSection taskId={task.id} />}
+          {task.board?.name === "Estimation" && canSeeSecretAttachments(user) && (
+            <SecretAttachmentsSection
+              taskId={task.id}
+              approvalStatus={task.quotationApprovalStatus}
+              rejectionReason={task.quotationRejectionReason}
+              decidedByName={task.quotationDecidedByName}
+              canDecide={isAdmin(user) || can(user, "APPROVE_TASK", "ALL")}
+            />
+          )}
 
           <section>
             <ActivitySection taskId={task.id} />

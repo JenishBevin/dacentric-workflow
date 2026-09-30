@@ -348,6 +348,20 @@ export function useLostApprovalMutations(taskId: string) {
   return { approve, reject };
 }
 
+/** Management's decision on a pending "Submit Quotation" request — raised
+ * automatically the moment a file lands in the Estimation board's secret
+ * quotation upload (see SecretAttachmentsSection). */
+export function useQuotationApprovalMutations(taskId: string) {
+  const qc = useQueryClient();
+  const invalidate = () => invalidateTaskEverywhere(qc, taskId);
+  const approve = useMutation({ mutationFn: async () => api.post(`/tasks/${taskId}/quotation-approval/approve`), onSuccess: invalidate });
+  const reject = useMutation({
+    mutationFn: async (reason: string) => api.post(`/tasks/${taskId}/quotation-approval/reject`, { reason }),
+    onSuccess: invalidate,
+  });
+  return { approve, reject };
+}
+
 export function useQuickComplete() {
   const qc = useQueryClient();
   return useMutation({

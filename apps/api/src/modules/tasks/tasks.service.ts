@@ -300,6 +300,9 @@ function serializeTask(task: any) {
     approvalStatus: task.approvalStatus,
     lostApprovalStatus: task.lostApprovalStatus,
     lostReason: task.lostReason,
+    quotationApprovalStatus: task.quotationApprovalStatus,
+    quotationRejectionReason: task.quotationRejectionReason,
+    quotationDecidedByName: task.quotationDecidedBy?.name ?? null,
     dependencyEnforced: task.dependencyEnforced,
     assignees: (task.assignees ?? []).map((a: any) => ({ userId: a.userId, name: a.user?.name, isPrimary: a.isPrimary })),
     watchers: (task.watchers ?? []).map((w: any) => ({ userId: w.userId, name: w.user?.name })),
@@ -335,6 +338,7 @@ const TASK_DETAIL_INCLUDE = {
   createdBy: true,
   salesperson: { select: { id: true, name: true } },
   followUpAssignee: { select: { id: true, name: true } },
+  quotationDecidedBy: { select: { id: true, name: true } },
   assignees: { include: { user: true } },
   watchers: { include: { user: true } },
   checklistItems: { include: { owner: true }, orderBy: { position: "asc" as const } },
@@ -941,10 +945,11 @@ export async function rejectAccountsTask(taskId: string, reason: string, actor: 
 }
 
 // Anyone holding Approve Task: All (Management, by default — configurable
-// from Settings -> Roles & Permissions) rather than a single named approver,
-// since a Lost enquiry needs sign-off from management broadly, not one
-// designated person chosen per task.
-async function findLostApproverIds(): Promise<string[]> {
+// from Settings -> Roles & Permissions) rather than a single named approver
+// — shared by the Lost and Submit Quotation approval flows below, since
+// both need sign-off from management broadly, not one designated person
+// chosen per task.
+export async function findApproveTaskAllUserIds(): Promise<string[]> {
   const rolePermissions = await prisma.rolePermission.findMany({
     where: { permission: PermissionKey.APPROVE_TASK, scope: "ALL" },
     select: { roleId: true },
@@ -1002,7 +1007,7 @@ export async function requestLostApproval(taskId: string, reason: string | undef
     afterValue: `requested: ${reason.trim()} — pending Management approval`,
   });
 
-  const approverIds = await findLostApproverIds();
+  const approverIds = await findApproveTaskAllUserIds();
   await notifyMany(approverIds, {
     event: NotificationEvent.APPROVAL_REQUESTED,
     title: `${ctx.task.taskId} requests approval to mark Lost`,
@@ -1103,6 +1108,55 @@ export async function decideLost(taskId: string, approve: boolean, actor: Authed
   });
 
   return result;
+}
+
+/** Management's decision on a pending "Submit Quotation" request — see the
+ *  quotationApprovalStatus field comment on the Task model, and
+ *  uploadSecretAttachment (secret-attachments.service.ts) for where a
+ *  request gets raised in the first place. Unlike decideLost, there's no
+ *  stage move attached — this only ever flips the approval flag itself. */
+export async function decideQuotation(taskId: string, approve: boolean, actor: AuthedUser, reason?: string) {
+  const ctx = await loadTaskWithAccess(taskId, actor);
+
+  const canDecide = isSystemLevelAdmin(actor.roles) || scopeAtLeast(getPermissionScope(actor.permissions, PermissionKey.APPROVE_TASK), "ALL");
+  if (!canDecide) throw Errors.forbidden("Only Management or an Administrator can approve or reject a quotation.");
+
+  if (ctx.task.quotationApprovalStatus !== TaskApprovalStatus.PENDING_APPROVAL) {
+    throw Errors.badRequest("This task has no pending quotation approval request.");
+  }
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      quotationApprovalStatus: approve ? TaskApprovalStatus.APPROVED : TaskApprovalStatus.REJECTED,
+      quotationDecidedById: actor.id,
+      quotationDecidedAt: new Date(),
+      quotationRejectionReason: approve ? null : reason?.trim() || null,
+    },
+    include: TASK_DETAIL_INCLUDE as any,
+  });
+
+  await writeAudit({
+    actor,
+    action: approve ? AuditAction.APPROVE : AuditAction.REJECT,
+    entityType: "Task",
+    entityId: taskId,
+    boardId: ctx.task.boardId,
+    field: "quotationApprovalStatus",
+    afterValue: approve ? "approved" : reason ? `rejected: ${reason}` : "rejected",
+  });
+
+  const notifyIds = [...new Set([ctx.task.createdById, ...ctx.task.assignees.map((a: any) => a.userId)])];
+  await notifyMany(notifyIds, {
+    event: approve ? NotificationEvent.APPROVAL_APPROVED : NotificationEvent.APPROVAL_REJECTED,
+    title: approve
+      ? `${ctx.task.taskId}'s quotation was approved`
+      : `${ctx.task.taskId}'s quotation was rejected${reason ? `: ${reason}` : ""}`,
+    taskId,
+    boardId: ctx.task.boardId,
+  });
+
+  return serializeTask(updated);
 }
 
 /** Undoes a Lost or Completed task from Project/Task History — sends it back

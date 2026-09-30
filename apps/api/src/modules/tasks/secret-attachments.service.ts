@@ -2,9 +2,10 @@ import { prisma } from "../../lib/prisma";
 import { writeAudit } from "../../common/audit";
 import { loadTaskWithAccess } from "./task-access";
 import { AuthedUser } from "../../middleware/authenticate";
-import { AuditAction, RoleCode } from "@dacentric/types";
+import { AuditAction, RoleCode, TaskApprovalStatus, NotificationEvent } from "@dacentric/types";
 import { getStorageAdapter, validateFile, scanFile } from "../../lib/storage";
 import { Errors } from "../../common/errors";
+import { notifyMany } from "../notifications/notifications.service";
 
 const ESTIMATION_BOARD_NAME = "Estimation";
 
@@ -62,6 +63,39 @@ export async function uploadSecretAttachment(taskId: string, file: Express.Multe
     boardId: ctx.task.boardId,
     afterValue: { fileName: file.originalname, sizeBytes: file.size },
   });
+
+  // A submitted quotation file needs Management's sign-off before it counts
+  // as approved. Re-submitting after a rejection (or the very first upload)
+  // raises a fresh request; if one's already pending, another file landing
+  // alongside it doesn't need a second notification round.
+  if (ctx.task.quotationApprovalStatus !== TaskApprovalStatus.PENDING_APPROVAL) {
+    const { findApproveTaskAllUserIds } = await import("./tasks.service");
+    await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        quotationApprovalStatus: TaskApprovalStatus.PENDING_APPROVAL,
+        quotationDecidedById: null,
+        quotationDecidedAt: null,
+        quotationRejectionReason: null,
+      },
+    });
+    await writeAudit({
+      actor,
+      action: AuditAction.EDIT,
+      entityType: "Task",
+      entityId: taskId,
+      boardId: ctx.task.boardId,
+      field: "quotationApprovalStatus",
+      afterValue: "requested: quotation submitted — pending Management approval",
+    });
+    const approverIds = await findApproveTaskAllUserIds();
+    await notifyMany(approverIds, {
+      event: NotificationEvent.APPROVAL_REQUESTED,
+      title: `${ctx.task.taskId} submitted a quotation for approval`,
+      taskId,
+      boardId: ctx.task.boardId,
+    });
+  }
 
   return attachment;
 }

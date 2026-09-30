@@ -1,10 +1,14 @@
 import React, { useRef, useState } from "react";
 import { format } from "date-fns";
-import { Lock, Download, Trash2, UploadCloud } from "lucide-react";
-import { useTaskSecretAttachments, useUploadSecretAttachment, useDeleteSecretAttachment } from "../../api/tasks";
+import { Lock, Download, Trash2, UploadCloud, Check, X as XIcon } from "lucide-react";
+import { useTaskSecretAttachments, useUploadSecretAttachment, useDeleteSecretAttachment, useQuotationApprovalMutations } from "../../api/tasks";
 import { useToast } from "../../context/ToastContext";
 import { api, extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { Modal } from "../ui/Modal";
+import { Button } from "../ui/primitives";
+import { ApprovalStatusBadge } from "../workflow/badges";
+import { TaskApprovalStatus } from "../../lib/types";
 
 interface SecretAttachment {
   id: string;
@@ -23,16 +27,31 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+interface Props {
+  taskId: string;
+  approvalStatus: TaskApprovalStatus;
+  rejectionReason?: string | null;
+  decidedByName?: string | null;
+  /** isAdmin(user) || can(user, "APPROVE_TASK", "ALL") — whoever can approve/reject. */
+  canDecide: boolean;
+}
+
 /**
  * Restricted-visibility attachments on Estimation tasks — only rendered at
  * all when the caller has already checked canSeeSecretAttachments(user); the
  * API independently 404s these routes for anyone else, so this component
- * never needs its own permission prop.
+ * never needs its own view-permission prop. Uploading a file here raises a
+ * Management approval request automatically (see quotationApprovalStatus on
+ * the backend) — approve/reject lives here too since it's this section's
+ * own concern, not the task's general requiresApproval gate.
  */
-export const SecretAttachmentsSection: React.FC<{ taskId: string }> = ({ taskId }) => {
+export const SecretAttachmentsSection: React.FC<Props> = ({ taskId, approvalStatus, rejectionReason, decidedByName, canDecide }) => {
   const { push } = useToast();
   const { data: attachments } = useTaskSecretAttachments(taskId, true);
   const upload = useUploadSecretAttachment(taskId);
+  const quotationApproval = useQuotationApprovalMutations(taskId);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const del = useDeleteSecretAttachment(taskId);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -75,11 +94,45 @@ export const SecretAttachmentsSection: React.FC<{ taskId: string }> = ({ taskId 
 
   return (
     <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/40 p-3">
-      <div>
+      <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-sm font-medium text-amber-900">
           <Lock className="h-3.5 w-3.5" /> Submit Quotation
         </p>
+        <ApprovalStatusBadge status={approvalStatus} />
       </div>
+
+      {approvalStatus === "PENDING_APPROVAL" && (
+        <p className="text-xs text-amber-800">Waiting on Management to approve this quotation.</p>
+      )}
+      {approvalStatus === "REJECTED" && (
+        <p className="text-xs text-red-700">
+          Rejected{decidedByName ? ` by ${decidedByName}` : ""}
+          {rejectionReason ? `: ${rejectionReason}` : ""} — submit a new file to request approval again.
+        </p>
+      )}
+      {approvalStatus === "APPROVED" && decidedByName && <p className="text-xs text-emerald-700">Approved by {decidedByName}.</p>}
+
+      {approvalStatus === "PENDING_APPROVAL" && canDecide && (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={async () => {
+              try {
+                await quotationApproval.approve.mutateAsync();
+                push({ variant: "success", title: "Quotation approved." });
+              } catch (err) {
+                push({ variant: "error", title: "Could not approve", description: extractApiError(err).message });
+              }
+            }}
+            loading={quotationApproval.approve.isPending}
+          >
+            <Check className="h-3.5 w-3.5" /> Approve
+          </Button>
+          <Button variant="danger" size="sm" onClick={() => setRejectOpen(true)}>
+            <XIcon className="h-3.5 w-3.5" /> Reject
+          </Button>
+        </div>
+      )}
 
       <div
         onDragOver={(e) => {
@@ -153,6 +206,43 @@ export const SecretAttachmentsSection: React.FC<{ taskId: string }> = ({ taskId 
           setPendingDelete(null);
         }}
       />
+
+      <Modal
+        open={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        title="Reject quotation"
+        description="A reason is required and will be shown on the task."
+      >
+        <textarea
+          rows={3}
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          placeholder="Explain what needs to change…"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-visible:focus-ring"
+        />
+        <div className="mt-3 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setRejectOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            disabled={!rejectReason.trim()}
+            loading={quotationApproval.reject.isPending}
+            onClick={async () => {
+              try {
+                await quotationApproval.reject.mutateAsync(rejectReason.trim());
+                push({ variant: "success", title: "Quotation rejected." });
+                setRejectOpen(false);
+                setRejectReason("");
+              } catch (err) {
+                push({ variant: "error", title: "Could not reject", description: extractApiError(err).message });
+              }
+            }}
+          >
+            Reject quotation
+          </Button>
+        </div>
+      </Modal>
     </section>
   );
 };

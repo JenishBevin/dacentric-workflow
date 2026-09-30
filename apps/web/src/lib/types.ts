@@ -319,6 +319,9 @@ export interface TaskSummary {
   approverUserId?: string | null;
   approvalStatus: TaskApprovalStatus;
   lostApprovalStatus: TaskApprovalStatus;
+  quotationApprovalStatus: TaskApprovalStatus;
+  quotationRejectionReason?: string | null;
+  quotationDecidedByName?: string | null;
   dependencyEnforced: boolean;
   assignees: Array<{ userId: string; name: string; isPrimary: boolean }>;
   watchers: Array<{ userId: string; name: string }>;

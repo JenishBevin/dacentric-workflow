@@ -267,6 +267,21 @@ tasksRouter.post(
   asyncHandler(async (req, res) => ok(res, await tasksService.decideLost(req.params.taskId, false, req.user!, (req as any).validatedBody.reason)))
 );
 
+// Management's decision on a pending "Submit Quotation" request — see
+// decideQuotation's own doc comment in tasks.service.ts.
+tasksRouter.post(
+  "/:taskId/quotation-approval/approve",
+  requirePermission(PermissionKey.APPROVE_TASK, "ALL"),
+  asyncHandler(async (req, res) => ok(res, await tasksService.decideQuotation(req.params.taskId, true, req.user!)))
+);
+
+tasksRouter.post(
+  "/:taskId/quotation-approval/reject",
+  requirePermission(PermissionKey.APPROVE_TASK, "ALL"),
+  validate(rejectApprovalSchema),
+  asyncHandler(async (req, res) => ok(res, await tasksService.decideQuotation(req.params.taskId, false, req.user!, (req as any).validatedBody.reason)))
+);
+
 // The "Reject" action on an Accounts-board task — Approve reuses the normal
 // /award endpoint (see awardTask's three-stage pipeline in tasks.service.ts).
 tasksRouter.post(

@@ -165,6 +165,7 @@ model User {
   salesTasks           Task[]               @relation("TaskSalesperson")
   followUpTasks        Task[]               @relation("TaskFollowUpAssignee")
   quotationsCreated    EstimationQuotation[] @relation("QuotationCreatedBy")
+  quotationApprovalsDecided Task[]           @relation("QuotationDecidedBy")
   taskAssignments      TaskAssignee[]
   taskWatching         TaskWatcher[]
   comments             Comment[]
@@ -794,6 +795,18 @@ model Task {
   // task only actually moves to the "Lost" stage once approved.
   lostApprovalStatus TaskApprovalStatus @default(NONE)
   lostReason         String?            // why the requester believes this enquiry is Lost — shown to the approver
+
+  // "Submit Quotation" approval (the Estimation board's restricted quotation
+  // upload — see SecretTaskAttachment) — separate from requiresApproval
+  // above. Uploading a file while this isn't already pending flips it to
+  // PENDING_APPROVAL and notifies anyone holding Approve Task: All
+  // (Management, by default); same approver pool as lostApprovalStatus, just
+  // without a stage move attached to the decision.
+  quotationApprovalStatus  TaskApprovalStatus @default(NONE)
+  quotationDecidedById     String?
+  quotationDecidedBy       User?              @relation("QuotationDecidedBy", fields: [quotationDecidedById], references: [id])
+  quotationDecidedAt       DateTime?
+  quotationRejectionReason String?
 
   // The stage this task was on right before it entered "Lost" or a terminal
   // (Completed) stage — lets restoreTask() send it back where it came from.
