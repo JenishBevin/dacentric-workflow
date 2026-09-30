@@ -275,3 +275,56 @@ export async function migrateProjectStages(apply: boolean): Promise<ProjectStage
 
   return { changes };
 }
+
+export interface ProjectCustomerReconcileChange {
+  boardId: string;
+  boardName: string;
+  boardCustomerBefore: string | null;
+  taskCustomerName: string | null;
+}
+export interface ProjectCustomerReconcileResult {
+  changes: ProjectCustomerReconcileChange[];
+}
+
+/**
+ * One-off maintenance tool (Settings -> Backup & Restore -> "Sync project
+ * customers"): a Project board's own customer (shown on the Projects list,
+ * Accounts page, Board Settings, ...) is copied from its anchor task's
+ * customer once, at award time — see createProjectFromAwardedTask in
+ * tasks.service.ts. Editing either side now keeps them in sync going
+ * forward (same file's updateTask, and updateBoard in boards.service.ts),
+ * but a task's customer wasn't editable in the UI at all until this fix
+ * shipped, so any project whose anchor task's customer was changed before
+ * then is still showing a stale customer everywhere except the task itself.
+ * This finds every such project and makes the board match its anchor task
+ * (the direction that matches how this drifted — see the two call sites
+ * above for why the anchor task, not any other task, is what's compared).
+ */
+export async function reconcileProjectCustomers(apply: boolean): Promise<ProjectCustomerReconcileResult> {
+  const boards = await prisma.board.findMany({
+    where: { isDeleted: false, name: { notIn: SYSTEM_BOARD_NAMES } },
+    select: {
+      id: true,
+      name: true,
+      customerId: true,
+      customer: { select: { name: true } },
+      tasks: { where: { isDeleted: false }, orderBy: { createdAt: "asc" }, take: 1, select: { id: true, customerId: true, customer: { select: { name: true } } } },
+    },
+  });
+
+  const changes: ProjectCustomerReconcileChange[] = [];
+  for (const b of boards) {
+    const anchorTask = b.tasks[0];
+    if (!anchorTask) continue;
+    if (anchorTask.customerId === b.customerId) continue;
+    changes.push({
+      boardId: b.id,
+      boardName: b.name,
+      boardCustomerBefore: b.customer?.name ?? null,
+      taskCustomerName: anchorTask.customer?.name ?? null,
+    });
+    if (apply) await prisma.board.update({ where: { id: b.id }, data: { customerId: anchorTask.customerId } });
+  }
+
+  return { changes };
+}

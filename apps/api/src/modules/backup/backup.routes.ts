@@ -118,3 +118,28 @@ backupRouter.post(
     return ok(res, result);
   })
 );
+
+// One-off maintenance tool — see reconcileProjectCustomers's own doc comment.
+backupRouter.get(
+  "/reconcile-project-customers",
+  asyncHandler(async (req, res) => {
+    requireSuperAdmin(req);
+    return ok(res, await backupService.reconcileProjectCustomers(false));
+  })
+);
+
+backupRouter.post(
+  "/reconcile-project-customers",
+  asyncHandler(async (req, res) => {
+    requireSuperAdmin(req);
+    const result = await backupService.reconcileProjectCustomers(true);
+    await writeAudit({
+      actor: req.user!,
+      action: AuditAction.EDIT,
+      entityType: "Database",
+      entityId: "reconcile-project-customers",
+      afterValue: { changed: result.changes.length },
+    });
+    return ok(res, result);
+  })
+);

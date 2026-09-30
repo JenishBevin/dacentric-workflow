@@ -88,3 +88,34 @@ export function useApplyProjectStageMigration() {
     mutationFn: async () => (await api.post<{ data: ProjectStageMigrationResult }>("/backup/migrate-project-stages")).data.data,
   });
 }
+
+export interface ProjectCustomerReconcileChange {
+  boardId: string;
+  boardName: string;
+  boardCustomerBefore: string | null;
+  taskCustomerName: string | null;
+}
+export interface ProjectCustomerReconcileResult {
+  changes: ProjectCustomerReconcileChange[];
+}
+
+/** One-off tool: a project's own customer (Projects list, Accounts, Board
+ * Settings, ...) is copied from its anchor task's customer once, at award
+ * time, and wasn't editable on the task itself until this fix shipped — so
+ * any project whose anchor task's customer was since changed some other way
+ * is still showing a stale customer everywhere but the task. This makes the
+ * board match its anchor task. See reconcileProjectCustomers on the backend
+ * for the full story. Not auto-run; only fetches when asked. */
+export function usePreviewProjectCustomerReconcile(enabled: boolean) {
+  return useQuery({
+    queryKey: ["project-customer-reconcile-preview"],
+    queryFn: async () => (await api.get<{ data: ProjectCustomerReconcileResult }>("/backup/reconcile-project-customers")).data.data,
+    enabled,
+  });
+}
+
+export function useApplyProjectCustomerReconcile() {
+  return useMutation({
+    mutationFn: async () => (await api.post<{ data: ProjectCustomerReconcileResult }>("/backup/reconcile-project-customers")).data.data,
+  });
+}

@@ -11,7 +11,7 @@ import { computeDueDateStatus } from "./task-formatting";
 import { formatTaskId, formatProjectId, formatEstimationId, formatEnquiryId, formatProcurementId, AuditAction, TaskApprovalStatus, TaskType, TaskPriority, NotificationEvent, RoleCode, PermissionKey, BoardType } from "@dacentric/types";
 import { getPermissionScope, scopeAtLeast, isSystemLevelAdmin } from "../../common/permissions";
 import { createRecurringSeries, attachTemplateAndScheduleFirst } from "../recurrence/recurrence.service";
-import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard, ACCOUNTS_BOARD_NAME, getOrCreatePersonalBoard } from "../boards/boards.service";
+import { DEFAULT_STAGES, getOrCreateEstimationBoard, ESTIMATION_BOARD_NAME, getOrCreateEnquiryBoard, ACCOUNTS_BOARD_NAME, getOrCreatePersonalBoard, SYSTEM_BOARD_NAMES } from "../boards/boards.service";
 import { nextYearlySequence } from "../../common/sequence";
 import { createCustomer } from "../customers/customers.service";
 
@@ -492,6 +492,27 @@ export async function updateTask(taskId: string, input: Record<string, any>, act
 
   const updated = await prisma.task.update({ where: { id: taskId }, data, include: TASK_DETAIL_INCLUDE as any });
   await clearBoardHighlight(ctx.task.boardId);
+
+  // A Project board's own customer (shown on the Projects list, Accounts
+  // page, Board Settings, etc. — see updateBoard's symmetric sync below) was
+  // copied from its anchor task's customer once, at award time. Left alone,
+  // editing the customer here would silently drift out of sync with every
+  // other place the project's customer is shown. Only the board's anchor
+  // task (same one listAccountsPendingBoards/listProcurementBoards treat as
+  // "the" task representing the project — its oldest) drives this; a later
+  // operational sub-task's own customer field is its own business. System
+  // boards (Enquiry List/Estimation/Accounts/Personal) hold many tasks for
+  // many different customers, so they have no board-level customer to sync.
+  if (changedFields.includes("customerId") && !SYSTEM_BOARD_NAMES.includes(ctx.task.board.name)) {
+    const anchorTask = await prisma.task.findFirst({
+      where: { boardId: ctx.task.boardId, isDeleted: false },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (anchorTask?.id === taskId) {
+      await prisma.board.update({ where: { id: ctx.task.boardId }, data: { customerId: data.customerId } });
+    }
+  }
 
   for (const field of changedFields) {
     await writeAudit({

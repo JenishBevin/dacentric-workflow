@@ -485,6 +485,22 @@ export async function updateBoard(
     },
   });
 
+  // Keep the anchor task's own customer field in sync the same way the
+  // reverse direction does in tasks.service.ts's updateTask — otherwise the
+  // Task Detail Drawer would keep showing whatever customer was here before
+  // this edit, even though everywhere else (Projects list, Accounts, etc.)
+  // now shows the new one.
+  if (input.customerId !== undefined && !SYSTEM_BOARD_NAMES.includes(existing.name)) {
+    const anchorTask = await prisma.task.findFirst({
+      where: { boardId, isDeleted: false },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (anchorTask) {
+      await prisma.task.update({ where: { id: anchorTask.id }, data: { customerId: input.customerId } });
+    }
+  }
+
   await writeAudit({
     actor,
     action: AuditAction.EDIT,

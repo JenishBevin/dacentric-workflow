@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { DatabaseBackup, Download, Upload, AlertTriangle, ShieldAlert, Wrench, Kanban } from "lucide-react";
+import { DatabaseBackup, Download, Upload, AlertTriangle, ShieldAlert, Wrench, Kanban, Building2 } from "lucide-react";
 import {
   downloadBackup,
   useRestoreBackup,
@@ -9,6 +9,9 @@ import {
   usePreviewProjectStageMigration,
   useApplyProjectStageMigration,
   ProjectStageMigrationResult,
+  usePreviewProjectCustomerReconcile,
+  useApplyProjectCustomerReconcile,
+  ProjectCustomerReconcileResult,
 } from "../../api/backup";
 import { Button, EmptyState, Input, Label, Badge } from "../../components/ui/primitives";
 import { Modal } from "../../components/ui/Modal";
@@ -45,6 +48,11 @@ export default function BackupSettingsPage() {
   const { data: stagePreview, isLoading: stagePreviewLoading, refetch: refetchStagePreview } = usePreviewProjectStageMigration(stagePreviewRequested);
   const applyStageMigration = useApplyProjectStageMigration();
   const [stageApplied, setStageApplied] = useState<ProjectStageMigrationResult | null>(null);
+
+  const [customerPreviewRequested, setCustomerPreviewRequested] = useState(false);
+  const { data: customerPreview, isLoading: customerPreviewLoading, refetch: refetchCustomerPreview } = usePreviewProjectCustomerReconcile(customerPreviewRequested);
+  const applyCustomerReconcile = useApplyProjectCustomerReconcile();
+  const [customerApplied, setCustomerApplied] = useState<ProjectCustomerReconcileResult | null>(null);
 
   if (!isSuperAdmin(user)) {
     return (
@@ -113,6 +121,25 @@ export default function BackupSettingsPage() {
       push({ variant: "success", title: `Set ${result.changes.length} project${result.changes.length === 1 ? "" : "s"}' stage.` });
     } catch (err) {
       push({ variant: "error", title: "Could not set project stages", description: extractApiError(err).message });
+    }
+  }
+
+  async function handleCheckCustomers() {
+    setCustomerApplied(null);
+    if (!customerPreviewRequested) {
+      setCustomerPreviewRequested(true);
+    } else {
+      await refetchCustomerPreview();
+    }
+  }
+
+  async function handleApplyCustomerReconcile() {
+    try {
+      const result = await applyCustomerReconcile.mutateAsync();
+      setCustomerApplied(result);
+      push({ variant: "success", title: `Synced ${result.changes.length} project${result.changes.length === 1 ? "" : "s"}' customer.` });
+    } catch (err) {
+      push({ variant: "error", title: "Could not sync project customers", description: extractApiError(err).message });
     }
   }
 
@@ -279,6 +306,62 @@ export default function BackupSettingsPage() {
                         {c.name}
                       </span>
                       <Badge tone={c.stageName.toLowerCase() === "done" ? "green" : "amber"}>{c.stageName}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-teal-600">
+            <Building2 className="h-5 w-5" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-900">Sync project customers</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              A project's own customer (shown on the Projects list, Accounts, Board Settings, ...) is copied from its task
+              once, when it's awarded — editing either side now keeps them in sync, but a task's customer wasn't editable
+              at all until that fix shipped. One-time only: finds every project still showing a different customer than
+              its task and makes the project match the task.
+            </p>
+          </div>
+          <Button variant="outline" onClick={handleCheckCustomers} loading={customerPreviewLoading}>
+            Check projects
+          </Button>
+        </div>
+
+        {customerPreviewRequested && !customerPreviewLoading && customerPreview && (
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            {customerPreview.changes.length === 0 ? (
+              <p className="text-sm text-slate-500">Nothing out of sync — every project's customer already matches its task.</p>
+            ) : (
+              <>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-700">
+                    {customerPreview.changes.length} project{customerPreview.changes.length === 1 ? "" : "s"} out of sync
+                  </p>
+                  {!customerApplied && (
+                    <Button size="sm" loading={applyCustomerReconcile.isPending} onClick={handleApplyCustomerReconcile}>
+                      Sync {customerPreview.changes.length} project{customerPreview.changes.length === 1 ? "" : "s"}
+                    </Button>
+                  )}
+                  {customerApplied && <Badge tone="green">Done</Badge>}
+                </div>
+                <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2 text-xs">
+                  {customerPreview.changes.map((c) => (
+                    <div key={c.boardId} className="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-slate-50">
+                      <span className="min-w-0 flex-1 truncate text-slate-600" title={c.boardName}>
+                        {c.boardName}
+                      </span>
+                      <span className="shrink-0 truncate text-slate-400 line-through" title={c.boardCustomerBefore ?? "No customer"}>
+                        {c.boardCustomerBefore ?? "No customer"}
+                      </span>
+                      <span className="shrink-0 text-slate-400">&rarr;</span>
+                      <Badge tone="green">{c.taskCustomerName ?? "No customer"}</Badge>
                     </div>
                   ))}
                 </div>
