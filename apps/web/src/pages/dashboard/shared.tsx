@@ -187,19 +187,21 @@ export function StatDrillDownModal({ kind, onClose, onOpenTask }: { kind: StatKi
               onClick={() => onOpenTask(t.id)}
               style={{ animationDelay: `${Math.min(idx, 12) * 25}ms` }}
               className={clsx(
-                "animate-fade-in-up flex w-full flex-wrap items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-brand-50/60 sm:flex-nowrap",
+                "animate-fade-in-up flex w-full flex-col gap-1.5 px-3 py-2.5 text-left transition-colors hover:bg-brand-50/60",
                 idx !== 0 && "border-t border-slate-100"
               )}
             >
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0">
                 <span className="mr-1.5 text-xs text-slate-400">{t.taskId}</span>
                 <span className="text-sm font-medium text-slate-800">{t.title}</span>
                 {kind === "PENDING_LOST" && t.lostReason && <p className="mt-0.5 truncate text-xs text-slate-500">"{t.lostReason}"</p>}
               </div>
-              <Badge tone="slate">{t.boardName}</Badge>
-              {t.assignees.length > 0 && <AvatarGroup names={t.assignees.map((a: any) => a.name)} max={3} />}
-              <PriorityBadge priority={t.priority} />
-              {t.dueDate && <DueDateBadge dueDate={t.dueDate} status={t.dueDateStatus} />}
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="slate">{t.boardName}</Badge>
+                {t.assignees.length > 0 && <AvatarGroup names={t.assignees.map((a: any) => a.name)} max={3} />}
+                <PriorityBadge priority={t.priority} />
+                {t.dueDate && <DueDateBadge dueDate={t.dueDate} status={t.dueDateStatus} />}
+              </div>
             </button>
           ))}
         </div>
