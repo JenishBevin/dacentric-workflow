@@ -34,7 +34,16 @@ function dateWindows() {
 
 async function scopedBoardIds(actor: AuthedUser, filters: DashboardFilters) {
   const boardWhere = visibleBoardsWhere(actor);
-  const visibleBoards = await prisma.board.findMany({ where: boardWhere, select: { id: true } });
+  // Completed/archived projects (and their tasks) already live in
+  // Project/Task History — marking a project Complete doesn't retroactively
+  // mark its individual tasks complete, so without this exclusion a task
+  // left overdue inside a finished project would still count here. An
+  // explicit filters.boardId (drilling into one project) is left as-is —
+  // that's a deliberate choice by whoever's looking, not this default scope.
+  const visibleBoards = await prisma.board.findMany({
+    where: filters.boardId ? boardWhere : { ...boardWhere, isCompleted: false, isArchived: false },
+    select: { id: true },
+  });
   const boardIds = filters.boardId ? [filters.boardId] : visibleBoards.map((b) => b.id);
   return { boardWhere, boardIds };
 }
