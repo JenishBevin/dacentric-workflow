@@ -394,7 +394,7 @@ export async function getTaskStatusHistory(taskId: string, actor: AuthedUser) {
 export async function listBoardTasks(
   boardId: string,
   actor: AuthedUser,
-  filters: { assigneeUserId?: string; priority?: string; tagId?: string; search?: string; dueBefore?: Date; dueAfter?: Date }
+  filters: { assigneeUserId?: string; priority?: string; tagId?: string; serviceId?: string; search?: string; dueBefore?: Date; dueAfter?: Date }
 ) {
   const { assertBoardVisible } = await import("../boards/board-access");
   await assertBoardVisible(boardId, actor);
@@ -405,6 +405,7 @@ export async function listBoardTasks(
   if (filters.assigneeUserId) where.assignees = { some: { userId: filters.assigneeUserId } };
   if (filters.priority) where.priority = filters.priority;
   if (filters.tagId) where.tags = { some: { tagId: filters.tagId } };
+  if (filters.serviceId) where.serviceId = filters.serviceId;
   if (filters.search) {
     where.OR = [
       { title: { contains: filters.search, mode: "insensitive" } },

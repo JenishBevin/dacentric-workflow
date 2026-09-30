@@ -47,11 +47,12 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
 tasksRouter.get(
   "/board/:boardId",
   asyncHandler(async (req, res) => {
-    const { assigneeUserId, priority, tagId, search, dueBefore, dueAfter } = req.query as Record<string, string>;
+    const { assigneeUserId, priority, tagId, serviceId, search, dueBefore, dueAfter } = req.query as Record<string, string>;
     const tasks = await tasksService.listBoardTasks(req.params.boardId, req.user!, {
       assigneeUserId,
       priority,
       tagId,
+      serviceId,
       search,
       dueBefore: dueBefore ? new Date(dueBefore) : undefined,
       dueAfter: dueAfter ? new Date(dueAfter) : undefined,

@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload, Trello, PackageSearch, Building2, Landmark } from "lucide-react";
-import { useBoardDetail, useReorderStages, useSetBoardCompleted } from "../../api/boards";
+import { useBoardDetail, useReorderStages, useSetBoardCompleted, useServices } from "../../api/boards";
 import { useBoardTasks, useDuplicateTask, useDeleteTask, useImportEnquiries, useImportEstimations, useBulkDeleteTasks, useBulkMoveTasks } from "../../api/tasks";
 import { downloadExport } from "../../api/misc";
 import { KanbanToolbar } from "../../components/kanban/KanbanToolbar";
@@ -29,6 +29,7 @@ interface Filters {
   search: string;
   assigneeUserId?: string;
   priority?: string;
+  serviceId?: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
   groupBy?: string;
@@ -66,11 +67,13 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: board, isLoading, isError, refetch } = useBoardDetail(boardId);
+  const { data: services } = useServices();
   const [filters, setFilters] = useState<Filters>({ search: "" });
   const { data: tasks, isLoading: tasksLoading } = useBoardTasks(boardId, {
     search: filters.search || undefined,
     assigneeUserId: filters.assigneeUserId,
     priority: filters.priority,
+    serviceId: filters.serviceId,
   });
 
   const [newTaskStageId, setNewTaskStageId] = useState<string | null>(null);
@@ -410,6 +413,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
       <KanbanToolbar
         board={board}
         employees={board.members.map((m: any) => ({ employeeId: m.userId, userId: m.userId, name: m.name, email: "" }))}
+        services={services}
         filters={filters}
         onChange={setFilters}
         onExport={() => downloadExport(`/exports/board/${boardId}`, filters, `${board.name.replace(/\s+/g, "-").toLowerCase()}-export.xlsx`).catch((err) => push({ variant: "error", title: "Export failed", description: extractApiError(err).message }))}

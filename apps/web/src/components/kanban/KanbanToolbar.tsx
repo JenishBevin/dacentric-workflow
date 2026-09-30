@@ -7,6 +7,7 @@ interface Filters {
   search: string;
   assigneeUserId?: string;
   priority?: string;
+  serviceId?: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
   groupBy?: string;
@@ -15,6 +16,7 @@ interface Filters {
 interface Props {
   board: Board;
   employees: EmployeeDirectoryEntry[];
+  services?: { id: string; name: string }[];
   filters: Filters;
   onChange: (f: Filters) => void;
   onExport: () => void;
@@ -26,7 +28,7 @@ interface Props {
   canExport: boolean;
 }
 
-export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onChange, onExport, onOpenMembers, onOpenSettings, onAddStage, canManage, canAddStage, canExport }) => {
+export const KanbanToolbar: React.FC<Props> = ({ board, employees, services, filters, onChange, onExport, onOpenMembers, onOpenSettings, onAddStage, canManage, canAddStage, canExport }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -46,7 +48,7 @@ export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onCh
         </Button>
 
         <div className="hidden items-center gap-2 sm:flex">
-          <FilterControls filters={filters} onChange={onChange} employees={employees} />
+          <FilterControls filters={filters} onChange={onChange} employees={employees} services={services} />
         </div>
 
         <button onClick={onOpenMembers} className="ml-1 hidden sm:block" aria-label="Project members">
@@ -72,7 +74,7 @@ export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onCh
 
       {expanded && (
         <div className="mt-2 flex flex-col gap-2 sm:hidden">
-          <FilterControls filters={filters} onChange={onChange} employees={employees} />
+          <FilterControls filters={filters} onChange={onChange} employees={employees} services={services} />
           <button onClick={onOpenMembers} className="flex items-center gap-2 text-sm text-slate-500">
             <Users className="h-4 w-4" /> {board.members.length} members
           </button>
@@ -82,7 +84,12 @@ export const KanbanToolbar: React.FC<Props> = ({ board, employees, filters, onCh
   );
 };
 
-const FilterControls: React.FC<{ filters: Filters; onChange: (f: Filters) => void; employees?: EmployeeDirectoryEntry[] }> = ({ filters, onChange, employees }) => (
+const FilterControls: React.FC<{
+  filters: Filters;
+  onChange: (f: Filters) => void;
+  employees?: EmployeeDirectoryEntry[];
+  services?: { id: string; name: string }[];
+}> = ({ filters, onChange, employees, services }) => (
   <>
     {employees && employees.length > 0 && (
       <Select value={filters.assigneeUserId ?? ""} onChange={(e) => onChange({ ...filters, assigneeUserId: e.target.value || undefined })} className="!w-36">
@@ -101,6 +108,16 @@ const FilterControls: React.FC<{ filters: Filters; onChange: (f: Filters) => voi
       <option value="HIGH">High</option>
       <option value="URGENT">Urgent</option>
     </Select>
+    {services && services.length > 0 && (
+      <Select value={filters.serviceId ?? ""} onChange={(e) => onChange({ ...filters, serviceId: e.target.value || undefined })} className="!w-36">
+        <option value="">All services</option>
+        {services.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </Select>
+    )}
     <Select value={filters.sortBy ?? ""} onChange={(e) => onChange({ ...filters, sortBy: e.target.value || undefined })} className="!w-40">
       <option value="">Sort: Default</option>
       <option value="dueDate">Sort: Due date</option>
