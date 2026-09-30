@@ -1,6 +1,15 @@
 import React, { useRef, useState } from "react";
-import { DatabaseBackup, Download, Upload, AlertTriangle, ShieldAlert, Wrench } from "lucide-react";
-import { downloadBackup, useRestoreBackup, usePreviewIdCleanup, useApplyIdCleanup, IdCleanupResult } from "../../api/backup";
+import { DatabaseBackup, Download, Upload, AlertTriangle, ShieldAlert, Wrench, Kanban } from "lucide-react";
+import {
+  downloadBackup,
+  useRestoreBackup,
+  usePreviewIdCleanup,
+  useApplyIdCleanup,
+  IdCleanupResult,
+  usePreviewProjectStageMigration,
+  useApplyProjectStageMigration,
+  ProjectStageMigrationResult,
+} from "../../api/backup";
 import { Button, EmptyState, Input, Label, Badge } from "../../components/ui/primitives";
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../context/AuthContext";
@@ -31,6 +40,11 @@ export default function BackupSettingsPage() {
   const { data: preview, isLoading: previewLoading, refetch: refetchPreview } = usePreviewIdCleanup(previewRequested);
   const applyCleanup = useApplyIdCleanup();
   const [applied, setApplied] = useState<IdCleanupResult | null>(null);
+
+  const [stagePreviewRequested, setStagePreviewRequested] = useState(false);
+  const { data: stagePreview, isLoading: stagePreviewLoading, refetch: refetchStagePreview } = usePreviewProjectStageMigration(stagePreviewRequested);
+  const applyStageMigration = useApplyProjectStageMigration();
+  const [stageApplied, setStageApplied] = useState<ProjectStageMigrationResult | null>(null);
 
   if (!isSuperAdmin(user)) {
     return (
@@ -80,6 +94,25 @@ export default function BackupSettingsPage() {
       push({ variant: "success", title: `Fixed ${result.changes.length} id${result.changes.length === 1 ? "" : "s"}.` });
     } catch (err) {
       push({ variant: "error", title: "Could not apply fix", description: extractApiError(err).message });
+    }
+  }
+
+  async function handleCheckStages() {
+    setStageApplied(null);
+    if (!stagePreviewRequested) {
+      setStagePreviewRequested(true);
+    } else {
+      await refetchStagePreview();
+    }
+  }
+
+  async function handleApplyStageMigration() {
+    try {
+      const result = await applyStageMigration.mutateAsync();
+      setStageApplied(result);
+      push({ variant: "success", title: `Set ${result.changes.length} project${result.changes.length === 1 ? "" : "s"}' stage.` });
+    } catch (err) {
+      push({ variant: "error", title: "Could not set project stages", description: extractApiError(err).message });
     }
   }
 
@@ -194,6 +227,58 @@ export default function BackupSettingsPage() {
                       </span>
                       <span className="font-mono text-slate-500">{c.before}</span>
                       <span className="text-red-600">would collide — left as-is</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+            <Kanban className="h-5 w-5" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-900">Set initial project stage</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              The Projects page's own Stage column (Backlog/To Do/In Progress/Done) is separate from a project's own task
+              pipeline — every project that existed before it shipped defaults to "Backlog" regardless of real progress.
+              One-time only: sets it to "Done" for projects whose tasks are all finished, "In Progress" otherwise. Projects
+              with no tasks yet, or a stage you've already set by hand, are left alone.
+            </p>
+          </div>
+          <Button variant="outline" onClick={handleCheckStages} loading={stagePreviewLoading}>
+            Check projects
+          </Button>
+        </div>
+
+        {stagePreviewRequested && !stagePreviewLoading && stagePreview && (
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            {stagePreview.changes.length === 0 ? (
+              <p className="text-sm text-slate-500">Nothing to set — every project already has a stage, or has no tasks yet.</p>
+            ) : (
+              <>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-700">
+                    {stagePreview.changes.length} project{stagePreview.changes.length === 1 ? "" : "s"} will get a stage set
+                  </p>
+                  {!stageApplied && (
+                    <Button size="sm" loading={applyStageMigration.isPending} onClick={handleApplyStageMigration}>
+                      Set {stagePreview.changes.length} project{stagePreview.changes.length === 1 ? "" : "s"}
+                    </Button>
+                  )}
+                  {stageApplied && <Badge tone="green">Done</Badge>}
+                </div>
+                <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2 text-xs">
+                  {stagePreview.changes.map((c, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-slate-50">
+                      <span className="min-w-0 flex-1 truncate text-slate-600" title={c.name}>
+                        {c.name}
+                      </span>
+                      <Badge tone={c.stageName.toLowerCase() === "done" ? "green" : "amber"}>{c.stageName}</Badge>
                     </div>
                   ))}
                 </div>

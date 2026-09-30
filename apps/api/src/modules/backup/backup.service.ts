@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { Errors } from "../../common/errors";
+import { SYSTEM_BOARD_NAMES } from "../boards/boards.service";
 
 // A full logical (row-data) backup of every table Prisma knows about — not
 // a pg_dump. Table order is derived from the schema's own foreign keys at
@@ -215,4 +216,62 @@ export async function cleanUpImportedIds(apply: boolean): Promise<IdCleanupResul
   }
 
   return { changes, conflicts };
+}
+
+export interface ProjectStageMigrationChange {
+  boardId: string;
+  name: string;
+  stageName: string; // the ProjectStage it was (or would be) moved to
+}
+export interface ProjectStageMigrationResult {
+  changes: ProjectStageMigrationChange[];
+}
+
+/**
+ * One-off maintenance tool (Settings -> Backup & Restore -> "Set initial
+ * project stage"): request 1005 added the Projects page's own company-wide
+ * Kanban stage (Backlog/To Do/In Progress/Done, customisable) — a separate,
+ * manually-set field from a project's own task pipeline. Every project that
+ * existed before that feature shipped has projectStageId: null, so it shows
+ * up under "Backlog" on the Projects page regardless of how far along its
+ * actual tasks are — misleading on day one. This is a one-time, best-effort
+ * initializer: for each project that's never had its stage touched
+ * (projectStageId still null), look at its own tasks — if every one sits on
+ * a terminal (Done-type) board stage, move it to the "Done" project stage;
+ * if it has tasks but they're not all finished, move it to "In Progress";
+ * a project with no tasks yet is left alone. Going forward this field stays
+ * a manual label, same as request 1005 always intended — this only backfills
+ * the ones that predate it.
+ */
+export async function migrateProjectStages(apply: boolean): Promise<ProjectStageMigrationResult> {
+  const stages = await prisma.projectStage.findMany({ orderBy: { position: "asc" } });
+  const doneStage = stages.find((s) => s.name.toLowerCase() === "done") ?? stages[stages.length - 1];
+  const inProgressStage = stages.find((s) => s.name.toLowerCase() === "in progress") ?? stages[Math.min(1, stages.length - 1)];
+  if (!doneStage || !inProgressStage) return { changes: [] };
+
+  const boards = await prisma.board.findMany({
+    where: {
+      isDeleted: false,
+      isCompleted: false,
+      isArchived: false,
+      projectStageId: null,
+      name: { notIn: SYSTEM_BOARD_NAMES },
+    },
+    select: {
+      id: true,
+      name: true,
+      tasks: { where: { isDeleted: false }, select: { stage: { select: { isTerminal: true } } } },
+    },
+  });
+
+  const changes: ProjectStageMigrationChange[] = [];
+  for (const b of boards) {
+    if (b.tasks.length === 0) continue; // nothing to infer from — leave at Backlog
+    const allDone = b.tasks.every((t) => t.stage.isTerminal);
+    const target = allDone ? doneStage : inProgressStage;
+    changes.push({ boardId: b.id, name: b.name, stageName: target.name });
+    if (apply) await prisma.board.update({ where: { id: b.id }, data: { projectStageId: target.id } });
+  }
+
+  return { changes };
 }

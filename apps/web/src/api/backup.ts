@@ -61,3 +61,30 @@ export function useApplyIdCleanup() {
     mutationFn: async () => (await api.post<{ data: IdCleanupResult }>("/backup/fix-imported-ids")).data.data,
   });
 }
+
+export interface ProjectStageMigrationChange {
+  boardId: string;
+  name: string;
+  stageName: string;
+}
+export interface ProjectStageMigrationResult {
+  changes: ProjectStageMigrationChange[];
+}
+
+/** One-off tool: sets a sensible initial Projects-page Stage for projects
+ * that predate request 1005 (still unset/"Backlog" by default) based on
+ * whether their own tasks are actually done — see migrateProjectStages on
+ * the backend for the full story. Not auto-run; only fetches when asked. */
+export function usePreviewProjectStageMigration(enabled: boolean) {
+  return useQuery({
+    queryKey: ["project-stage-migration-preview"],
+    queryFn: async () => (await api.get<{ data: ProjectStageMigrationResult }>("/backup/migrate-project-stages")).data.data,
+    enabled,
+  });
+}
+
+export function useApplyProjectStageMigration() {
+  return useMutation({
+    mutationFn: async () => (await api.post<{ data: ProjectStageMigrationResult }>("/backup/migrate-project-stages")).data.data,
+  });
+}

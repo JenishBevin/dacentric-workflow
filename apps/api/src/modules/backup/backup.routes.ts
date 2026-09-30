@@ -93,3 +93,28 @@ backupRouter.post(
     return ok(res, result);
   })
 );
+
+// One-off maintenance tool — see migrateProjectStages's own doc comment.
+backupRouter.get(
+  "/migrate-project-stages",
+  asyncHandler(async (req, res) => {
+    requireSuperAdmin(req);
+    return ok(res, await backupService.migrateProjectStages(false));
+  })
+);
+
+backupRouter.post(
+  "/migrate-project-stages",
+  asyncHandler(async (req, res) => {
+    requireSuperAdmin(req);
+    const result = await backupService.migrateProjectStages(true);
+    await writeAudit({
+      actor: req.user!,
+      action: AuditAction.EDIT,
+      entityType: "Database",
+      entityId: "migrate-project-stages",
+      afterValue: { changed: result.changes.length },
+    });
+    return ok(res, result);
+  })
+);
