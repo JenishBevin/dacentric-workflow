@@ -77,6 +77,8 @@ export interface CurrentUser {
   roles: RoleCode[];
   moduleAccess: ModuleCode[];
   permissions: Record<string, PermissionScope>;
+  // Local-only sidebar/route restriction — see apps/web/src/lib/menuRegistry.ts.
+  restrictedMenuKeys: string[];
   employee: { id: string; fullName: string; departmentId: string | null; jobTitle: string | null } | null;
   hasAvatar: boolean;
   avatarUpdatedAt: string | null;
@@ -218,6 +220,14 @@ export interface TaskStatusHistoryEntry {
   createdAt: string;
 }
 
+export interface ProjectStage {
+  id: string;
+  name: string;
+  color: string;
+  position: number;
+  wipLimit: number | null;
+}
+
 export interface Board {
   id: string;
   boardId: string;
@@ -227,6 +237,9 @@ export interface Board {
   linkedRecord?: { id: string; recordType: LinkedRecordType; name: string; externalRef: string } | null;
   customerId?: string | null;
   customer?: CustomerRef | null;
+  serviceId?: string | null;
+  service?: { id: string; name: string } | null;
+  projectStageId: string | null;
   isArchived: boolean;
   isHighlighted: boolean;
   stageCount: number;

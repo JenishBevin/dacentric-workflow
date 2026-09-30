@@ -21,6 +21,7 @@ import { useAuth } from "../../context/AuthContext";
 import { isSuperAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { RoleCode, ModuleCode } from "../../lib/types";
+import { MENU_REGISTRY, MENU_MODULES } from "../../lib/menuRegistry";
 
 const ROLE_LABELS: Record<RoleCode, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -56,6 +57,7 @@ interface UserRow {
   workEmail: string;
   status: string;
   moduleAccess: ModuleCode[];
+  restrictedMenuKeys?: string[];
   roles: Array<{ role: { code: RoleCode; name: string } }>;
   employee?: { id: string; fullName: string; employeeCode: string } | null;
 }
@@ -374,6 +376,63 @@ function RoleModuleCheckboxes({
   );
 }
 
+/**
+ * Per-user sidebar/route restriction, on top of Roles & Permissions and
+ * Module Access above. Every checkbox is
+ * driven by MENU_REGISTRY, so a new nav item just needs a registry entry to
+ * show up here, nothing else to wire up. Checked = has access; unchecking
+ * every item under a module heading has the same effect as restricting the
+ * whole module (a "Deselect all" link makes that one click).
+ */
+function MenuAccessCheckboxes({ restrictedKeys, setRestrictedKeys }: { restrictedKeys: string[]; setRestrictedKeys: (k: string[]) => void }) {
+  const restricted = new Set(restrictedKeys);
+  function toggle(key: string, allowed: boolean) {
+    const next = new Set(restricted);
+    if (allowed) next.delete(key);
+    else next.add(key);
+    setRestrictedKeys([...next]);
+  }
+  return (
+    <div>
+      <Label>Menu Access</Label>
+      <p className="mb-2 text-xs text-slate-400">Restrict this person from specific menu items, or an entire module at once. Everything is allowed by default.</p>
+      <div className="space-y-3">
+        {MENU_MODULES.map((moduleName) => {
+          const items = MENU_REGISTRY.filter((m) => m.module === moduleName);
+          if (!items.length) return null;
+          const allAllowed = items.every((m) => !restricted.has(m.key));
+          return (
+            <div key={moduleName} className="rounded-lg border border-slate-200 p-2.5">
+              <div className="mb-1.5 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{moduleName}</p>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-brand-600 hover:underline"
+                  onClick={() => {
+                    const next = new Set(restricted);
+                    items.forEach((m) => (allAllowed ? next.add(m.key) : next.delete(m.key)));
+                    setRestrictedKeys([...next]);
+                  }}
+                >
+                  {allAllowed ? "Restrict entire module" : "Allow entire module"}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                {items.map((m) => (
+                  <label key={m.key} className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-slate-700">
+                    <Checkbox checked={!restricted.has(m.key)} onChange={(e) => toggle(m.key, e.target.checked)} />
+                    {m.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const NewUserDrawer: React.FC<{ open: boolean; onClose: () => void; onCreate: ReturnType<typeof useCreateUser> }> = ({ open, onClose, onCreate }) => {
   const { push } = useToast();
   const [name, setName] = useState("");
@@ -528,6 +587,7 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
   const { push } = useToast();
   const [roles, setRoles] = useState<RoleCode[]>(user.roles.map((r) => r.role.code));
   const [modules, setModules] = useState<ModuleCode[]>(user.moduleAccess);
+  const [restrictedMenuKeys, setRestrictedMenuKeys] = useState<string[]>(user.restrictedMenuKeys ?? []);
   const [workEmail, setWorkEmail] = useState(user.workEmail);
   const canEditEmail = isSuperAdmin(actor);
 
@@ -557,6 +617,7 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
                   userId: user.id,
                   roles,
                   moduleAccess: modules,
+                  restrictedMenuKeys,
                   ...(emailChanged ? { workEmail: workEmail.trim() } : {}),
                   ...(employeeChanged ? { employeeId } : {}),
                 });
@@ -627,6 +688,7 @@ const EditUserDrawer: React.FC<{ user: UserRow; onClose: () => void; onUpdate: R
           )}
         </div>
         <RoleModuleCheckboxes roles={roles} setRoles={setRoles} modules={modules} setModules={setModules} />
+        <MenuAccessCheckboxes restrictedKeys={restrictedMenuKeys} setRestrictedKeys={setRestrictedMenuKeys} />
       </div>
     </Drawer>
   );

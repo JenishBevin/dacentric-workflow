@@ -145,6 +145,12 @@ model User {
   lockedUntil         DateTime?
   lastLoginAt         DateTime?
   moduleAccess        ModuleCode[]
+  // Per-user sidebar/route restriction, on top of the role/module permission
+  // system — keys into the frontend's MENU_REGISTRY (apps/web/src/lib/menuRegistry.ts).
+  // Set from Settings -> Users -> Edit -> Menu Access; not enforced as an
+  // API-level security boundary, only hides nav and blocks direct routes,
+  // matching the same enforcement level moduleAccess itself already has today.
+  restrictedMenuKeys  String[]      @default([])
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   createdById         String?
@@ -158,6 +164,7 @@ model User {
   createdTasks         Task[]               @relation("TaskCreatedBy")
   salesTasks           Task[]               @relation("TaskSalesperson")
   followUpTasks        Task[]               @relation("TaskFollowUpAssignee")
+  quotationsCreated    EstimationQuotation[] @relation("QuotationCreatedBy")
   taskAssignments      TaskAssignee[]
   taskWatching         TaskWatcher[]
   comments             Comment[]
@@ -298,6 +305,21 @@ enum BoardType {
   LINKED
 }
 
+// The Projects page's kanban columns (seeded as Backlog / To Do / In Progress
+// / Done, then customisable) — company-wide, and separate from the stages of
+// the tasks inside a project and from being marked completed (History).
+model ProjectStage {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#6366f1")
+  position  Int
+  wipLimit  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  boards Board[]
+}
+
 enum LinkedRecordType {
   CUSTOMER
   LEAD
@@ -362,6 +384,9 @@ model Board {
   service         Service?   @relation(fields: [serviceId], references: [id])
   customerId      String?
   customer        Customer?  @relation(fields: [customerId], references: [id])
+  // Null until first moved: a project with no stage yet shows in the first column.
+  projectStageId  String?
+  projectStage    ProjectStage? @relation(fields: [projectStageId], references: [id])
   isArchived      Boolean    @default(false)
   archivedAt      DateTime?
   // Manually marked once every task on the project is done — moves it out
@@ -1140,6 +1165,60 @@ model EstimationRecord {
   quotedAt          DateTime?
   quotedById        String?
   quotedBy          User?     @relation("EstimationQuotedBy", fields: [quotedById], references: [id])
+
+  // Every saved quotation, newest version last. The quotation fields above
+  // mirror the highest version (kept in sync on every save) so screens that
+  // only need "the current quote" don't have to load this.
+  quotations EstimationQuotation[]
+}
+
+// One saved version of a task's quotation — "Previous quotations" lists these
+// so an earlier one can be reopened and edited instead of starting over.
+// lineItems: [{ description, qty, unit, unitPrice, vendorName?, vendorContact?,
+// buyingCost?, marginPercent? }] — the costing fields (vendor / buying cost /
+// per-line margin) are internal and never leave the quotation endpoints;
+// unitPrice is always the selling price (computed from cost + margin when
+// costingEnabled).
+model EstimationQuotation {
+  id                 String           @id @default(uuid())
+  estimationRecordId String
+  estimationRecord   EstimationRecord @relation(fields: [estimationRecordId], references: [id], onDelete: Cascade)
+  versionNumber      Int
+  // Unique per task (compared case-insensitively in the service) — how a saved quotation is found again
+  // under "Previous quotations". Null only on nothing created by the app; legacy quotes are named "Version 1".
+  name               String?
+
+  currency            String   @default("AED")
+  title               String?
+  quotationRef        String?
+  recipientName       String?
+  recipientCompany    String?
+  recipientLocation   String?
+  lineItems           Json
+  subtotal            Float
+  vatRate             Float    @default(0)
+  vatAmount           Float
+  totalAmount         Float
+  validityDays        Int?     @default(7)
+  paymentTerms        String?
+  notes               String?
+  generalTerms        String?
+  preparerName        String?
+  preparerDesignation String?
+  preparerMobile      String?
+
+  // Costing sheet: when on, each line's selling price is buyingCost plus its
+  // margin (its own marginPercent, else this default) — not typed by hand.
+  costingEnabled Boolean @default(false)
+  marginPercent  Float?
+
+  createdById String?
+  createdBy   User?    @relation("QuotationCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([estimationRecordId, versionNumber])
+  @@unique([estimationRecordId, name])
 }
 
 // Same idea as EstimationRecord, for tasks on the Enquiry List board —

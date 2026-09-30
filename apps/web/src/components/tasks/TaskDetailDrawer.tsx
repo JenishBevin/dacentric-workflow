@@ -21,7 +21,7 @@ import { SecretAttachmentsSection } from "./SecretAttachmentsSection";
 import { DependenciesSection } from "./DependenciesSection";
 import { ActivitySection } from "./ActivitySection";
 import { PriorityBadge, ApprovalStatusBadge } from "../workflow/badges";
-import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask, useAwardTask, useMarkTaskLost, useLostApprovalMutations, useRejectAccountsTask, useSaveEstimationQuote } from "../../api/tasks";
+import { useTask, useUpdateTask, useMoveTask, useSetAssignees, useWatcherMutations, useSetTaskTags, useApprovalMutations, useDuplicateTask, useDeleteTask, useAwardTask, useMarkTaskLost, useLostApprovalMutations, useRejectAccountsTask } from "../../api/tasks";
 import { useBoardDetail, useServices } from "../../api/boards";
 import { useTags, useCreateTag } from "../../api/misc";
 import { useAuth } from "../../context/AuthContext";
@@ -35,25 +35,6 @@ import { FollowUpMoveDialog, FollowUpChoice } from "../kanban/FollowUpMoveDialog
 import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt, Plus, PauseCircle } from "lucide-react";
 import { format } from "date-fns";
 import clsx from "clsx";
-import { useCustomerDetail } from "../../api/customers";
-import { generateQuotationPdf, DEFAULT_PAYMENT_TERMS, DEFAULT_NOTES, DEFAULT_GENERAL_TERMS } from "../../lib/quotationPdf";
-
-interface QuoteLineItemForm {
-  description: string;
-  qty: string;
-  unit: string;
-  unitPrice: string;
-}
-
-function emptyLineItem(): QuoteLineItemForm {
-  return { description: "", qty: "1", unit: "Nos", unitPrice: "" };
-}
-
-// e.g. "QPTS-2026-0006" -> "QPTS/QN/2026-0006" — the quotation's suggested
-// reference number, still editable in the popup before it's saved.
-function defaultQuotationRef(estimationId?: string | null): string {
-  return estimationId ? estimationId.replace(/^QPTS-/, "QPTS/QN/") : "";
-}
 
 // Stage names are editable, so "Submitted" may have been renamed (e.g.
 // "Submitted / Follow-up") — try the exact name, then any name containing
@@ -100,7 +81,6 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
   const awardTask = useAwardTask();
   const markTaskLost = useMarkTaskLost();
   const rejectAccountsTask = useRejectAccountsTask();
-  const saveQuote = useSaveEstimationQuote();
   const { data: allTags } = useTags();
   const createTag = useCreateTag();
 
@@ -119,24 +99,6 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
   const [accountsRejectOpen, setAccountsRejectOpen] = useState(false);
   const [accountsRejectReason, setAccountsRejectReason] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [quotationOpen, setQuotationOpen] = useState(false);
-  const [quoteTitle, setQuoteTitle] = useState("");
-  const [quoteRef, setQuoteRef] = useState("");
-  const [quoteRecipientName, setQuoteRecipientName] = useState("");
-  const [quoteRecipientCompany, setQuoteRecipientCompany] = useState("");
-  const [quoteRecipientLocation, setQuoteRecipientLocation] = useState("");
-  const [quoteCurrency, setQuoteCurrency] = useState("AED");
-  const [quoteVatRate, setQuoteVatRate] = useState("5");
-  const [quoteValidityDays, setQuoteValidityDays] = useState("7");
-  const [quotePaymentTerms, setQuotePaymentTerms] = useState(DEFAULT_PAYMENT_TERMS);
-  const [quoteNotes, setQuoteNotes] = useState(DEFAULT_NOTES);
-  const [quoteGeneralTerms, setQuoteGeneralTerms] = useState(DEFAULT_GENERAL_TERMS);
-  const [quotePreparerName, setQuotePreparerName] = useState("");
-  const [quotePreparerDesignation, setQuotePreparerDesignation] = useState("");
-  const [quotePreparerMobile, setQuotePreparerMobile] = useState("");
-  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItemForm[]>([emptyLineItem()]);
-  const [quoteGenerating, setQuoteGenerating] = useState(false);
-  const { data: quoteCustomer } = useCustomerDetail(task?.customerId ?? undefined);
 
   useEffect(() => {
     if (task) {
@@ -146,6 +108,9 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
   }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canEdit = can(user, "EDIT_TASK") || task?.createdById === user?.id;
+  // Saved quotations with their costing (vendors, buying costs, margins) are internal: Management and admins may review
+  // them to negotiate costs, as may anyone who can edit the task. The API enforces the same rule.
+  const canViewCosting = canEdit || isAdmin(user) || !!user?.roles.includes("MANAGEMENT");
   const canDelete = can(user, "DELETE_TASK");
   const canAssign = can(user, "ASSIGN_TASK");
   const canMove = can(user, "MOVE_TASK");
@@ -187,143 +152,6 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
       } else {
         push({ variant: "error", title: "Could not move task", description: apiErr.message });
       }
-    }
-  }
-
-  function openQuotation() {
-    if (task?.quotation) {
-      setQuoteTitle(task.quotation.title ?? "");
-      setQuoteRef(task.quotation.quotationRef ?? defaultQuotationRef(task.estimationId));
-      setQuoteRecipientName(task.quotation.recipientName ?? "");
-      setQuoteRecipientCompany(task.quotation.recipientCompany ?? "");
-      setQuoteRecipientLocation(task.quotation.recipientLocation ?? "");
-      setQuoteCurrency(task.quotation.currency);
-      setQuoteVatRate(String(task.quotation.vatRate));
-      setQuoteValidityDays(String(task.quotation.validityDays ?? 7));
-      setQuotePaymentTerms(task.quotation.paymentTerms ?? DEFAULT_PAYMENT_TERMS);
-      setQuoteNotes(task.quotation.notes ?? DEFAULT_NOTES);
-      setQuoteGeneralTerms(task.quotation.generalTerms ?? DEFAULT_GENERAL_TERMS);
-      setQuotePreparerName(task.quotation.preparerName ?? user?.name ?? "");
-      setQuotePreparerDesignation(task.quotation.preparerDesignation ?? user?.employee?.jobTitle ?? "");
-      setQuotePreparerMobile(task.quotation.preparerMobile ?? "");
-      setQuoteLineItems(
-        task.quotation.lineItems.length
-          ? task.quotation.lineItems.map((li) => ({ description: li.description, qty: String(li.qty), unit: li.unit, unitPrice: String(li.unitPrice) }))
-          : [emptyLineItem()]
-      );
-    } else {
-      setQuoteTitle("");
-      setQuoteRef(defaultQuotationRef(task?.estimationId));
-      setQuoteRecipientName(quoteCustomer?.mainContactName ?? "");
-      setQuoteRecipientCompany(quoteCustomer?.name ?? "");
-      setQuoteRecipientLocation(quoteCustomer?.city || quoteCustomer?.address || "");
-      setQuoteCurrency("AED");
-      setQuoteVatRate("5");
-      setQuoteValidityDays("7");
-      setQuotePaymentTerms(DEFAULT_PAYMENT_TERMS);
-      setQuoteNotes(DEFAULT_NOTES);
-      setQuoteGeneralTerms(DEFAULT_GENERAL_TERMS);
-      setQuotePreparerName(user?.name ?? "");
-      setQuotePreparerDesignation(user?.employee?.jobTitle ?? "");
-      setQuotePreparerMobile("");
-      setQuoteLineItems([emptyLineItem()]);
-    }
-    setQuotationOpen(true);
-  }
-
-  function handleQuoteCurrencyChange(currency: string) {
-    setQuoteCurrency(currency);
-    setQuoteVatRate(currency === "AED" ? "5" : "0");
-  }
-
-  function updateLineItem(index: number, patch: Partial<QuoteLineItemForm>) {
-    setQuoteLineItems((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  }
-
-  function addLineItem() {
-    setQuoteLineItems((rows) => [...rows, emptyLineItem()]);
-  }
-
-  function removeLineItem(index: number) {
-    setQuoteLineItems((rows) => (rows.length > 1 ? rows.filter((_, i) => i !== index) : rows));
-  }
-
-  const parsedLineItems = quoteLineItems
-    .map((row) => ({ description: row.description.trim(), qty: Number(row.qty), unit: row.unit.trim() || "Nos", unitPrice: Number(row.unitPrice) }))
-    .filter((row) => row.description && Number.isFinite(row.qty) && row.qty > 0 && Number.isFinite(row.unitPrice) && row.unitPrice >= 0);
-
-  const quoteSubtotal = parsedLineItems.reduce((sum, i) => sum + i.qty * i.unitPrice, 0);
-  const quoteVatAmount = (quoteSubtotal * (Number(quoteVatRate) || 0)) / 100;
-  const quoteTotal = quoteSubtotal + quoteVatAmount;
-
-  async function submitQuotation(mode: "with" | "without" | "both" | "preview" = "with", previewWindow?: Window | null) {
-    if (!taskId) return;
-    if (!quoteTitle.trim()) {
-      push({ variant: "error", title: "Enter a title for the proposal." });
-      return;
-    }
-    if (parsedLineItems.length === 0) {
-      push({ variant: "error", title: "Add at least one line item with a description, quantity and unit price." });
-      return;
-    }
-    const vatRate = Number.isNaN(Number(quoteVatRate)) ? 0 : Number(quoteVatRate);
-    const validityDays = Number.isNaN(Number(quoteValidityDays)) || Number(quoteValidityDays) <= 0 ? 7 : Number(quoteValidityDays);
-    setQuoteGenerating(true);
-    try {
-      const quotationRef = quoteRef.trim() || defaultQuotationRef(task?.estimationId);
-      const saved = await saveQuote.mutateAsync({
-        taskId,
-        currency: quoteCurrency,
-        title: quoteTitle.trim(),
-        quotationRef,
-        recipientName: quoteRecipientName.trim() || undefined,
-        recipientCompany: quoteRecipientCompany.trim() || undefined,
-        recipientLocation: quoteRecipientLocation.trim() || undefined,
-        lineItems: parsedLineItems,
-        vatRate,
-        validityDays,
-        paymentTerms: quotePaymentTerms.trim() || undefined,
-        notes: quoteNotes.trim() || undefined,
-        generalTerms: quoteGeneralTerms.trim() || undefined,
-        preparerName: quotePreparerName.trim() || undefined,
-        preparerDesignation: quotePreparerDesignation.trim() || undefined,
-        preparerMobile: quotePreparerMobile.trim() || undefined,
-      });
-      const pdfInput = {
-        refId: quotationRef,
-        projectName: task?.title ?? "",
-        title: quoteTitle.trim(),
-        recipientName: quoteRecipientName.trim(),
-        recipientCompany: quoteRecipientCompany.trim(),
-        recipientLocation: quoteRecipientLocation.trim(),
-        currency: quoteCurrency,
-        lineItems: parsedLineItems,
-        vatRate,
-        subtotal: saved.subtotal,
-        vatAmount: saved.vatAmount ?? 0,
-        totalAmount: saved.totalAmount ?? 0,
-        validityDays,
-        paymentTerms: quotePaymentTerms.trim() || DEFAULT_PAYMENT_TERMS,
-        notes: quoteNotes.trim() || DEFAULT_NOTES,
-        generalTerms: quoteGeneralTerms.trim() || DEFAULT_GENERAL_TERMS,
-        preparerName: quotePreparerName.trim(),
-        preparerDesignation: quotePreparerDesignation.trim(),
-        preparerMobile: quotePreparerMobile.trim(),
-      };
-      if (mode === "preview") {
-        await generateQuotationPdf({ ...pdfInput, hidePrices: false }, { preview: true, previewWindow });
-        push({ variant: "success", title: "Preview opened in a new tab." });
-      } else {
-        if (mode === "with" || mode === "both") await generateQuotationPdf({ ...pdfInput, hidePrices: false });
-        if (mode === "without" || mode === "both") await generateQuotationPdf({ ...pdfInput, hidePrices: true });
-        push({ variant: "success", title: "Quotation downloaded.", description: "Upload the PDF to this task's Attachments below." });
-        setQuotationOpen(false);
-      }
-    } catch (err) {
-      previewWindow?.close(); // don't leave a blank about:blank tab behind if generation failed
-      push({ variant: "error", title: "Could not create quotation", description: extractApiError(err).message });
-    } finally {
-      setQuoteGenerating(false);
     }
   }
 
@@ -737,14 +565,28 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
             </div>
           </section>
 
-          {task.board?.name === "Estimation" && canEdit && (
-            <section className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+          {((task.board?.name === "Estimation" && canEdit) || (task.quotation && canViewCosting)) && (
+            <section className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-3">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                 <Receipt className="h-4 w-4 text-slate-400" /> Quotation
               </p>
-              <Button variant="outline" size="sm" onClick={openQuotation}>
-                Create Quotation
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {task.quotation && canViewCosting && (
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/workflow/tasks/${task.id}/quotations`)}>
+                    View quotations &amp; costing
+                  </Button>
+                )}
+                {task.board?.name === "Estimation" && canEdit && task.quotation && (
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/workflow/tasks/${task.id}/quotation?history=1`)}>
+                    Previous quotations
+                  </Button>
+                )}
+                {task.board?.name === "Estimation" && canEdit && (
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/workflow/tasks/${task.id}/quotation?new=1`)}>
+                    Create Quotation
+                  </Button>
+                )}
+              </div>
             </section>
           )}
 
@@ -1170,221 +1012,6 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
         </div>
       </Modal>
 
-      <Modal
-        open={quotationOpen}
-        onClose={() => setQuotationOpen(false)}
-        title="Create Quotation"
-        description="Fills the company's standard proposal template — download the PDF, then attach it below."
-        size="lg"
-      >
-        <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
-              <Label required>Title</Label>
-              <Input
-                placeholder="e.g. Proposal For Supply and Installation of Server"
-                value={quoteTitle}
-                onChange={(e) => setQuoteTitle(e.target.value)}
-                className="py-2.5"
-              />
-            </div>
-            <div>
-              <Label>Reference No.</Label>
-              <Input placeholder="QPTS/QN/2026-0006" value={quoteRef} onChange={(e) => setQuoteRef(e.target.value)} className="py-2.5" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label>Recipient name</Label>
-              <Input placeholder="Mr. Dilip" value={quoteRecipientName} onChange={(e) => setQuoteRecipientName(e.target.value)} className="py-2.5" />
-            </div>
-            <div>
-              <Label>Recipient company</Label>
-              <Input placeholder="Telal Resort" value={quoteRecipientCompany} onChange={(e) => setQuoteRecipientCompany(e.target.value)} className="py-2.5" />
-            </div>
-            <div>
-              <Label>Location</Label>
-              <Input placeholder="Al Ain" value={quoteRecipientLocation} onChange={(e) => setQuoteRecipientLocation(e.target.value)} className="py-2.5" />
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <Label required>Line items</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
-                <Plus className="h-3.5 w-3.5" /> Add item
-              </Button>
-            </div>
-            <div className="space-y-3">
-              {quoteLineItems.map((row, i) => (
-                <div key={i} className="rounded-lg border border-slate-300 bg-slate-50/60 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500">Item {i + 1}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeLineItem(i)}
-                      disabled={quoteLineItems.length === 1}
-                      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
-                      aria-label="Remove item"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Remove
-                    </button>
-                  </div>
-                  <div className="mt-2">
-                    <Label className="!text-xs">Description</Label>
-                    <textarea
-                      rows={2}
-                      placeholder="Item description"
-                      value={row.description}
-                      onChange={(e) => updateLineItem(i, { description: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:focus-ring"
-                    />
-                  </div>
-                  <div className="mt-2 grid grid-cols-3 gap-3">
-                    <div>
-                      <Label className="!text-xs">Qty</Label>
-                      <Input type="number" min="0" step="1" placeholder="1" value={row.qty} onChange={(e) => updateLineItem(i, { qty: e.target.value })} className="py-2.5" />
-                    </div>
-                    <div>
-                      <Label className="!text-xs">Unit</Label>
-                      <Input placeholder="Nos" value={row.unit} onChange={(e) => updateLineItem(i, { unit: e.target.value })} className="py-2.5" />
-                    </div>
-                    <div>
-                      <Label className="!text-xs">Unit price</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={row.unitPrice}
-                        onChange={(e) => updateLineItem(i, { unitPrice: e.target.value })}
-                        className="py-2.5"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label>Currency</Label>
-              <Select value={quoteCurrency} onChange={(e) => handleQuoteCurrencyChange(e.target.value)} className="py-2.5">
-                <option value="AED">AED</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="SAR">SAR</option>
-              </Select>
-            </div>
-            <div>
-              <Label>VAT %</Label>
-              <Input type="number" min="0" max="100" step="0.01" value={quoteVatRate} onChange={(e) => setQuoteVatRate(e.target.value)} className="py-2.5" />
-            </div>
-            <div>
-              <Label>Offer validity (days)</Label>
-              <Input type="number" min="1" step="1" value={quoteValidityDays} onChange={(e) => setQuoteValidityDays(e.target.value)} className="py-2.5" />
-            </div>
-          </div>
-
-          <div>
-            <Label>Payment terms</Label>
-            <textarea
-              rows={2}
-              value={quotePaymentTerms}
-              onChange={(e) => setQuotePaymentTerms(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus-visible:focus-ring"
-            />
-            <p className="mt-1 text-[11px] text-slate-400">One line per item.</p>
-          </div>
-
-          <div>
-            <Label>Notes</Label>
-            <textarea
-              rows={3}
-              value={quoteNotes}
-              onChange={(e) => setQuoteNotes(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus-visible:focus-ring"
-            />
-            <p className="mt-1 text-[11px] text-slate-400">One line per item — numbered automatically.</p>
-          </div>
-
-          <div>
-            <Label>General Terms and Conditions</Label>
-            <textarea
-              rows={5}
-              value={quoteGeneralTerms}
-              onChange={(e) => setQuoteGeneralTerms(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus-visible:focus-ring"
-            />
-            <p className="mt-1 text-[11px] text-slate-400">One line per item — numbered automatically.</p>
-          </div>
-
-          <div>
-            <Label className="!mb-2">Thanks &amp; Regards</Label>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label className="!text-xs">Name</Label>
-                <Input placeholder="Preparer name" value={quotePreparerName} onChange={(e) => setQuotePreparerName(e.target.value)} className="py-2.5" />
-              </div>
-              <div>
-                <Label className="!text-xs">Designation</Label>
-                <Input placeholder="Assistant Manager" value={quotePreparerDesignation} onChange={(e) => setQuotePreparerDesignation(e.target.value)} className="py-2.5" />
-              </div>
-              <div>
-                <Label className="!text-xs">Mobile</Label>
-                <Input placeholder="+971 5xxxxxxxx" value={quotePreparerMobile} onChange={(e) => setQuotePreparerMobile(e.target.value)} className="py-2.5" />
-              </div>
-            </div>
-          </div>
-
-          {parsedLineItems.length > 0 && (
-            <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-              {quoteCurrency} {quoteSubtotal.toLocaleString()}
-              {Number(quoteVatRate) > 0 && (
-                <>
-                  {" "}
-                  + {quoteVatRate}% VAT ({quoteCurrency} {quoteVatAmount.toLocaleString()})
-                </>
-              )}
-              {" = "}
-              <span className="font-semibold">
-                {quoteCurrency} {quoteTotal.toLocaleString()}
-              </span>
-            </p>
-          )}
-
-          <div className="flex flex-wrap justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setQuotationOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                // Must open synchronously in this click handler — opening it
-                // later (after the awaits inside submitQuotation) is past
-                // the window most browsers allow for a user-gesture popup.
-                const win = window.open("", "_blank");
-                submitQuotation("preview", win);
-              }}
-              loading={saveQuote.isPending || quoteGenerating}
-            >
-              Preview
-            </Button>
-            <Button variant="outline" onClick={() => submitQuotation("without")} loading={saveQuote.isPending || quoteGenerating}>
-              Download without Price
-            </Button>
-            <Button variant="outline" onClick={() => submitQuotation("both")} loading={saveQuote.isPending || quoteGenerating}>
-              Download Both
-            </Button>
-            <Button onClick={() => submitQuotation("with")} loading={saveQuote.isPending || quoteGenerating}>
-              Download with Price
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </Drawer>
   );
 };

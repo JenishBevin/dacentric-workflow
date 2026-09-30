@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Spinner } from "./components/ui/primitives";
@@ -15,7 +15,11 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const CrmDashboardPage = lazy(() => import("./pages/dashboard/CrmDashboardPage"));
 const HrmsDashboardPage = lazy(() => import("./pages/dashboard/HrmsDashboardPage"));
 const BoardsListPage = lazy(() => import("./pages/boards/BoardsListPage"));
-const ServiceProjectsPage = lazy(() => import("./pages/boards/ServiceProjectsPage"));
+// Old per-service page: the Projects page now filters by service itself, so bookmarks/links land there.
+function ServiceProjectsRedirect() {
+  const { serviceId } = useParams<{ serviceId: string }>();
+  return <Navigate to={`/workflow/boards?service=${serviceId ?? ""}`} replace />;
+}
 const BoardKanbanPage = lazy(() => import("./pages/boards/BoardKanbanPage"));
 const EnquiryListPage = lazy(() => import("./pages/boards/EnquiryListPage"));
 const EstimationPage = lazy(() => import("./pages/boards/EstimationPage"));
@@ -24,6 +28,8 @@ const ProcurementListPage = lazy(() => import("./pages/procurement/ProcurementLi
 const MyTasksPage = lazy(() => import("./pages/MyTasksPage"));
 const TeamWorkloadPage = lazy(() => import("./pages/TeamWorkloadPage"));
 const FollowUpWorkloadPage = lazy(() => import("./pages/FollowUpWorkloadPage"));
+const QuotationEditorPage = lazy(() => import("./pages/tasks/QuotationEditorPage"));
+const QuotationViewerPage = lazy(() => import("./pages/tasks/QuotationViewerPage"));
 const TimeLogsPage = lazy(() => import("./pages/TimeLogsPage"));
 const RecentActivityPage = lazy(() => import("./pages/RecentActivityPage"));
 const HistoryPage = lazy(() => import("./pages/HistoryPage"));
@@ -83,7 +89,7 @@ export default function App() {
           {isLocalhost && <Route path="/crm" element={<CrmDashboardPage />} />}
           {isLocalhost && <Route path="/hrms" element={<HrmsDashboardPage />} />}
           <Route path="/workflow/boards" element={<BoardsListPage />} />
-          <Route path="/workflow/boards/service/:serviceId" element={<ServiceProjectsPage />} />
+          <Route path="/workflow/boards/service/:serviceId" element={<ServiceProjectsRedirect />} />
           <Route path="/workflow/boards/:boardId" element={<BoardKanbanPage />} />
           <Route path="/workflow/enquiries" element={<EnquiryListPage />} />
           <Route path="/workflow/estimation" element={<EstimationPage />} />
@@ -96,6 +102,8 @@ export default function App() {
           <Route path="/workflow/my-tasks" element={<MyTasksPage />} />
           <Route path="/workflow/team" element={<TeamWorkloadPage />} />
           <Route path="/workflow/follow-ups" element={<FollowUpWorkloadPage />} />
+          <Route path="/workflow/tasks/:taskId/quotation" element={<QuotationEditorPage />} />
+          <Route path="/workflow/tasks/:taskId/quotations" element={<QuotationViewerPage />} />
           <Route path="/workflow/time-logs" element={<TimeLogsPage />} />
           <Route path="/workflow/activity" element={<RecentActivityPage />} />
           <Route path="/workflow/history" element={<HistoryPage />} />

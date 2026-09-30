@@ -8,6 +8,7 @@ import { RoleCode } from "@dacentric/types";
 import * as tasksService from "./tasks.service";
 import * as checklistService from "./checklist.service";
 import * as commentsService from "./comments.service";
+import * as quotationsService from "./quotations.service";
 import * as attachmentsService from "./attachments.service";
 import * as secretAttachmentsService from "./secret-attachments.service";
 import * as watchersService from "./watchers.service";
@@ -201,12 +202,44 @@ tasksRouter.post(
   asyncHandler(async (req, res) => ok(res, await tasksService.awardTask(req.params.taskId, req.user!)))
 );
 
-// The "Create Quotation" popup on an Estimation-board task.
-tasksRouter.put(
-  "/:taskId/quotation",
+// Quotations on an Estimation-board task: every saved version (so an earlier one can be reopened and
+// edited), plus the internal costing sheet. Creating/editing needs edit rights on the task; viewing (incl. costing)
+// is limited in the service to Management, admins and task editors — costing is internal.
+tasksRouter.get(
+  "/:taskId/quotations",
+  requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await quotationsService.listQuotations(req.params.taskId, req.user!)))
+);
+
+tasksRouter.post(
+  "/:taskId/quotations",
   requirePermission(PermissionKey.EDIT_TASK, "OWN"),
   validate(saveEstimationQuoteSchema),
-  asyncHandler(async (req, res) => ok(res, await tasksService.saveEstimationQuote(req.params.taskId, (req as any).validatedBody, req.user!)))
+  asyncHandler(async (req, res) => created(res, await quotationsService.createQuotation(req.params.taskId, (req as any).validatedBody, req.user!)))
+);
+
+tasksRouter.get(
+  "/:taskId/quotations/:quotationId",
+  requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
+  asyncHandler(async (req, res) => ok(res, await quotationsService.getQuotation(req.params.taskId, req.params.quotationId, req.user!)))
+);
+
+tasksRouter.put(
+  "/:taskId/quotations/:quotationId",
+  requirePermission(PermissionKey.EDIT_TASK, "OWN"),
+  validate(saveEstimationQuoteSchema),
+  asyncHandler(async (req, res) => ok(res, await quotationsService.updateQuotation(req.params.taskId, req.params.quotationId, (req as any).validatedBody, req.user!)))
+);
+
+tasksRouter.get(
+  "/:taskId/quotations/:quotationId/costing-sheet",
+  requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
+  asyncHandler(async (req, res) => {
+    const { buffer, filename } = await quotationsService.buildCostingSheet(req.params.taskId, req.params.quotationId, req.user!);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  })
 );
 
 // The "Lost" action on an enquiry, the counterpart to "Qualified"/"Awarded".

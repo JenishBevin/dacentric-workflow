@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/apiClient";
-import { Board, BoardStage } from "../lib/types";
+import { Board, BoardStage, ProjectStage } from "../lib/types";
 
-export function useBoards(params: { search?: string; scope?: string; serviceId?: string }) {
+export function useBoards(params: { search?: string; scope?: string; serviceId?: string; projectsOnly?: boolean }) {
   return useQuery({
     queryKey: ["boards", params],
     queryFn: async () => (await api.get<{ data: Board[] }>("/boards", { params })).data.data,
@@ -187,6 +187,62 @@ export function useArchiveBoard() {
     mutationFn: async ({ boardId, archived }: { boardId: string; archived: boolean }) =>
       (await api.post(`/boards/${boardId}/archive`, { archived })).data.data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["boards"] }),
+  });
+}
+
+/** The Projects page's kanban columns (company-wide, customisable). */
+export function useProjectStages() {
+  return useQuery({
+    queryKey: ["project-stages"],
+    queryFn: async () => (await api.get<{ data: ProjectStage[] }>("/boards/project-stages")).data.data,
+  });
+}
+
+function invalidateProjectStages(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["project-stages"] });
+  qc.invalidateQueries({ queryKey: ["boards"] });
+}
+
+export function useAddProjectStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { name: string; color?: string; wipLimit?: number | null }) => (await api.post("/boards/project-stages", payload)).data.data,
+    onSuccess: () => invalidateProjectStages(qc),
+  });
+}
+
+export function useUpdateProjectStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ stageId, ...payload }: { stageId: string; name?: string; color?: string; wipLimit?: number | null }) =>
+      (await api.patch(`/boards/project-stages/${stageId}`, payload)).data.data,
+    onSuccess: () => invalidateProjectStages(qc),
+  });
+}
+
+export function useDeleteProjectStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (stageId: string) => (await api.delete(`/boards/project-stages/${stageId}`)).data.data,
+    onSuccess: () => invalidateProjectStages(qc),
+  });
+}
+
+export function useReorderProjectStages() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderedStageIds: string[]) => (await api.post("/boards/project-stages/reorder", { orderedStageIds })).data.data,
+    onSuccess: () => invalidateProjectStages(qc),
+  });
+}
+
+export function useSetProjectStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ boardId, stageId, confirmWipOverride }: { boardId: string; stageId: string; confirmWipOverride?: boolean }) =>
+      (await api.post(`/boards/${boardId}/stage`, { stageId, confirmWipOverride })).data.data,
+    // Refetch on failure too, so the kanban snaps back to the server's real column.
+    onSettled: () => qc.invalidateQueries({ queryKey: ["boards"] }),
   });
 }
 

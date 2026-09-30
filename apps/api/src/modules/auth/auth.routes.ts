@@ -154,6 +154,7 @@ authRouter.get(
       roles: req.user!.roles,
       moduleAccess: req.user!.moduleAccess,
       permissions: req.user!.permissions,
+      restrictedMenuKeys: user?.restrictedMenuKeys ?? [],
       employee: user?.employee ?? null,
       hasAvatar: !!user?.avatarStorageKey,
       // Cache-busts the header/profile avatar <img> after an upload — bumps

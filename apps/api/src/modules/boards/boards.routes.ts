@@ -31,8 +31,8 @@ boardsRouter.get(
   "/",
   requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
   asyncHandler(async (req, res) => {
-    const { search, scope, serviceId } = req.query as Record<string, string>;
-    const boards = await boardsService.listBoards(req.user!, { search, scope: scope as any, serviceId });
+    const { search, scope, serviceId, projectsOnly } = req.query as Record<string, string>;
+    const boards = await boardsService.listBoards(req.user!, { search, scope: scope as any, serviceId, projectsOnly: projectsOnly === "true" });
     return ok(res, boards);
   })
 );
@@ -64,6 +64,49 @@ boardsRouter.post(
   asyncHandler(async (req, res) => {
     const { boardIds, archived } = (req as any).validatedBody;
     return ok(res, await boardsService.bulkArchiveBoards(boardIds, archived, req.user!));
+  })
+);
+
+// --- Project stages (the Projects page's kanban columns) ---
+// Must come before "/:boardId" so "project-stages" isn't captured as a boardId.
+const projectStageBody = z.object({
+  name: z.string().trim().min(1).max(60),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  wipLimit: z.number().int().positive().nullable().optional(),
+});
+
+boardsRouter.get(
+  "/project-stages",
+  requirePermission(PermissionKey.VIEW_WORKFLOW, "OWN"),
+  asyncHandler(async (_req, res) => ok(res, await boardsService.listProjectStages()))
+);
+
+boardsRouter.post(
+  "/project-stages",
+  validate(projectStageBody),
+  asyncHandler(async (req, res) => created(res, await boardsService.addProjectStage((req as any).validatedBody, req.user!)))
+);
+
+boardsRouter.post(
+  "/project-stages/reorder",
+  validate(z.object({ orderedStageIds: z.array(z.string().uuid()).min(1) })),
+  asyncHandler(async (req, res) => {
+    await boardsService.reorderProjectStages((req as any).validatedBody.orderedStageIds, req.user!);
+    return ok(res, { message: "Stages reordered." });
+  })
+);
+
+boardsRouter.patch(
+  "/project-stages/:stageId",
+  validate(projectStageBody.partial()),
+  asyncHandler(async (req, res) => ok(res, await boardsService.updateProjectStage(req.params.stageId, (req as any).validatedBody, req.user!)))
+);
+
+boardsRouter.delete(
+  "/project-stages/:stageId",
+  asyncHandler(async (req, res) => {
+    await boardsService.deleteProjectStage(req.params.stageId, req.user!);
+    return ok(res, { message: "Stage deleted." });
   })
 );
 
@@ -145,6 +188,15 @@ boardsRouter.post(
   "/:boardId/archive",
   validate(z.object({ archived: z.boolean() })),
   asyncHandler(async (req, res) => ok(res, await boardsService.archiveBoard(req.params.boardId, (req as any).validatedBody.archived, req.user!)))
+);
+
+boardsRouter.post(
+  "/:boardId/stage",
+  validate(z.object({ stageId: z.string().uuid(), confirmWipOverride: z.boolean().optional() })),
+  asyncHandler(async (req, res) => {
+    const { stageId, confirmWipOverride } = (req as any).validatedBody;
+    return ok(res, await boardsService.setProjectStage(req.params.boardId, stageId, req.user!, confirmWipOverride));
+  })
 );
 
 boardsRouter.post(

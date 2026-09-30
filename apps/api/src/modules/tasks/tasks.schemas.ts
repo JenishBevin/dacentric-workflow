@@ -129,9 +129,19 @@ export const quotationLineItemSchema = z.object({
   qty: z.number().positive(),
   unit: z.string().trim().min(1).max(20),
   unitPrice: z.number().nonnegative(),
+  // Costing sheet (internal): who supplies it, what it costs us, and this line's own margin over the default.
+  vendorName: z.string().trim().max(200).optional(),
+  vendorContact: z.string().trim().max(300).optional(),
+  buyingCost: z.number().nonnegative().optional(),
+  marginPercent: z.number().min(0).max(1000).optional(),
+  priceMode: z.enum(["MARGIN", "PRICE"]).optional(),
 });
 
 export const saveEstimationQuoteSchema = z.object({
+  // Required when saving a new quotation (checked in createQuotation); optional when saving changes to one.
+  name: z.string().trim().min(1, "Give the quotation a name.").max(80, "Keep the name under 80 characters.").optional(),
+  costingEnabled: z.boolean().optional(),
+  marginPercent: z.number().min(0).max(1000).nullable().optional(),
   currency: z.string().min(1).max(10),
   title: z.string().trim().max(200).optional(),
   quotationRef: z.string().trim().max(100).optional(),

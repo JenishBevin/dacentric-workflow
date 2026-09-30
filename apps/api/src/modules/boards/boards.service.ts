@@ -3,7 +3,7 @@ import { Errors } from "../../common/errors";
 import { writeAudit } from "../../common/audit";
 import { AuthedUser } from "../../middleware/authenticate";
 import { getBoardRole, assertBoardVisible, assertCanEditBoard, assertIsBoardOwnerOrAdmin, visibleBoardsWhere } from "./board-access";
-import { getPermissionScope, scopeAtLeast } from "../../common/permissions";
+import { getPermissionScope, scopeAtLeast, isSystemLevelAdmin } from "../../common/permissions";
 import { AuditAction, BoardType, RoleCode, PermissionKey, formatProjectId } from "@dacentric/types";
 import { nextYearlySequence } from "../../common/sequence";
 import { clearBoardHighlight } from "../../common/highlight";
@@ -30,12 +30,18 @@ export interface CreateBoardInput {
 
 export async function listBoards(
   user: AuthedUser,
-  filters: { search?: string; scope?: "MY" | "ALL" | "LINKED" | "ARCHIVED"; serviceId?: string }
+  filters: { search?: string; scope?: "MY" | "ALL" | "LINKED" | "ARCHIVED"; serviceId?: string; projectsOnly?: boolean }
 ) {
   const base = visibleBoardsWhere(user);
   // Completed projects have moved to Project/Task History — they never show
   // up in the regular Projects browsing view, archived or not.
   const where: any = { ...base, isCompleted: false };
+
+  // Enquiry List, Estimation, Accounts and each user's Personal Tasks board
+  // are system boards, not "Projects" — the Projects page opts out of them.
+  if (filters.projectsOnly) {
+    where.name = { notIn: SYSTEM_BOARD_NAMES };
+  }
 
   if (filters.scope === "ARCHIVED") {
     where.isArchived = true;
@@ -69,6 +75,7 @@ export async function listBoards(
       members: { include: { user: true } },
       linkedRecord: true,
       customer: { select: { id: true, customerId: true, name: true } },
+      service: { select: { id: true, name: true } },
       _count: { select: { tasks: true } },
     },
     orderBy: { updatedAt: "desc" },
@@ -87,6 +94,8 @@ export async function listBoards(
   });
   const openMap = new Map(openCounts.map((c) => [c.boardId, c._count._all]));
   const overdueMap = new Map(overdueCounts.map((c) => [c.boardId, c._count._all]));
+  // A project that has never been moved sits in the first kanban column.
+  const firstProjectStageId = (await listProjectStages())[0]?.id ?? null;
 
   return boards.map((b) => ({
     id: b.id,
@@ -97,6 +106,9 @@ export async function listBoards(
     linkedRecord: b.linkedRecord,
     customerId: b.customerId,
     customer: (b as any).customer ?? null,
+    serviceId: b.serviceId,
+    service: b.service,
+    projectStageId: b.projectStageId ?? firstProjectStageId,
     isArchived: b.isArchived,
     isHighlighted: b.isHighlighted,
     stageCount: b.stages.length,
@@ -562,6 +574,139 @@ export async function archiveBoard(boardId: string, archived: boolean, actor: Au
 /** Marks the whole project done and moves it out of the active Projects
  *  view into Project/Task History — no per-task completion is required by
  *  the system; the Owner/Admin decides when every task is actually done. */
+// ---------------------------------------------------------------------------
+// Project stages — the Projects page's kanban columns. Company-wide (not per
+// project), seeded on first use, then customised like any board's stages:
+// rename / colour / WIP limit / reorder / delete by an admin, add by Super Admin.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_PROJECT_STAGES = [
+  { name: "Backlog", color: "#94a3b8" },
+  { name: "To Do", color: "#60a5fa" },
+  { name: "In Progress", color: "#f59e0b" },
+  { name: "Done", color: "#22c55e" },
+];
+
+export async function listProjectStages() {
+  const existing = await prisma.projectStage.findMany({ orderBy: { position: "asc" } });
+  if (existing.length > 0) return existing;
+  // skipDuplicates + the unique constraint on `name` make this safe against
+  // two near-simultaneous first-ever calls both seeing an empty table and
+  // both trying to seed the defaults — without it, that race used to insert
+  // every default stage twice.
+  await prisma.projectStage.createMany({ data: DEFAULT_PROJECT_STAGES.map((s, position) => ({ ...s, position })), skipDuplicates: true });
+  return prisma.projectStage.findMany({ orderBy: { position: "asc" } });
+}
+
+function assertCanConfigureProjectStages(actor: AuthedUser) {
+  if (!isSystemLevelAdmin(actor.roles)) throw Errors.forbidden("Only an Administrator can change the project stages.");
+}
+
+/** Projects currently sitting in a stage — a project with no stage of its own counts as being in the first one. */
+async function countProjectsInStage(stageId: string, firstStageId: string) {
+  return prisma.board.count({
+    where: {
+      isDeleted: false,
+      isCompleted: false,
+      isArchived: false,
+      name: { notIn: SYSTEM_BOARD_NAMES },
+      serviceId: { not: null },
+      OR: [{ projectStageId: stageId }, ...(stageId === firstStageId ? [{ projectStageId: null }] : [])],
+    },
+  });
+}
+
+export async function addProjectStage(input: { name: string; color?: string; wipLimit?: number | null }, actor: AuthedUser) {
+  if (!actor.roles.includes(RoleCode.SUPER_ADMIN)) throw Errors.forbidden("Only a Super Admin can add a stage.");
+  const stages = await listProjectStages();
+  if (stages.some((s) => s.name.toLowerCase() === input.name.trim().toLowerCase())) {
+    throw Errors.conflict(`A stage named "${input.name.trim()}" already exists.`);
+  }
+  const stage = await prisma.projectStage.create({
+    data: { name: input.name.trim(), color: input.color ?? "#6366f1", wipLimit: input.wipLimit ?? null, position: stages.length },
+  });
+  await writeAudit({ actor, action: AuditAction.CREATE, entityType: "ProjectStage", entityId: stage.id, afterValue: input });
+  return stage;
+}
+
+export async function updateProjectStage(stageId: string, input: { name?: string; color?: string; wipLimit?: number | null }, actor: AuthedUser) {
+  assertCanConfigureProjectStages(actor);
+  const before = await prisma.projectStage.findUnique({ where: { id: stageId } });
+  if (!before) throw Errors.notFound("Project stage");
+  if (input.name) {
+    const collision = await prisma.projectStage.findFirst({ where: { id: { not: stageId }, name: { equals: input.name.trim(), mode: "insensitive" } } });
+    if (collision) throw Errors.conflict(`A stage named "${input.name.trim()}" already exists.`);
+    input = { ...input, name: input.name.trim() };
+  }
+  const stage = await prisma.projectStage.update({ where: { id: stageId }, data: input });
+  await writeAudit({ actor, action: AuditAction.EDIT, entityType: "ProjectStage", entityId: stageId, beforeValue: before, afterValue: input });
+  return stage;
+}
+
+export async function deleteProjectStage(stageId: string, actor: AuthedUser) {
+  assertCanConfigureProjectStages(actor);
+  const stages = await listProjectStages();
+  const target = stages.find((s) => s.id === stageId);
+  if (!target) throw Errors.notFound("Project stage");
+  if (stages.length <= 1) throw Errors.conflict("There must always be at least one project stage.");
+
+  const inStage = await countProjectsInStage(stageId, stages[0].id);
+  if (inStage > 0) {
+    throw Errors.conflict(`This stage still has ${inStage} project(s). Move them to another stage before deleting it.`);
+  }
+  // Archived/completed projects still point at it, but aren't shown on the kanban — re-home them.
+  await prisma.board.updateMany({ where: { projectStageId: stageId }, data: { projectStageId: null } });
+  await prisma.projectStage.delete({ where: { id: stageId } });
+  await prisma.$transaction(
+    stages
+      .filter((s) => s.id !== stageId)
+      .map((s, position) => prisma.projectStage.update({ where: { id: s.id }, data: { position } }))
+  );
+  await writeAudit({ actor, action: AuditAction.DELETE, entityType: "ProjectStage", entityId: stageId, beforeValue: target });
+}
+
+export async function reorderProjectStages(orderedStageIds: string[], actor: AuthedUser) {
+  assertCanConfigureProjectStages(actor);
+  await prisma.$transaction(orderedStageIds.map((id, position) => prisma.projectStage.update({ where: { id }, data: { position } })));
+  await writeAudit({ actor, action: AuditAction.EDIT, entityType: "ProjectStage", entityId: "all", field: "order", afterValue: orderedStageIds });
+}
+
+/** Moves a Project between the Projects page's kanban columns. Board Owners/Editors only — the same bar
+ *  as other project edits. Like task boards, a full column asks for confirmation (confirmWipOverride). */
+export async function setProjectStage(boardId: string, stageId: string, actor: AuthedUser, confirmWipOverride = false) {
+  const role = await assertBoardVisible(boardId, actor);
+  assertCanEditBoard(role, actor);
+
+  const stages = await listProjectStages();
+  const target = stages.find((s) => s.id === stageId);
+  if (!target) throw Errors.badRequest("That project stage does not exist.");
+
+  const before = await prisma.board.findUniqueOrThrow({ where: { id: boardId }, select: { projectStageId: true } });
+  const currentId = before.projectStageId ?? stages[0].id;
+  if (currentId === stageId) return { id: boardId, projectStageId: stageId };
+
+  if (target.wipLimit) {
+    const count = await countProjectsInStage(stageId, stages[0].id);
+    if (count >= target.wipLimit && !confirmWipOverride) {
+      throw Errors.conflict(`"${target.name}" is at its WIP limit (${target.wipLimit}). Confirm to move the project anyway.`);
+    }
+  }
+
+  await prisma.board.update({ where: { id: boardId }, data: { projectStageId: stageId, version: { increment: 1 } } });
+  await writeAudit({
+    actor,
+    action: AuditAction.MOVE,
+    entityType: "Board",
+    entityId: boardId,
+    boardId,
+    field: "projectStage",
+    beforeValue: stages.find((s) => s.id === currentId)?.name,
+    afterValue: target.name,
+  });
+  await clearBoardHighlight(boardId);
+  return { id: boardId, projectStageId: stageId };
+}
+
 export async function setBoardCompleted(boardId: string, completed: boolean, actor: AuthedUser) {
   const role = await assertBoardVisible(boardId, actor);
   assertIsBoardOwnerOrAdmin(role, actor);

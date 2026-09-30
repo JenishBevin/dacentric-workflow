@@ -52,6 +52,9 @@ export const updateUserSchema = z.object({
   // exist in HRMS yet at import time. The DB's unique constraint on
   // User.employeeId rejects linking an employee already claimed by someone else.
   employeeId: z.string().uuid().optional().nullable(),
+  // Sidebar/route restriction on top of Roles & Permissions — see the
+  // restrictedMenuKeys field comment on the User model.
+  restrictedMenuKeys: z.array(z.string()).optional(),
 });
 
 export const createEmployeeSchema = z.object({

@@ -179,32 +179,18 @@ export interface QuotationLineItemInput {
   qty: number;
   unit: string;
   unitPrice: number;
+  // Costing sheet (internal) — vendor, what we pay, and this line's own margin over the default.
+  vendorName?: string;
+  vendorContact?: string;
+  buyingCost?: number;
+  marginPercent?: number;
+  /** MARGIN: price = cost + margin %; PRICE: the selling price was typed and the margin % is derived from it. */
+  priceMode?: "MARGIN" | "PRICE";
 }
 
-export interface EstimationQuote {
-  currency: string;
-  title: string | null;
-  quotationRef: string | null;
-  recipientName: string | null;
-  recipientCompany: string | null;
-  recipientLocation: string | null;
-  lineItems: QuotationLineItemInput[];
-  subtotal: number;
-  vatRate: number;
-  vatAmount: number | null;
-  totalAmount: number | null;
-  validityDays: number | null;
-  paymentTerms: string | null;
-  notes: string | null;
-  generalTerms: string | null;
-  preparerName: string | null;
-  preparerDesignation: string | null;
-  preparerMobile: string | null;
-  quotedAt: string | null;
-}
-
-export interface SaveEstimationQuoteInput {
-  taskId: string;
+export interface SaveQuotationInput {
+  /** Unique per task; required when saving a new quotation, optional (a rename) when saving changes. */
+  name?: string;
   currency: string;
   title?: string;
   quotationRef?: string;
@@ -220,18 +206,92 @@ export interface SaveEstimationQuoteInput {
   preparerName?: string;
   preparerDesignation?: string;
   preparerMobile?: string;
+  costingEnabled?: boolean;
+  marginPercent?: number | null;
 }
 
-/** The "Create Quotation" popup on an Estimation-board task. */
-export function useSaveEstimationQuote() {
+export interface QuotationSummary {
+  id: string;
+  versionNumber: number;
+  name: string | null;
+  title: string | null;
+  quotationRef: string | null;
+  currency: string;
+  totalAmount: number;
+  itemCount: number;
+  costingEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdByName: string | null;
+}
+
+export interface Quotation extends Required<Pick<SaveQuotationInput, "currency" | "vatRate">> {
+  id: string;
+  versionNumber: number;
+  name: string | null;
+  title: string | null;
+  quotationRef: string | null;
+  recipientName: string | null;
+  recipientCompany: string | null;
+  recipientLocation: string | null;
+  lineItems: QuotationLineItemInput[];
+  subtotal: number;
+  vatAmount: number;
+  totalAmount: number;
+  validityDays: number | null;
+  paymentTerms: string | null;
+  notes: string | null;
+  generalTerms: string | null;
+  preparerName: string | null;
+  preparerDesignation: string | null;
+  preparerMobile: string | null;
+  costingEnabled: boolean;
+  marginPercent: number | null;
+  createdAt: string;
+  updatedAt: string;
+  createdByName: string | null;
+}
+
+/** Every saved version of an Estimation task's quotation, newest first. */
+export function useQuotations(taskId: string | undefined) {
+  return useQuery({
+    queryKey: ["quotations", taskId],
+    queryFn: async () => (await api.get<{ data: QuotationSummary[] }>(`/tasks/${taskId}/quotations`)).data.data,
+    enabled: !!taskId,
+  });
+}
+
+export function useQuotation(taskId: string | undefined, quotationId: string | undefined) {
+  return useQuery({
+    queryKey: ["quotation", taskId, quotationId],
+    queryFn: async () => (await api.get<{ data: Quotation }>(`/tasks/${taskId}/quotations/${quotationId}`)).data.data,
+    enabled: !!taskId && !!quotationId,
+  });
+}
+
+function invalidateQuotes(qc: ReturnType<typeof useQueryClient>, taskId: string) {
+  qc.invalidateQueries({ queryKey: ["quotations", taskId] });
+  qc.invalidateQueries({ queryKey: ["quotation", taskId] });
+  qc.invalidateQueries({ queryKey: ["task", taskId] });
+  qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
+}
+
+/** Saves as a new version (v1 for the first quotation) — earlier versions stay untouched. */
+export function useCreateQuotation(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ taskId, ...body }: SaveEstimationQuoteInput) =>
-      (await api.put<{ data: EstimationQuote }>(`/tasks/${taskId}/quotation`, body)).data.data,
-    onSuccess: (_result, { taskId }) => {
-      qc.invalidateQueries({ queryKey: ["task", taskId] });
-      qc.invalidateQueries({ queryKey: ["task-activity", taskId] });
-    },
+    mutationFn: async (body: SaveQuotationInput) => (await api.post<{ data: Quotation }>(`/tasks/${taskId}/quotations`, body)).data.data,
+    onSuccess: () => invalidateQuotes(qc, taskId),
+  });
+}
+
+/** Saves changes onto an existing version in place. */
+export function useUpdateQuotation(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ quotationId, ...body }: SaveQuotationInput & { quotationId: string }) =>
+      (await api.put<{ data: Quotation }>(`/tasks/${taskId}/quotations/${quotationId}`, body)).data.data,
+    onSuccess: () => invalidateQuotes(qc, taskId),
   });
 }
 

@@ -28,6 +28,7 @@ const SAFE_USER_SELECT = {
   status: true,
   employeeId: true,
   moduleAccess: true,
+  restrictedMenuKeys: true,
   avatarStorageKey: true,
   lastLoginAt: true,
   createdAt: true,
@@ -226,6 +227,7 @@ export async function updateUser(
     moduleAccess?: ModuleCode[];
     status?: "ACTIVE" | "DEACTIVATED";
     employeeId?: string | null;
+    restrictedMenuKeys?: string[];
   },
   actor: AuthedUser
 ) {
@@ -262,6 +264,7 @@ export async function updateUser(
   if (input.moduleAccess) data.moduleAccess = input.moduleAccess;
   if (input.status) data.status = input.status;
   if (input.employeeId !== undefined) data.employeeId = input.employeeId;
+  if (input.restrictedMenuKeys !== undefined) data.restrictedMenuKeys = input.restrictedMenuKeys;
 
   await prisma.$transaction(async (tx) => {
     if (Object.keys(data).length) {

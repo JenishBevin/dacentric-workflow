@@ -48,95 +48,12 @@ export interface CreateTaskInput {
 // the Estimation board — created directly there, or Awarded onto it from
 // Enquiry List. Kept forever after, even once the task is later Awarded on
 // into a real Project, as a permanent record of its estimation phase.
-async function ensureEstimationRecord(tx: any, taskId: string) {
+export async function ensureEstimationRecord(tx: any, taskId: string) {
   const existing = await tx.estimationRecord.findUnique({ where: { taskId } });
   if (existing) return existing;
   const year = new Date().getFullYear();
   const sequence = await nextYearlySequence("ESTIMATION", year, tx);
   return tx.estimationRecord.create({ data: { taskId, year, sequence, estimationId: formatEstimationId(year, sequence) } });
-}
-
-export interface QuotationLineItemInput {
-  description: string;
-  qty: number;
-  unit: string;
-  unitPrice: number;
-}
-
-export interface SaveEstimationQuoteInput {
-  currency: string;
-  title?: string;
-  quotationRef?: string;
-  recipientName?: string;
-  recipientCompany?: string;
-  recipientLocation?: string;
-  lineItems: QuotationLineItemInput[];
-  vatRate: number;
-  validityDays?: number;
-  paymentTerms?: string;
-  notes?: string;
-  generalTerms?: string;
-  preparerName?: string;
-  preparerDesignation?: string;
-  preparerMobile?: string;
-}
-
-/** The "Create Quotation" popup on an Estimation-board task, rendered onto
- * the company's fixed letterhead template client-side — multi-currency
- * (default AED, per the frontend), with VAT computed server-side from
- * whatever rate the client sends (5% is only a suggested default for AED,
- * applied client-side, not hard-coded here). */
-export async function saveEstimationQuote(taskId: string, input: SaveEstimationQuoteInput, actor: AuthedUser) {
-  const ctx = await loadTaskWithAccess(taskId, actor);
-  assertCanEditTask(ctx);
-
-  if (ctx.task.board?.name !== ESTIMATION_BOARD_NAME) {
-    throw Errors.badRequest("Quotations can only be created while a task is on the Estimation board.");
-  }
-
-  const estimationRecord = await ensureEstimationRecord(prisma, taskId);
-
-  const subtotal = Math.round(input.lineItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0) * 100) / 100;
-  const vatAmount = Math.round(subtotal * (input.vatRate / 100) * 100) / 100;
-  const totalAmount = Math.round((subtotal + vatAmount) * 100) / 100;
-
-  const updated = await prisma.estimationRecord.update({
-    where: { id: estimationRecord.id },
-    data: {
-      currency: input.currency,
-      title: input.title,
-      quotationRef: input.quotationRef,
-      recipientName: input.recipientName,
-      recipientCompany: input.recipientCompany,
-      recipientLocation: input.recipientLocation,
-      lineItems: input.lineItems as any,
-      subtotal,
-      vatRate: input.vatRate,
-      vatAmount,
-      totalAmount,
-      validityDays: input.validityDays ?? 7,
-      paymentTerms: input.paymentTerms,
-      notes: input.notes,
-      generalTerms: input.generalTerms,
-      preparerName: input.preparerName,
-      preparerDesignation: input.preparerDesignation,
-      preparerMobile: input.preparerMobile,
-      quotedAt: new Date(),
-      quotedById: actor.id,
-    },
-  });
-
-  await writeAudit({
-    actor,
-    action: AuditAction.EDIT,
-    entityType: "EstimationRecord",
-    entityId: updated.id,
-    boardId: ctx.task.boardId,
-    field: "quotation",
-    afterValue: { currency: updated.currency, subtotal: updated.subtotal, vatRate: updated.vatRate, vatAmount: updated.vatAmount, totalAmount: updated.totalAmount },
-  });
-
-  return updated;
 }
 
 // Same idea, for a task's first (and only ever) landing on the Enquiry List

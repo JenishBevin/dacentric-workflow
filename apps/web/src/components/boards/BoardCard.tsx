@@ -73,6 +73,7 @@ export const BoardCard: React.FC<Props> = ({ board, onEdit, onDuplicate, onArchi
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        {board.service && <Badge tone="blue">{board.service.name}</Badge>}
         <Badge tone={board.boardType === "LINKED" ? "indigo" : "slate"}>
           {board.boardType === "LINKED" ? (
             <>

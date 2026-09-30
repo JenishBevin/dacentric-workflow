@@ -7,6 +7,7 @@ import { ChatWidget } from "../chat/ChatWidget";
 import { DesktopNotifications } from "./DesktopNotifications";
 import { Spinner } from "../ui/primitives";
 import { useAuth } from "../../context/AuthContext";
+import { menuItemForPath } from "../../lib/menuRegistry";
 
 function ContentFallback() {
   return (
@@ -31,6 +32,14 @@ export const AppLayout: React.FC = () => {
   // through this layout's <Outlet />.
   if (user?.roles.includes("STAFF") && !STAFF_ALLOWED_PATHS.includes(location.pathname)) {
     return <Navigate to={STAFF_HOME} replace />;
+  }
+
+  // Per-user menu restriction (Settings -> Users -> Edit -> Menu Access) —
+  // blocks a typed/bookmarked URL the same way it's hidden from the
+  // sidebar, not just a UI omission. See lib/menuRegistry.ts.
+  const restrictedItem = menuItemForPath(location.pathname);
+  if (restrictedItem && user?.restrictedMenuKeys?.includes(restrictedItem.key)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (

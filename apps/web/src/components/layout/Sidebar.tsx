@@ -37,6 +37,7 @@ import qplusIcon from "../../assets/qplus-icon.png";
 import { useAllTickets } from "../../api/tickets";
 
 interface NavItem {
+  key?: string;
   to: string;
   label: string;
   icon: React.ElementType;
@@ -66,17 +67,20 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
   // item is force-hidden rather than left to permission scopes.
   const isStaff = user?.roles.includes("STAFF") ?? false;
   const hasModule = (m: "CRM" | "ERP" | "HRMS" | "WORKFLOW") => user?.moduleAccess.includes(m) ?? false;
+  // Per-user sidebar/route restriction on top of role permissions — set from
+  // Settings -> Users -> Edit -> Menu Access, see lib/menuRegistry.ts.
+  const isRestricted = (key: string) => user?.restrictedMenuKeys?.includes(key) ?? false;
 
   const workflowItems: NavItem[] = [
-    { to: "/workflow/enquiries", label: "Enquiry List", icon: Inbox, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
-    { to: "/workflow/estimation", label: "Estimation", icon: Calculator, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
-    { to: "/workflow/accounts", label: "Accounts", icon: Landmark, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
-    { to: "/workflow/procurement", label: "Procurement", icon: Truck, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
-    { to: "/workflow/boards", label: "Projects", icon: Trello, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
-    { to: "/workflow/my-tasks", label: "My Tasks", icon: ListChecks, visible: !isStaff, badge: myTaskCount || undefined },
-    { to: "/workflow/team", label: "Team Workload", icon: Users2, visible: !isStaff && can(user, "VIEW_TEAM_WORKLOAD") },
-    { to: "/workflow/follow-ups", label: "Follow-up Workload", icon: PhoneCall, visible: !isStaff && can(user, "VIEW_TEAM_WORKLOAD") },
-    { to: "/workflow/history", label: "Project/Task History", icon: Archive, visible: !isStaff && can(user, "VIEW_WORKFLOW") },
+    { key: "workflow.enquiries", to: "/workflow/enquiries", label: "Enquiry List", icon: Inbox, visible: !isStaff && !isRestricted("workflow.enquiries") && can(user, "VIEW_WORKFLOW") },
+    { key: "workflow.estimation", to: "/workflow/estimation", label: "Estimation", icon: Calculator, visible: !isStaff && !isRestricted("workflow.estimation") && can(user, "VIEW_WORKFLOW") },
+    { key: "workflow.accounts", to: "/workflow/accounts", label: "Accounts", icon: Landmark, visible: !isStaff && !isRestricted("workflow.accounts") && can(user, "VIEW_WORKFLOW") },
+    { key: "workflow.procurement", to: "/workflow/procurement", label: "Procurement", icon: Truck, visible: !isStaff && !isRestricted("workflow.procurement") && can(user, "VIEW_WORKFLOW") },
+    { key: "workflow.boards", to: "/workflow/boards", label: "Projects", icon: Trello, visible: !isStaff && !isRestricted("workflow.boards") && can(user, "VIEW_WORKFLOW") },
+    { key: "workflow.my-tasks", to: "/workflow/my-tasks", label: "My Tasks", icon: ListChecks, visible: !isStaff && !isRestricted("workflow.my-tasks"), badge: myTaskCount || undefined },
+    { key: "workflow.team", to: "/workflow/team", label: "Team Workload", icon: Users2, visible: !isStaff && !isRestricted("workflow.team") && can(user, "VIEW_TEAM_WORKLOAD") },
+    { key: "workflow.follow-ups", to: "/workflow/follow-ups", label: "Follow-up Workload", icon: PhoneCall, visible: !isStaff && !isRestricted("workflow.follow-ups") && can(user, "VIEW_TEAM_WORKLOAD") },
+    { key: "workflow.history", to: "/workflow/history", label: "Project/Task History", icon: Archive, visible: !isStaff && !isRestricted("workflow.history") && can(user, "VIEW_WORKFLOW") },
   ];
 
   // Module-gated top-level sections, parallel to Workflow — visible only to
@@ -92,30 +96,30 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
   // moving to HRMS — it's a universal employee entitlement, not an
   // HRMS-admin feature, and most users don't have HRMS access.
   const crmItems: NavItem[] = [
-    { to: "/workflow/customers", label: "Customers", icon: Building2, visible: !isStaff && hasModule("CRM") && can(user, "VIEW_WORKFLOW") },
+    { key: "crm.customers", to: "/workflow/customers", label: "Customers", icon: Building2, visible: !isStaff && !isRestricted("crm.customers") && hasModule("CRM") && can(user, "VIEW_WORKFLOW") },
   ];
 
   const hrmsItems: NavItem[] = [
-    { to: "/settings/employees", label: "Employees", icon: Contact, visible: !isStaff && hasModule("HRMS") },
+    { key: "hrms.employees", to: "/settings/employees", label: "Employees", icon: Contact, visible: !isStaff && !isRestricted("hrms.employees") && hasModule("HRMS") },
   ];
 
-  const erpItems: NavItem[] = [{ to: "/erp", label: "ERP", icon: Package, visible: !isStaff && hasModule("ERP") }];
+  const erpItems: NavItem[] = [{ key: "erp.erp", to: "/erp", label: "ERP", icon: Package, visible: !isStaff && !isRestricted("erp.erp") && hasModule("ERP") }];
 
   // Grouped separately from Workflow/Settings, sitting just above Settings —
   // reporting/utility pages that don't fit neatly under a single module.
   // Every item keeps its original visibility condition unchanged, so this is
   // a pure regrouping with no access changes.
   const toolsItems: NavItem[] = [
-    { to: "/workflow/time-logs", label: "Time Logs", icon: Clock3, visible: !isStaff && can(user, "VIEW_TIME_LOGS", "TEAM") },
+    { key: "tools.time-logs", to: "/workflow/time-logs", label: "Time Logs", icon: Clock3, visible: !isStaff && !isRestricted("tools.time-logs") && can(user, "VIEW_TIME_LOGS", "TEAM") },
     // "Request" covers both Leave and Claim. Management is excluded from
     // Leave (RequestPage hides that tab for them) but does approve Claims,
     // so the menu stays visible for them too; approving others' leave (the
     // pending-count badge below) is additionally gated server-side.
-    { to: "/hrms/leave", label: "Request", icon: ClipboardList, visible: true, badge: isLeaveApprover ? leaveRequests?.length || undefined : undefined },
-    { to: "/tickets", label: "Support Tickets", icon: TicketIcon, visible: !isStaff, badge: isTicketManager ? openTickets?.length || undefined : undefined },
-    { to: "/workflow/activity", label: "Recent Activity", icon: Activity, visible: !isStaff },
+    { key: "tools.request", to: "/hrms/leave", label: "Request", icon: ClipboardList, visible: !isRestricted("tools.request"), badge: isLeaveApprover ? leaveRequests?.length || undefined : undefined },
+    { key: "tools.tickets", to: "/tickets", label: "Support Tickets", icon: TicketIcon, visible: !isStaff && !isRestricted("tools.tickets"), badge: isTicketManager ? openTickets?.length || undefined : undefined },
+    { key: "tools.activity", to: "/workflow/activity", label: "Recent Activity", icon: Activity, visible: !isStaff && !isRestricted("tools.activity") },
     { to: "/settings/audit", label: "Audit Trail", icon: History, visible: !isStaff && can(user, "VIEW_AUDIT_TRAIL") },
-    { to: "/settings/tags", label: "Tags", icon: Tags, visible: !isStaff },
+    { key: "tools.tags", to: "/settings/tags", label: "Tags", icon: Tags, visible: !isStaff && !isRestricted("tools.tags") },
   ];
 
   const settingsItems: NavItem[] = [
