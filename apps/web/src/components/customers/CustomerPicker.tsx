@@ -19,7 +19,10 @@ export const CustomerPicker: React.FC<{
   /** Offers a quick inline "+ New Customer" form for when the customer isn't
    * on file yet, so the caller doesn't have to leave this form to add one. */
   allowCreate?: boolean;
-}> = ({ value, onChange, placeholder, linkToDetail, allowCreate }) => {
+  /** Read-only mode: shows the same value display, but no clear button and
+   * no search box — for callers who don't have edit rights on this record. */
+  disabled?: boolean;
+}> = ({ value, onChange, placeholder, linkToDetail, allowCreate, disabled }) => {
   const [query, setQuery] = useState("");
   const { data: matches } = useCustomerSearch(query);
   const [creating, setCreating] = useState(false);
@@ -99,11 +102,17 @@ export const CustomerPicker: React.FC<{
             {value.name} <span className="text-slate-400">· {value.customerId}</span>
           </span>
         )}
-        <button type="button" onClick={() => onChange(null)} className="shrink-0 text-slate-400 hover:text-red-500" aria-label="Clear customer">
-          <X className="h-3.5 w-3.5" />
-        </button>
+        {!disabled && (
+          <button type="button" onClick={() => onChange(null)} className="shrink-0 text-slate-400 hover:text-red-500" aria-label="Clear customer">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     );
+  }
+
+  if (disabled) {
+    return <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">No customer</p>;
   }
 
   return (

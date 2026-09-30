@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Drawer } from "../ui/Drawer";
 import {
   Button,
@@ -31,10 +31,10 @@ import { boardPath } from "../../lib/boardPath";
 import { extractApiError } from "../../lib/apiClient";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { DiscussButton } from "../chat/DiscussButton";
+import { CustomerPicker } from "../customers/CustomerPicker";
 import { FollowUpMoveDialog, FollowUpChoice } from "../kanban/FollowUpMoveDialog";
 import { Repeat, Link2, Copy, Trash2, Check, X as XIcon, BadgeCheck, ThumbsDown, Landmark, Receipt, Plus, PauseCircle } from "lucide-react";
 import { format } from "date-fns";
-import clsx from "clsx";
 
 // Stage names are editable, so "Submitted" may have been renamed (e.g.
 // "Submitted / Follow-up") — try the exact name, then any name containing
@@ -493,12 +493,7 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
           )}
 
           {/* Workflow */}
-          <section
-            className={clsx(
-              "grid gap-3",
-              ["grid-cols-3", "grid-cols-4"][task.customer ? 1 : 0]
-            )}
-          >
+          <section className="grid grid-cols-4 gap-3">
             <div>
               <Label>Project</Label>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{task.board?.name}</p>
@@ -530,17 +525,18 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
                 </button>
               )}
             </div>
-            {task.customer && (
-              <div>
-                <Label>Customer</Label>
-                <Link
-                  to={`/workflow/customers/${task.customer.id}`}
-                  className="block truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-brand-700 hover:bg-slate-100"
-                >
-                  {task.customer.name} <span className="text-slate-400">· {task.customer.customerId}</span>
-                </Link>
-              </div>
-            )}
+            <div>
+              <Label>Customer</Label>
+              <CustomerPicker
+                value={task.customer}
+                disabled={!canEdit}
+                linkToDetail
+                onChange={async (c) => {
+                  await saveField({ customerId: c?.id ?? null });
+                  push({ variant: "success", title: c ? "Customer linked." : "Customer unlinked." });
+                }}
+              />
+            </div>
             <div>
               <Label>Stage</Label>
               <Select value={task.stageId} disabled={!canMove} onChange={(e) => performMove(e.target.value)}>
