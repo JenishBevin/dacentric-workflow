@@ -117,7 +117,7 @@ tasksRouter.get(
         taskId: true,
         title: true,
         boardId: true,
-        board: { select: { name: true } },
+        board: { select: { name: true, isCompleted: true, isArchived: true } },
         enquiryRecord: { select: { enquiryId: true } },
         estimationRecord: { select: { estimationId: true, quotationRef: true } },
       },

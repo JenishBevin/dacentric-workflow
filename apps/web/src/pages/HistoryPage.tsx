@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { format, startOfDay, endOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { Download, Archive, Trello, Inbox, ChevronRight, RotateCcw } from "lucide-react";
@@ -96,16 +96,25 @@ export default function HistoryPage() {
     setPreset((p) => (p === next ? null : next));
   }
 
-  useEffect(() => {
-    if (!highlightId) return;
-    const el = document.getElementById(`history-row-${highlightId}`);
-    el?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [highlightId, rows]);
-
   function openRow(r: any) {
     if (r.kind === "PROJECT") setOpenProjectId(r.id);
     else setOpenTaskId(r.id);
   }
+
+  // Once per highlightId (not on every poll-driven refetch of `rows`) —
+  // scrolls to the row and opens its read-only summary, e.g. when the
+  // header search sends you here for an Awarded task/project that's moved
+  // to history and is no longer reachable on its own live board/list.
+  const autoOpenedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlightId || autoOpenedFor.current === highlightId) return;
+    const row = rows.find((r: any) => r.id === highlightId);
+    if (!row) return;
+    autoOpenedFor.current = highlightId;
+    const el = document.getElementById(`history-row-${highlightId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    openRow(row);
+  }, [highlightId, rows]);
 
   return (
     <div className="space-y-4">

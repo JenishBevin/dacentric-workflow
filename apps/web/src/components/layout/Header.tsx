@@ -62,8 +62,10 @@ function useBreadcrumbs() {
 // search box — searched for an exact match so it jumps straight to that
 // record. Order matters: QPTS-PRJ- and QPTS-ENQ- must be checked before the
 // bare QPTS-\d{4}- (Estimation ID) alternative, otherwise a shorter prefix
-// match could misfire — hence the negative lookahead below.
-const ID_LOOKUP_PATTERN = /^(WF-\d+|CLM-\d+|QPTS-PRJ-\d{4}-\d+|QPTS-ENQ-\d{4}-\d+|QPTS(?!-PRJ-|-ENQ-)-\d{4}-\d+|QPTS\/QN\/\d{4}-\d+)$/i;
+// match could misfire — hence the negative lookahead below. The trailing
+// (-[A-Za-z0-9]+)* allows a bulk-imported quotation ref's revision suffix
+// (e.g. "-R3", "-Rev2", "-DUP2") to still match.
+const ID_LOOKUP_PATTERN = /^(WF-\d+|CLM-\d+|QPTS-PRJ-\d{4}-\d+|QPTS-ENQ-\d{4}-\d+|QPTS(?!-PRJ-|-ENQ-)-\d{4}-\d+|QPTS\/QN\/\d{4}-\d+(-[A-Za-z0-9]+)*)$/i;
 
 export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobileMenu }) => {
   const { user, logout } = useAuth();
@@ -135,7 +137,12 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
           const match = (data.data as any[]).find((b) => b.boardId.toLowerCase() === compact.toLowerCase());
           if (match) {
             setSearch("");
-            navigate(boardPath(match.name, match.id));
+            // A Completed/Archived project no longer shows on the live
+            // Projects page — it only lives in Project/Task History now, so
+            // send the search there instead of a project board it can't
+            // actually be found on.
+            if (match.isCompleted || match.isArchived) navigate(`/workflow/history?highlight=${match.id}`);
+            else navigate(boardPath(match.name, match.id));
             return;
           }
         } else if (isClaimId) {
@@ -159,7 +166,11 @@ export const Header: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
           );
           if (match) {
             setSearch("");
-            navigate(`${boardPath(match.board?.name, match.boardId)}?task=${match.id}`);
+            // Same reasoning as the project-id branch above — an Awarded
+            // task whose project has since been marked Completed/Archived
+            // is only reachable from Project/Task History now.
+            if (match.board?.isCompleted || match.board?.isArchived) navigate(`/workflow/history?highlight=${match.boardId}`);
+            else navigate(`${boardPath(match.board?.name, match.boardId)}?task=${match.id}`);
             return;
           }
         }

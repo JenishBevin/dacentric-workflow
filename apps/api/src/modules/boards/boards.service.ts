@@ -145,7 +145,7 @@ export async function searchBoards(q: string, user: AuthedUser) {
       OR: [{ name: { contains: q, mode: "insensitive" } }, { boardId: { contains: q, mode: "insensitive" } }],
     },
     take: 20,
-    select: { id: true, boardId: true, name: true },
+    select: { id: true, boardId: true, name: true, isCompleted: true, isArchived: true },
   });
   return boards;
 }
