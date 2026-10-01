@@ -194,7 +194,13 @@ export default function BoardsListPage() {
         push({ variant: "error", title: "Could not update project", description: extractApiError(err).message });
       }
     },
-    canMove: (b) => isAdmin(user) || ["OWNER", "EDITOR"].includes(b.members.find((m) => m.userId === user?.id)?.role ?? ""),
+    // Mirrors the backend's own assertCanEditBoard (board-access.ts): an org-
+    // wide EDIT_BOARD:ALL grant (Management has this by default) moves any
+    // project, same as an admin — not just ones this viewer owns/edits.
+    // Without this, Management saw a non-functional dropdown on projects
+    // it's not a member of (the API would have 403'd the save).
+    canMove: (b) =>
+      isAdmin(user) || can(user, "EDIT_BOARD", "ALL") || ["OWNER", "EDITOR"].includes(b.members.find((m) => m.userId === user?.id)?.role ?? ""),
     onStageChange: (b, stageId) => moveProjectToStage(b.id, stageId),
     onDelete: (b) => setPendingDelete(b),
     isSelected: selection.isSelected,
