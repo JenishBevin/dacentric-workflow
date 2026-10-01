@@ -31,6 +31,7 @@ const WorkTimerBadge: React.FC = () => {
 
 const BREADCRUMB_LABELS: Record<string, string> = {
   workflow: "Workflow",
+  crm: "CRM",
   boards: "Projects",
   service: "Service",
   "my-tasks": "My Tasks",
@@ -48,11 +49,16 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   hrms: "Workflow",
   leave: "Request",
   tickets: "Support Tickets",
+  customers: "Customers",
 };
 
 function useBreadcrumbs() {
   const location = useLocation();
   const segments = location.pathname.split("/").filter(Boolean);
+  // Customers lives under the CRM section in the sidebar even though its
+  // URL still starts with /workflow/ for route-compatibility — show the
+  // breadcrumb matching where it sits in the nav, not the URL prefix.
+  if (segments[0] === "workflow" && segments[1] === "customers") segments[0] = "crm";
   return segments.map((s) => BREADCRUMB_LABELS[s] ?? s);
 }
 
