@@ -40,6 +40,28 @@ export function useVendors(filters: { search?: string; brand?: string; service?:
   });
 }
 
+export interface CreateVendorInput {
+  name: string;
+  brands: string[];
+  services: string[];
+  contacts: VendorContact[];
+  website: string | null;
+  vatNumber: string | null;
+  address: string | null;
+  notes: string | null;
+}
+
+export function useCreateVendor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateVendorInput) => (await api.post<{ data: Vendor }>("/vendors", input)).data.data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vendors"] });
+      qc.invalidateQueries({ queryKey: ["vendor-filter-options"] });
+    },
+  });
+}
+
 export function useVendorFilterOptions() {
   return useQuery({
     queryKey: ["vendor-filter-options"],

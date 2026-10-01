@@ -11,6 +11,46 @@ export interface VendorContact {
   email: string | null;
 }
 
+export interface CreateVendorInput {
+  name: string;
+  brands: string[];
+  services: string[];
+  contacts: VendorContact[];
+  website?: string | null;
+  vatNumber?: string | null;
+  address?: string | null;
+  notes?: string | null;
+}
+
+/** One-at-a-time counterpart to importVendorsFromExcel — a vendor the
+ *  spreadsheet doesn't cover yet, or added between imports. Same uniqueness
+ *  rule as the import (case-insensitive name), so a manual add can't quietly
+ *  create a duplicate of one the next re-import would have merged into. */
+export async function createVendor(input: CreateVendorInput, actor: AuthedUser) {
+  const name = input.name.trim();
+  if (!name) throw Errors.badRequest("Vendor name is required.");
+
+  const existing = await prisma.vendor.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
+  if (existing) throw Errors.conflict(`A vendor named "${existing.name}" already exists.`);
+
+  const vendor = await prisma.vendor.create({
+    data: {
+      name,
+      brands: input.brands,
+      services: input.services,
+      contacts: input.contacts as any,
+      website: input.website ?? null,
+      vatNumber: input.vatNumber ?? null,
+      address: input.address ?? null,
+      notes: input.notes ?? null,
+      createdById: actor.id,
+    },
+  });
+
+  await writeAudit({ actor, action: AuditAction.CREATE, entityType: "Vendor", entityId: vendor.id, afterValue: { name: vendor.name }, module: ModuleCode.ERP });
+  return vendor;
+}
+
 export async function listVendors(filters: { search?: string; brand?: string; service?: string }) {
   const where: any = {};
   // Free-text search matches the vendor's own name; Brand/Service are exact

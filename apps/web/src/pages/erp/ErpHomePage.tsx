@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Lock, Upload, Search, Trash2, Mail, Phone, Building2, ChevronRight, Globe, FileText, MapPin, StickyNote, Users as UsersIcon, Tag, Award } from "lucide-react";
+import { Lock, Upload, Plus, Search, Trash2, Mail, Phone, Building2, ChevronRight, Globe, FileText, MapPin, StickyNote, Users as UsersIcon, Tag, Award } from "lucide-react";
 import { EmptyState, Button, Input, Select, Badge, Skeleton, ErrorState, Label, Textarea } from "../../components/ui/primitives";
 import { Drawer } from "../../components/ui/Drawer";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { useVendors, useVendorFilterOptions, useImportVendors, useDeleteVendor, useUpdateVendorDetails, Vendor } from "../../api/vendors";
+import { useVendors, useVendorFilterOptions, useImportVendors, useCreateVendor, useDeleteVendor, useUpdateVendorDetails, Vendor } from "../../api/vendors";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { isSuperAdmin } from "../../lib/permissions";
@@ -53,7 +53,14 @@ function StatTile({ icon, label, value, tone }: { icon: React.ReactNode; label: 
 function VendorMaster() {
   const { user } = useAuth();
   const { push } = useToast();
-  const canManage = isSuperAdmin(user);
+  // Bulk import stays Super Admin only (same reasoning as the
+  // Enquiry/Estimation Excel imports — see vendors.routes.ts); adding one by
+  // hand is also open to Management, Admin & Finance and Procurement, who
+  // deal with suppliers day to day; editing/deleting an existing record
+  // stays narrower still (Super Admin + Management).
+  const canImport = isSuperAdmin(user);
+  const canAddVendor = isSuperAdmin(user) || !!user?.roles.some((r) => r === "MANAGEMENT" || r === "ESTIMATION" || r === "PROCUREMENT");
+  const canEditDelete = isSuperAdmin(user) || !!user?.roles.includes("MANAGEMENT");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
@@ -61,6 +68,7 @@ function VendorMaster() {
   const [service, setService] = useState("");
   const [selected, setSelected] = useState<Vendor | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Vendor | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const { data: vendors, isLoading, isError, refetch } = useVendors({ search: search || undefined, brand: brand || undefined, service: service || undefined });
   const { data: filterOptions } = useVendorFilterOptions();
@@ -101,14 +109,21 @@ function VendorMaster() {
           <h1 className="text-lg font-semibold text-slate-900">Vendor List</h1>
           <p className="text-sm text-slate-500">Supplier directory — browse by brand or service category. Click a vendor for full details.</p>
         </div>
-        {canManage && (
-          <>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFilePicked} />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} loading={importVendors.isPending}>
-              <Upload className="h-4 w-4" /> Import from Excel
+        <div className="flex flex-wrap gap-2">
+          {canImport && (
+            <>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFilePicked} />
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} loading={importVendors.isPending}>
+                <Upload className="h-4 w-4" /> Import from Excel
+              </Button>
+            </>
+          )}
+          {canAddVendor && (
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4" /> Add Vendor
             </Button>
-          </>
-        )}
+          )}
+        </div>
       </div>
 
       {vendors && vendors.length > 0 && (
@@ -157,7 +172,7 @@ function VendorMaster() {
         <EmptyState
           icon={<Building2 className="h-8 w-8" />}
           title={filtersActive ? "No vendors match these filters." : "No vendors yet."}
-          description={filtersActive ? "Try clearing the search or filters." : canManage ? "Import your supplier spreadsheet to get started." : "Ask a Super Admin to import the supplier list."}
+          description={filtersActive ? "Try clearing the search or filters." : canImport ? "Import your supplier spreadsheet to get started." : "Ask a Super Admin to import the supplier list."}
         />
       )}
 
@@ -212,10 +227,12 @@ function VendorMaster() {
 
       <VendorDetailDrawer
         vendor={selected}
-        canManage={canManage}
+        canManage={canEditDelete}
         onClose={() => setSelected(null)}
         onRequestDelete={(v) => setPendingDelete(v)}
       />
+
+      <NewVendorDrawer open={addOpen} onClose={() => setAddOpen(false)} />
 
       <ConfirmDialog
         open={!!pendingDelete}
@@ -379,8 +396,160 @@ function VendorDetailDrawer({
             </Label>
             <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} disabled={!canManage} />
           </div>
-          {!canManage && <p className="text-xs text-slate-400">Only Super Admins can edit these details.</p>}
+          {!canManage && <p className="text-xs text-slate-400">Only Super Admins and Management can edit these details.</p>}
         </section>
+      </div>
+    </Drawer>
+  );
+}
+
+interface ContactRow {
+  name: string;
+  phone: string;
+  email: string;
+}
+const emptyContactRow = (): ContactRow => ({ name: "", phone: "", email: "" });
+
+function NewVendorDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { push } = useToast();
+  const createVendor = useCreateVendor();
+
+  const [name, setName] = useState("");
+  const [services, setServices] = useState("");
+  const [brands, setBrands] = useState("");
+  const [contacts, setContacts] = useState<ContactRow[]>([emptyContactRow()]);
+  const [website, setWebsite] = useState("");
+  const [vatNumber, setVatNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [notes, setNotes] = useState("");
+
+  function reset() {
+    setName("");
+    setServices("");
+    setBrands("");
+    setContacts([emptyContactRow()]);
+    setWebsite("");
+    setVatNumber("");
+    setAddress("");
+    setNotes("");
+  }
+
+  function updateContact(i: number, patch: Partial<ContactRow>) {
+    setContacts((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  async function handleCreate() {
+    if (!name.trim()) {
+      push({ variant: "error", title: "Vendor name is required." });
+      return;
+    }
+    try {
+      await createVendor.mutateAsync({
+        name: name.trim(),
+        services: services.split(",").map((s) => s.trim()).filter(Boolean),
+        brands: brands.split(",").map((b) => b.trim()).filter(Boolean),
+        contacts: contacts
+          .filter((c) => c.name.trim() || c.phone.trim() || c.email.trim())
+          .map((c) => ({ name: c.name.trim() || null, phone: c.phone.trim() || null, email: c.email.trim() || null })),
+        website: website.trim() || null,
+        vatNumber: vatNumber.trim() || null,
+        address: address.trim() || null,
+        notes: notes.trim() || null,
+      });
+      push({ variant: "success", title: "Vendor added." });
+      reset();
+      onClose();
+    } catch (err) {
+      push({ variant: "error", title: "Could not add vendor", description: extractApiError(err).message });
+    }
+  }
+
+  return (
+    <Drawer
+      open={open}
+      onClose={() => {
+        reset();
+        onClose();
+      }}
+      title="Add Vendor"
+      subtitle="Adds one supplier to the directory — the same list a bulk Excel import feeds into."
+      footer={
+        <>
+          <Button
+            variant="outline"
+            onClick={() => {
+              reset();
+              onClose();
+            }}
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleCreate} loading={createVendor.isPending}>
+            Add Vendor
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <Label required>Vendor Name</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Gulf Security Trading LLC" autoFocus />
+        </div>
+        <div>
+          <Label>Service Categories</Label>
+          <Input value={services} onChange={(e) => setServices(e.target.value)} placeholder="Comma-separated, e.g. CCTV System, Audio & Visual System" />
+        </div>
+        <div>
+          <Label>Brands Carried</Label>
+          <Input value={brands} onChange={(e) => setBrands(e.target.value)} placeholder="Comma-separated, e.g. Bosch, Hikvision" />
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <Label className="!mb-0">Contacts</Label>
+            <Button type="button" variant="outline" size="sm" onClick={() => setContacts((rows) => [...rows, emptyContactRow()])}>
+              <Plus className="h-3.5 w-3.5" /> Add contact
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {contacts.map((c, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Input className="flex-1" placeholder="Name" value={c.name} onChange={(e) => updateContact(i, { name: e.target.value })} />
+                <Input className="flex-1" placeholder="Phone" value={c.phone} onChange={(e) => updateContact(i, { phone: e.target.value })} />
+                <Input className="flex-1" placeholder="Email" value={c.email} onChange={(e) => updateContact(i, { email: e.target.value })} />
+                {contacts.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setContacts((rows) => rows.filter((_, idx) => idx !== i))}
+                    className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    aria-label="Remove contact"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
+          <div>
+            <Label>Website</Label>
+            <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://example.com" />
+          </div>
+          <div>
+            <Label>VAT Number</Label>
+            <Input value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} />
+          </div>
+        </div>
+        <div>
+          <Label>Address</Label>
+          <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+        </div>
+        <div>
+          <Label>Notes</Label>
+          <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
       </div>
     </Drawer>
   );
