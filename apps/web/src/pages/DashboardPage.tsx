@@ -1,9 +1,10 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Trello, ListChecks, Timer, Landmark } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Trello, ListChecks, Timer, Landmark, Wallet } from "lucide-react";
 import { useDashboard, useMyTasks, useTeamWorkload } from "../api/misc";
 import { useBoards } from "../api/boards";
+import { useActionableClaims } from "../api/claims";
 import { useWorkTimeToday, useWorkTimeSummary } from "../api/workTime";
 import { formatDuration } from "../hooks/useWorkTimer";
 import { Card, Skeleton, ErrorState, Avatar } from "../components/ui/primitives";
@@ -11,7 +12,7 @@ import { PriorityBadge } from "../components/workflow/badges";
 import { TaskDetailDrawer } from "../components/tasks/TaskDetailDrawer";
 import { format, differenceInCalendarDays } from "date-fns";
 import { useAuth } from "../context/AuthContext";
-import { can } from "../lib/permissions";
+import { can, isAdmin } from "../lib/permissions";
 import clsx from "clsx";
 import { StatCard, BoardOverviewCard, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./dashboard/shared";
 import DashboardManagementPage from "./dashboard/DashboardManagementPage";
@@ -39,6 +40,12 @@ export default function DashboardPage() {
   // (approveAccountsBoard/rejectAccountsBoard) — only shown to people who
   // can actually act on it, not just anyone who happens to see the count.
   const canApproveAccounts = can(user, "CREATE_BOARD", "ALL");
+  // Claims hit Accounts at the settlement stage and Admin & Finance (role
+  // code ESTIMATION — see rolesSeed.ts) at the verification stage;
+  // listActionableClaims is already scoped server-side to exactly the stage
+  // this viewer can act on, so the same hook/count works for either role.
+  const isClaimsApprover = isAdmin(user) || !!user?.roles.some((r) => r === "ACCOUNTS" || r === "ESTIMATION");
+  const { data: actionableClaims } = useActionableClaims(isClaimsApprover);
   const { data: workload } = useTeamWorkload({});
   const { data: myTaskGroups } = useMyTasks();
   const { data: todayTime } = useWorkTimeToday();
@@ -107,6 +114,16 @@ export default function DashboardPage() {
                   value={data.pendingAccountsApproval}
                   tone="bg-indigo-100 text-indigo-700"
                   onClick={() => navigate("/workflow/accounts")}
+                />
+              )}
+              {isClaimsApprover && (
+                <StatCard
+                  icon={Wallet}
+                  image="/images/dashboard/pending-approvals.jpg"
+                  label="Claims Awaiting Your Action"
+                  value={actionableClaims?.length ?? 0}
+                  tone="bg-amber-100 text-amber-700"
+                  onClick={() => navigate("/hrms/leave?tab=claim")}
                 />
               )}
 
