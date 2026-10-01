@@ -16,6 +16,7 @@ import {
   updateProcurementSchema,
   bulkDeleteBoardsSchema,
   bulkArchiveBoardsSchema,
+  createMaterialRequestSchema,
 } from "./boards.schemas";
 import { PermissionKey } from "@dacentric/types";
 
@@ -230,6 +231,21 @@ boardsRouter.patch(
   validate(updateProcurementSchema),
   asyncHandler(async (req, res) =>
     ok(res, await boardsService.updateProcurementRecord(req.params.boardId, (req as any).validatedBody, req.user!))
+  )
+);
+
+// --- Material Request Form — filled in from the Project page, listed
+// read-only on this same project's Procurement page (see MaterialRequest). ---
+boardsRouter.get(
+  "/:boardId/material-requests",
+  asyncHandler(async (req, res) => ok(res, await boardsService.listMaterialRequests(req.params.boardId, req.user!)))
+);
+
+boardsRouter.post(
+  "/:boardId/material-requests",
+  validate(createMaterialRequestSchema),
+  asyncHandler(async (req, res) =>
+    created(res, await boardsService.createMaterialRequest(req.params.boardId, (req as any).validatedBody, req.user!))
   )
 );
 

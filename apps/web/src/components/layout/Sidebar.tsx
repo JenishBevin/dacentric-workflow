@@ -103,7 +103,7 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
     { key: "hrms.employees", to: "/settings/employees", label: "Employees", icon: Contact, visible: !isStaff && !isRestricted("hrms.employees") && hasModule("HRMS") },
   ];
 
-  const erpItems: NavItem[] = [{ key: "erp.erp", to: "/erp", label: "ERP", icon: Package, visible: !isStaff && !isRestricted("erp.erp") && hasModule("ERP") }];
+  const erpItems: NavItem[] = [{ key: "erp.erp", to: "/erp", label: "Vendor List", icon: Package, visible: !isStaff && !isRestricted("erp.erp") && hasModule("ERP") }];
 
   // Grouped separately from Workflow/Settings, sitting just above Settings —
   // reporting/utility pages that don't fit neatly under a single module.

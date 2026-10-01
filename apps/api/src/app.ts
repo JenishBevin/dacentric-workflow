@@ -32,6 +32,7 @@ import { customersRouter } from "./modules/customers/customers.routes";
 import { checklistTemplatesRouter } from "./modules/checklistTemplates/checklistTemplates.routes";
 import { backupRouter } from "./modules/backup/backup.routes";
 import { contactRouter } from "./modules/contact/contact.routes";
+import { vendorsRouter } from "./modules/vendors/vendors.routes";
 
 export function createApp() {
   const app = express();
@@ -79,6 +80,7 @@ export function createApp() {
   app.use("/api/checklist-templates", checklistTemplatesRouter);
   app.use("/api/backup", backupRouter);
   app.use("/api/contact", contactRouter);
+  app.use("/api/vendors", vendorsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

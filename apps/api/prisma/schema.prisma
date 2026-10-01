@@ -420,6 +420,7 @@ model Board {
   tasks     Task[]
   tags      TagOnBoard[]
   procurementRecord ProcurementRecord?
+  materialRequests  MaterialRequest[]
 
   @@index([boardType])
   @@index([linkedRecordId])
@@ -1276,6 +1277,29 @@ model ProcurementRecord {
   status               ProcurementStatus @default(PENDING)
   notes                String?
 
+  // "Delivery Note" generation — the company's own printed handover slip
+  // (site/location/date/no, an item table, receiver sign-off), separate
+  // from lineItems above (that's cost tracking; this has no pricing at
+  // all). See apps/web/src/lib/deliveryNotePdf.ts for the PDF itself.
+  deliveryNoteNo       String?
+  deliverySite         String?
+  deliveryLocation     String?
+  deliveryDate         DateTime?
+  deliveryItems        Json? // [{ description, unit, qty }]
+  receiverName         String?
+  receiverDesignation  String?
+
+  // "Purchase Order" (LPO) generation — reuses lineItems above for its item
+  // table ({ description, quantity, unitCost, unit } — unit is new, the
+  // other three already existed) and poNumber/orderDate/vendorName/
+  // vendorAddress for LPO No./Date/Bill To, so only what's genuinely new to
+  // this document lives here. See apps/web/src/lib/purchaseOrderPdf.ts.
+  poRequestedBy        String?
+  poCustomerId         String?
+  poGeneralComments    String?
+  poQuoteRefNo         String?
+  poPreparerName       String?
+
   updatedById          String?
   updatedAt            DateTime          @updatedAt
   createdAt            DateTime          @default(now())
@@ -1287,6 +1311,56 @@ enum ProcurementStatus {
   DELIVERED
   CANCELLED
   NA
+}
+
+// A project's own "Material Request Form" (MRF) — filled in from the
+// Project page, listed read-only on that same project's Procurement page,
+// and importable into a Purchase Order's item list there (see
+// apps/web/src/lib/materialRequestPdf.ts and purchaseOrderPdf.ts). Each
+// submission is its own record, not edited after the fact — same spirit as
+// a paper form once it's been signed off.
+model MaterialRequest {
+  id               String   @id @default(uuid())
+  boardId          String
+  board            Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  requestNo        String   @unique // formatted QPTS-MRF-2026-0001
+  requestedByName  String
+  department       String?
+  empId            String?
+  urgency          String   @default("NORMAL") // NORMAL | URGENT
+  requestDate      DateTime?
+  requiredDate     DateTime?
+  items            Json // [{ description, unit, qty, remarks }]
+  comments         String?
+  reviewedByName   String?
+  approvedByName   String?
+  createdById      String
+  createdAt        DateTime @default(now())
+
+  @@index([boardId])
+}
+
+// ERP's Vendor Master — the supplier directory (which brands a supplier
+// carries, which service categories they work under, their contacts),
+// bulk-imported from the company's own supplier spreadsheet rather than
+// entered one at a time. One row per supplier company; a supplier that
+// appears under several brands/categories/contacts in the source sheet is
+// consolidated into one Vendor with those as arrays, not duplicated rows.
+model Vendor {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  brands      String[] @default([])
+  services    String[] @default([])
+  contacts    Json // [{ name, phone, email }]
+  // Not part of the supplier spreadsheet import — filled in by hand from the
+  // vendor's detail drawer after import.
+  website     String?
+  vatNumber   String?
+  address     String?
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // Backs every year-scoped id (Project, Estimation, Enquiry) — a single

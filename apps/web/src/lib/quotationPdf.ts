@@ -10,7 +10,7 @@ import qplusStamp from "../assets/qplus-company-stamp.png";
 // not eyeballed — page 1 is the cover (letterhead/recipient/title/ref),
 // which the reference keeps alone on its own page; page 2+ is the
 // quotation body, rendered almost entirely at 8.2pt.
-const COMPANY = {
+export const COMPANY = {
   addressLines: ["Office No. 203,", "Dar Al Wuheida Building,", "Hor Al Anz East, Dubai, UAE.", "P.O Box-16615"],
   mobile: "+971 4 393 1110",
   email: "info@qplus-ts.com",
@@ -20,10 +20,10 @@ const COMPANY = {
 // height / width, from the source PNG's actual pixel dimensions (3374x1697)
 // — re-measure this if the logo file is ever swapped, or it'll silently
 // stretch/squash the replacement. Never hardcode a size without this ratio.
-const LOGO_ASPECT = 1697 / 3374;
+export const LOGO_ASPECT = 1697 / 3374;
 // The reference PDF places its own (also wide, horizontal-lockup) logo at
 // ~68.7mm wide — sized ours to the same on-page width rather than a guess.
-const LOGO_WIDTH_MM = 68.7;
+export const LOGO_WIDTH_MM = 68.7;
 
 // Page-1 vertical rhythm, in mm from the top of the page — lifted directly
 // off the reference PDF's text positions (converted from its bottom-up PDF
@@ -94,7 +94,7 @@ export interface QuotationPdfInput {
   hidePrices?: boolean;
 }
 
-async function toDataUrl(url: string): Promise<string> {
+export async function toDataUrl(url: string): Promise<string> {
   const res = await fetch(url);
   const blob = await res.blob();
   return new Promise((resolve, reject) => {

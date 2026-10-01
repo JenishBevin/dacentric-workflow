@@ -27,7 +27,7 @@ export const MENU_REGISTRY: MenuItemDef[] = [
   { key: "workflow.history", label: "Project/Task History", path: "/workflow/history", module: "Workflow" },
   { key: "crm.customers", label: "Customers", path: "/workflow/customers", module: "CRM" },
   { key: "hrms.employees", label: "Employees", path: "/settings/employees", module: "HRMS" },
-  { key: "erp.erp", label: "ERP", path: "/erp", module: "ERP" },
+  { key: "erp.erp", label: "Vendor List", path: "/erp", module: "ERP" },
   { key: "tools.time-logs", label: "Time Logs", path: "/workflow/time-logs", module: "Tools" },
   { key: "tools.request", label: "Request", path: "/hrms/leave", module: "Tools" },
   { key: "tools.tickets", label: "Support Tickets", path: "/tickets", module: "Tools" },

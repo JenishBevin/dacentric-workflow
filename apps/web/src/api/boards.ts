@@ -105,11 +105,23 @@ export interface ProcurementRecord {
   vendorAddress: string | null;
   poNumber: string | null;
   orderDate: string | null;
-  lineItems: Array<{ description: string; quantity: number; unitCost: number }> | null;
+  lineItems: Array<{ description: string; quantity: number; unitCost: number; unit?: string }> | null;
   expectedDeliveryDate: string | null;
   actualDeliveryDate: string | null;
   status: "PENDING" | "ORDERED" | "DELIVERED" | "CANCELLED" | "NA";
   notes: string | null;
+  deliveryNoteNo: string | null;
+  deliverySite: string | null;
+  deliveryLocation: string | null;
+  deliveryDate: string | null;
+  deliveryItems: Array<{ description: string; unit: string; qty: number }> | null;
+  receiverName: string | null;
+  receiverDesignation: string | null;
+  poRequestedBy: string | null;
+  poCustomerId: string | null;
+  poGeneralComments: string | null;
+  poQuoteRefNo: string | null;
+  poPreparerName: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -141,6 +153,60 @@ export function useUpdateProcurementRecord(boardId: string) {
       qc.invalidateQueries({ queryKey: ["procurement-boards"] });
       qc.invalidateQueries({ queryKey: ["board", boardId] });
     },
+  });
+}
+
+export interface MaterialRequestItem {
+  description: string;
+  unit: string;
+  qty: number;
+  remarks?: string;
+}
+
+export interface MaterialRequest {
+  id: string;
+  boardId: string;
+  requestNo: string;
+  requestedByName: string;
+  department: string | null;
+  empId: string | null;
+  urgency: "NORMAL" | "URGENT";
+  requestDate: string | null;
+  requiredDate: string | null;
+  items: MaterialRequestItem[];
+  comments: string | null;
+  reviewedByName: string | null;
+  approvedByName: string | null;
+  createdAt: string;
+}
+
+/** Filled in from the Project page, listed read-only on that same
+ * project's Procurement page, and importable into a Purchase Order's item
+ * list there. */
+export function useMaterialRequests(boardId: string | undefined) {
+  return useQuery({
+    queryKey: ["material-requests", boardId],
+    queryFn: async () => (await api.get<{ data: MaterialRequest[] }>(`/boards/${boardId}/material-requests`)).data.data,
+    enabled: !!boardId,
+  });
+}
+
+export function useCreateMaterialRequest(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      requestedByName: string;
+      department?: string | null;
+      empId?: string | null;
+      urgency: "NORMAL" | "URGENT";
+      requestDate?: string | null;
+      requiredDate?: string | null;
+      items: MaterialRequestItem[];
+      comments?: string | null;
+      reviewedByName?: string | null;
+      approvedByName?: string | null;
+    }) => (await api.post<{ data: MaterialRequest }>(`/boards/${boardId}/material-requests`, payload)).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["material-requests", boardId] }),
   });
 }
 

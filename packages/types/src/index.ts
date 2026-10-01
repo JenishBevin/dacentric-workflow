@@ -238,6 +238,10 @@ export function formatProcurementId(year: number, sequence: number): string {
   return formatQptsId("PROC", year, sequence);
 }
 
+export function formatMaterialRequestId(year: number, sequence: number): string {
+  return formatQptsId("MRF", year, sequence);
+}
+
 // Customer IDs are permanent — unlike the QPTS ids above, they never reset
 // per year, since a customer relationship outlives any single year.
 export const CUSTOMER_ID_PREFIX = "CUS-";

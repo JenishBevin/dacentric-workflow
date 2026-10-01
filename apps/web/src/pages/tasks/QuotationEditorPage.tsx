@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronDown, Download, FileSpreadsheet, History, Plus, Save,
 import { useTask } from "../../api/tasks";
 import { useQuotations, useQuotation, useCreateQuotation, useUpdateQuotation, Quotation, QuotationLineItemInput } from "../../api/tasks";
 import { useCustomerDetail } from "../../api/customers";
+import { useVendors } from "../../api/vendors";
 import { downloadExport } from "../../api/misc";
 import { Button, Input, Label, Select, Badge, Skeleton, ErrorState } from "../../components/ui/primitives";
 import { Drawer } from "../../components/ui/Drawer";
@@ -55,6 +56,9 @@ export default function QuotationEditorPage() {
   const { data: task, isLoading: taskLoading, isError: taskError } = useTask(taskId);
   const { data: versions, isLoading: versionsLoading, isError: versionsError, refetch: refetchVersions } = useQuotations(taskId);
   const { data: customer } = useCustomerDetail(task?.customerId ?? undefined);
+  // Vendor Master lookup, for the costing sheet's vendor field below — lets a
+  // preparer pick from real suppliers instead of retyping a name each time.
+  const { data: vendorOptions } = useVendors({});
   const createQuotation = useCreateQuotation(taskId ?? "");
   const updateQuotation = useUpdateQuotation(taskId ?? "");
 
@@ -260,6 +264,22 @@ export default function QuotationEditorPage() {
 
   function updateRow(i: number, patch: Partial<RowForm>) {
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  // Typing (or picking, via the datalist) a name that exactly matches a
+  // Vendor Master record auto-fills that vendor's contact details — only
+  // when the contact cell is still blank, so it never overwrites something
+  // the preparer already typed by hand.
+  function handleVendorNameChange(i: number, value: string) {
+    const match = vendorOptions?.find((v) => v.name.toLowerCase() === value.trim().toLowerCase());
+    const row = rows[i];
+    if (match && !row.vendorContact.trim()) {
+      const c = match.contacts[0];
+      const contactParts = c ? [c.name, c.phone, c.email].filter(Boolean) : [];
+      updateRow(i, { vendorName: value, vendorContact: contactParts.join(" · ") });
+    } else {
+      updateRow(i, { vendorName: value });
+    }
   }
 
   function buildPayload() {
@@ -704,8 +724,17 @@ export default function QuotationEditorPage() {
               {costingEnabled && (
                 <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
                   Enter each item's buying cost and vendor, then either type a margin % (the selling price is worked out as buying cost + margin — a line's own margin, else the default above)
-                  or type the selling price you want and the margin % is worked out for you. Costing details stay internal — they never appear on the customer's PDF.
+                  or type the selling price you want and the margin % is worked out for you. Costing details stay internal — they never appear on the customer's PDF. Vendor names suggest from
+                  the ERP Vendor List, and picking one fills in its contact automatically.
                 </p>
+              )}
+
+              {costingEnabled && (
+                <datalist id="quotation-vendor-names">
+                  {vendorOptions?.map((v) => (
+                    <option key={v.id} value={v.name} />
+                  ))}
+                </datalist>
               )}
 
               <div className="overflow-x-auto">
@@ -749,7 +778,13 @@ export default function QuotationEditorPage() {
                           {costingEnabled && (
                             <>
                               <td className="px-1 py-2">
-                                <Input placeholder="Vendor" value={row.vendorName} onChange={(e) => updateRow(i, { vendorName: e.target.value })} className={CELL_INPUT} />
+                                <Input
+                                  placeholder="Vendor"
+                                  list="quotation-vendor-names"
+                                  value={row.vendorName}
+                                  onChange={(e) => handleVendorNameChange(i, e.target.value)}
+                                  className={CELL_INPUT}
+                                />
                               </td>
                               <td className="px-1 py-2">
                                 <Input placeholder="Phone / email / quote ref" value={row.vendorContact} onChange={(e) => updateRow(i, { vendorContact: e.target.value })} className={CELL_INPUT} />

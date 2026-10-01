@@ -92,6 +92,7 @@ export const updateProcurementSchema = z.object({
         description: z.string().min(1).max(300),
         quantity: z.number().nonnegative(),
         unitCost: z.number().nonnegative(),
+        unit: z.string().max(30).optional(),
       })
     )
     .optional()
@@ -100,4 +101,47 @@ export const updateProcurementSchema = z.object({
   actualDeliveryDate: isoDate.optional().nullable(),
   status: z.enum(["PENDING", "ORDERED", "DELIVERED", "CANCELLED", "NA"]).optional(),
   notes: z.string().max(4000).optional().nullable(),
+  deliveryNoteNo: z.string().max(100).optional().nullable(),
+  deliverySite: z.string().max(200).optional().nullable(),
+  deliveryLocation: z.string().max(200).optional().nullable(),
+  deliveryDate: isoDate.optional().nullable(),
+  deliveryItems: z
+    .array(
+      z.object({
+        description: z.string().min(1).max(300),
+        unit: z.string().max(30),
+        qty: z.number().nonnegative(),
+      })
+    )
+    .optional()
+    .nullable(),
+  receiverName: z.string().max(200).optional().nullable(),
+  receiverDesignation: z.string().max(200).optional().nullable(),
+  poRequestedBy: z.string().max(200).optional().nullable(),
+  poCustomerId: z.string().max(100).optional().nullable(),
+  poGeneralComments: z.string().max(2000).optional().nullable(),
+  poQuoteRefNo: z.string().max(100).optional().nullable(),
+  poPreparerName: z.string().max(200).optional().nullable(),
+});
+
+export const createMaterialRequestSchema = z.object({
+  requestedByName: z.string().min(1, "Requested By is required.").max(200),
+  department: z.string().max(200).optional().nullable(),
+  empId: z.string().max(100).optional().nullable(),
+  urgency: z.enum(["NORMAL", "URGENT"]).default("NORMAL"),
+  requestDate: isoDate.optional().nullable(),
+  requiredDate: isoDate.optional().nullable(),
+  items: z
+    .array(
+      z.object({
+        description: z.string().min(1).max(300),
+        unit: z.string().max(30),
+        qty: z.number().nonnegative(),
+        remarks: z.string().max(300).optional(),
+      })
+    )
+    .min(1, "At least one item is required."),
+  comments: z.string().max(2000).optional().nullable(),
+  reviewedByName: z.string().max(200).optional().nullable(),
+  approvedByName: z.string().max(200).optional().nullable(),
 });

@@ -4,7 +4,7 @@ import { writeAudit } from "../../common/audit";
 import { AuthedUser } from "../../middleware/authenticate";
 import { getBoardRole, assertBoardVisible, assertCanEditBoard, assertIsBoardOwnerOrAdmin, visibleBoardsWhere } from "./board-access";
 import { getPermissionScope, scopeAtLeast, isSystemLevelAdmin } from "../../common/permissions";
-import { AuditAction, BoardType, RoleCode, PermissionKey, formatProjectId } from "@dacentric/types";
+import { AuditAction, BoardType, RoleCode, PermissionKey, formatProjectId, formatMaterialRequestId } from "@dacentric/types";
 import { nextYearlySequence } from "../../common/sequence";
 import { clearBoardHighlight } from "../../common/highlight";
 
@@ -1150,11 +1150,23 @@ export interface UpdateProcurementInput {
   vendorAddress?: string | null;
   poNumber?: string | null;
   orderDate?: Date | null;
-  lineItems?: Array<{ description: string; quantity: number; unitCost: number }> | null;
+  lineItems?: Array<{ description: string; quantity: number; unitCost: number; unit?: string }> | null;
   expectedDeliveryDate?: Date | null;
   actualDeliveryDate?: Date | null;
   status?: "PENDING" | "ORDERED" | "DELIVERED" | "CANCELLED" | "NA";
   notes?: string | null;
+  deliveryNoteNo?: string | null;
+  deliverySite?: string | null;
+  deliveryLocation?: string | null;
+  deliveryDate?: Date | null;
+  deliveryItems?: Array<{ description: string; unit: string; qty: number }> | null;
+  receiverName?: string | null;
+  receiverDesignation?: string | null;
+  poRequestedBy?: string | null;
+  poCustomerId?: string | null;
+  poGeneralComments?: string | null;
+  poQuoteRefNo?: string | null;
+  poPreparerName?: string | null;
 }
 
 export async function updateProcurementRecord(boardId: string, input: UpdateProcurementInput, actor: AuthedUser) {
@@ -1164,12 +1176,13 @@ export async function updateProcurementRecord(boardId: string, input: UpdateProc
   const existing = await prisma.procurementRecord.findUnique({ where: { boardId } });
   if (!existing) throw Errors.notFound("Procurement record");
 
-  const { lineItems, ...rest } = input;
+  const { lineItems, deliveryItems, ...rest } = input;
   const updated = await prisma.procurementRecord.update({
     where: { boardId },
     data: {
       ...rest,
       ...(lineItems !== undefined ? { lineItems: lineItems as any } : {}),
+      ...(deliveryItems !== undefined ? { deliveryItems: deliveryItems as any } : {}),
       updatedById: actor.id,
     },
   });
@@ -1185,4 +1198,66 @@ export async function updateProcurementRecord(boardId: string, input: UpdateProc
   });
 
   return updated;
+}
+
+// --- Material Request Form (MRF) — filled in from a project's Project
+// page, listed read-only on that same project's Procurement page, and
+// importable into a Purchase Order's item list there. Each submission is
+// its own record (no edit/delete — same spirit as a signed paper form). ---
+
+export interface CreateMaterialRequestInput {
+  requestedByName: string;
+  department?: string | null;
+  empId?: string | null;
+  urgency: "NORMAL" | "URGENT";
+  requestDate?: Date | null;
+  requiredDate?: Date | null;
+  items: Array<{ description: string; unit: string; qty: number; remarks?: string }>;
+  comments?: string | null;
+  reviewedByName?: string | null;
+  approvedByName?: string | null;
+}
+
+export async function listMaterialRequests(boardId: string, user: AuthedUser) {
+  await assertBoardVisible(boardId, user);
+  return prisma.materialRequest.findMany({ where: { boardId }, orderBy: { createdAt: "desc" } });
+}
+
+export async function createMaterialRequest(boardId: string, input: CreateMaterialRequestInput, actor: AuthedUser) {
+  const role = await assertBoardVisible(boardId, actor);
+  assertCanEditBoard(role, actor);
+
+  const year = new Date().getFullYear();
+  const created = await prisma.$transaction(async (tx) => {
+    const sequence = await nextYearlySequence("MATERIAL_REQUEST", year, tx);
+    return tx.materialRequest.create({
+      data: {
+        boardId,
+        requestNo: formatMaterialRequestId(year, sequence),
+        requestedByName: input.requestedByName,
+        department: input.department ?? null,
+        empId: input.empId ?? null,
+        urgency: input.urgency,
+        requestDate: input.requestDate ?? null,
+        requiredDate: input.requiredDate ?? null,
+        items: input.items as any,
+        comments: input.comments ?? null,
+        reviewedByName: input.reviewedByName ?? null,
+        approvedByName: input.approvedByName ?? null,
+        createdById: actor.id,
+      },
+    });
+  });
+
+  await writeAudit({
+    actor,
+    action: AuditAction.CREATE,
+    entityType: "Board",
+    entityId: boardId,
+    boardId,
+    field: "materialRequest",
+    afterValue: { requestNo: created.requestNo, itemCount: input.items.length },
+  });
+
+  return created;
 }

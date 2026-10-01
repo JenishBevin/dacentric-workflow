@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload, Trello, PackageSearch, Building2, Landmark } from "lucide-react";
+import { ArrowLeft, CheckCircle2, List, LayoutGrid, Upload, Trello, PackageSearch, Building2, Landmark, ClipboardList } from "lucide-react";
 import { useBoardDetail, useReorderStages, useSetBoardCompleted, useServices } from "../../api/boards";
 import { useBoardTasks, useDuplicateTask, useDeleteTask, useImportEnquiries, useImportEstimations, useBulkDeleteTasks, useBulkMoveTasks } from "../../api/tasks";
 import { downloadExport } from "../../api/misc";
@@ -13,6 +13,7 @@ import { NewTaskDrawer } from "../../components/kanban/NewTaskDrawer";
 import { TaskDetailDrawer } from "../../components/tasks/TaskDetailDrawer";
 import { BoardSettingsDrawer } from "../../components/boards/BoardSettingsDrawer";
 import { ProcurementPanel } from "../../components/procurement/ProcurementPanel";
+import { MaterialRequestDrawer } from "../../components/boards/MaterialRequestDrawer";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { BulkActionBar } from "../../components/ui/BulkActionBar";
 import { DiscussButton } from "../../components/chat/DiscussButton";
@@ -78,6 +79,7 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
 
   const [newTaskStageId, setNewTaskStageId] = useState<string | null>(null);
   const [recurringPrefill, setRecurringPrefill] = useState<any>(null);
+  const [materialRequestOpen, setMaterialRequestOpen] = useState(false);
   const [pendingDeleteTask, setPendingDeleteTask] = useState<TaskSummary | null>(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
   // List/Kanban toggle is only offered on the Enquiry List embed (identified
@@ -352,6 +354,11 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
               </button>
             </div>
           )}
+          {board.procurementRecord && panelView === "project" && (
+            <Button variant="outline" onClick={() => setMaterialRequestOpen(true)}>
+              <ClipboardList className="h-4 w-4" /> Material Request
+            </Button>
+          )}
           {boardIdProp && panelView === "project" && (
             <div className="flex rounded-lg border border-slate-300 p-0.5">
               <button
@@ -519,6 +526,8 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
       <TaskDetailDrawer taskId={openTaskId} onClose={closeTask} onDeleted={closeTask} />
 
       {settingsTab && <BoardSettingsDrawer open={!!settingsTab} onClose={closeSettings} board={board} initialTab={settingsTab} />}
+
+      <MaterialRequestDrawer open={materialRequestOpen} onClose={() => setMaterialRequestOpen(false)} boardId={board.id} projectName={board.name} />
 
       <ConfirmDialog
         open={!!pendingDeleteTask}
