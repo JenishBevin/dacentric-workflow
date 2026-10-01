@@ -1,10 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Lock, Upload, Plus, Search, Trash2, Mail, Phone, Building2, ChevronRight, Globe, FileText, MapPin, StickyNote, Users as UsersIcon, Tag, Award } from "lucide-react";
+import { Lock, Upload, Plus, X, Search, Trash2, Mail, Phone, Building2, ChevronRight, Globe, FileText, MapPin, StickyNote, Users as UsersIcon, Tag, Award } from "lucide-react";
 import { EmptyState, Button, Input, Select, Badge, Skeleton, ErrorState, Label, Textarea } from "../../components/ui/primitives";
 import { Drawer } from "../../components/ui/Drawer";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { useVendors, useVendorFilterOptions, useImportVendors, useCreateVendor, useDeleteVendor, useUpdateVendorDetails, Vendor } from "../../api/vendors";
+import {
+  useVendors,
+  useVendorFilterOptions,
+  useImportVendors,
+  useCreateVendor,
+  useDeleteVendor,
+  useUpdateVendorDetails,
+  Vendor,
+  VendorFilterOptions,
+} from "../../api/vendors";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { isSuperAdmin } from "../../lib/permissions";
@@ -54,13 +63,15 @@ function VendorMaster() {
   const { user } = useAuth();
   const { push } = useToast();
   // Bulk import stays Super Admin only (same reasoning as the
-  // Enquiry/Estimation Excel imports — see vendors.routes.ts); adding one by
-  // hand is also open to Management, Admin & Finance and Procurement, who
-  // deal with suppliers day to day; editing/deleting an existing record
-  // stays narrower still (Super Admin + Management).
+  // Enquiry/Estimation Excel imports — see vendors.routes.ts). Adding one by
+  // hand and editing an existing vendor's details are both open to
+  // Management, Admin & Finance and Procurement too, who deal with suppliers
+  // day to day; deleting a vendor outright stays narrower still (Super Admin
+  // + Management — see vendors.routes.ts's DELETE route).
   const canImport = isSuperAdmin(user);
-  const canAddVendor = isSuperAdmin(user) || !!user?.roles.some((r) => r === "MANAGEMENT" || r === "ESTIMATION" || r === "PROCUREMENT");
-  const canEditDelete = isSuperAdmin(user) || !!user?.roles.includes("MANAGEMENT");
+  const canEdit = isSuperAdmin(user) || !!user?.roles.some((r) => r === "MANAGEMENT" || r === "ESTIMATION" || r === "PROCUREMENT");
+  const canAddVendor = canEdit;
+  const canDelete = isSuperAdmin(user) || !!user?.roles.includes("MANAGEMENT");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
@@ -227,12 +238,13 @@ function VendorMaster() {
 
       <VendorDetailDrawer
         vendor={selected}
-        canManage={canEditDelete}
+        canEdit={canEdit}
+        canDelete={canDelete}
         onClose={() => setSelected(null)}
         onRequestDelete={(v) => setPendingDelete(v)}
       />
 
-      <NewVendorDrawer open={addOpen} onClose={() => setAddOpen(false)} />
+      <NewVendorDrawer open={addOpen} onClose={() => setAddOpen(false)} filterOptions={filterOptions} />
 
       <ConfirmDialog
         open={!!pendingDelete}
@@ -263,12 +275,14 @@ function VendorMaster() {
 
 function VendorDetailDrawer({
   vendor,
-  canManage,
+  canEdit,
+  canDelete,
   onClose,
   onRequestDelete,
 }: {
   vendor: Vendor | null;
-  canManage: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
   onClose: () => void;
   onRequestDelete: (v: Vendor) => void;
 }) {
@@ -312,14 +326,18 @@ function VendorDetailDrawer({
       title={vendor.name}
       subtitle={`${vendor.services.length} service categor${vendor.services.length === 1 ? "y" : "ies"} · ${vendor.brands.length} brand${vendor.brands.length === 1 ? "" : "s"} · ${vendor.contacts.length} contact${vendor.contacts.length === 1 ? "" : "s"}`}
       footer={
-        canManage ? (
+        canEdit || canDelete ? (
           <>
-            <Button variant="outline" className="mr-auto text-red-600 hover:bg-red-50" onClick={() => onRequestDelete(vendor)}>
-              <Trash2 className="h-4 w-4" /> Delete vendor
-            </Button>
-            <Button onClick={handleSave} loading={updateDetails.isPending} disabled={!dirty}>
-              Save changes
-            </Button>
+            {canDelete && (
+              <Button variant="outline" className="mr-auto text-red-600 hover:bg-red-50" onClick={() => onRequestDelete(vendor)}>
+                <Trash2 className="h-4 w-4" /> Delete vendor
+              </Button>
+            )}
+            {canEdit && (
+              <Button onClick={handleSave} loading={updateDetails.isPending} disabled={!dirty}>
+                Save changes
+              </Button>
+            )}
           </>
         ) : undefined
       }
@@ -376,30 +394,120 @@ function VendorDetailDrawer({
             <Label className="flex items-center gap-1">
               <Globe className="h-3.5 w-3.5 text-slate-400" /> Website
             </Label>
-            <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://example.com" disabled={!canManage} />
+            <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://example.com" disabled={!canEdit} />
           </div>
           <div>
             <Label className="flex items-center gap-1">
               <FileText className="h-3.5 w-3.5 text-slate-400" /> VAT Number
             </Label>
-            <Input value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} disabled={!canManage} />
+            <Input value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} disabled={!canEdit} />
           </div>
           <div>
             <Label className="flex items-center gap-1">
               <MapPin className="h-3.5 w-3.5 text-slate-400" /> Address
             </Label>
-            <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!canManage} />
+            <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!canEdit} />
           </div>
           <div>
             <Label className="flex items-center gap-1">
               <StickyNote className="h-3.5 w-3.5 text-slate-400" /> Notes
             </Label>
-            <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} disabled={!canManage} />
+            <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} disabled={!canEdit} />
           </div>
-          {!canManage && <p className="text-xs text-slate-400">Only Super Admins and Management can edit these details.</p>}
+          {!canEdit && <p className="text-xs text-slate-400">Only Super Admin, Management, Admin & Finance and Procurement can edit these details.</p>}
         </section>
       </div>
     </Drawer>
+  );
+}
+
+/** Chip input with suggestions drawn from the vendors already in the
+ * directory (e.g. every distinct service category or brand seen so far) —
+ * type to filter, click or Enter/comma to add, Backspace on an empty box
+ * removes the last chip. Freely typed values not in `options` are still
+ * accepted, since a vendor can carry a brand/category nobody's entered yet. */
+function TagInput({
+  label,
+  placeholder,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  placeholder: string;
+  value: string[];
+  onChange: (v: string[]) => void;
+  options: string[];
+}) {
+  const [input, setInput] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const suggestions = input.trim()
+    ? options.filter((o) => o.toLowerCase().includes(input.trim().toLowerCase()) && !value.some((v) => v.toLowerCase() === o.toLowerCase())).slice(0, 8)
+    : [];
+
+  function addTag(tag: string) {
+    const t = tag.trim();
+    if (!t || value.some((v) => v.toLowerCase() === t.toLowerCase())) return;
+    onChange([...value, t]);
+    setInput("");
+    setOpen(false);
+  }
+  function removeTag(tag: string) {
+    onChange(value.filter((v) => v !== tag));
+  }
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(input);
+    } else if (e.key === "Backspace" && !input && value.length > 0) {
+      removeTag(value[value.length - 1]);
+    }
+  }
+
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="relative">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-1.5 focus-within:focus-ring">
+          {value.map((v) => (
+            <span key={v} className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+              {v}
+              <button type="button" onClick={() => removeTag(v)} aria-label={`Remove ${v}`} className="text-slate-400 hover:text-red-500">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          <input
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setOpen(true);
+            }}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            placeholder={value.length === 0 ? placeholder : ""}
+            className="min-w-[8rem] flex-1 border-0 p-0.5 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+          />
+        </div>
+        {open && suggestions.length > 0 && (
+          <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => addTag(s)}
+                className="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -410,13 +518,13 @@ interface ContactRow {
 }
 const emptyContactRow = (): ContactRow => ({ name: "", phone: "", email: "" });
 
-function NewVendorDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function NewVendorDrawer({ open, onClose, filterOptions }: { open: boolean; onClose: () => void; filterOptions: VendorFilterOptions | undefined }) {
   const { push } = useToast();
   const createVendor = useCreateVendor();
 
   const [name, setName] = useState("");
-  const [services, setServices] = useState("");
-  const [brands, setBrands] = useState("");
+  const [services, setServices] = useState<string[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
   const [contacts, setContacts] = useState<ContactRow[]>([emptyContactRow()]);
   const [website, setWebsite] = useState("");
   const [vatNumber, setVatNumber] = useState("");
@@ -425,8 +533,8 @@ function NewVendorDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
   function reset() {
     setName("");
-    setServices("");
-    setBrands("");
+    setServices([]);
+    setBrands([]);
     setContacts([emptyContactRow()]);
     setWebsite("");
     setVatNumber("");
@@ -446,8 +554,8 @@ function NewVendorDrawer({ open, onClose }: { open: boolean; onClose: () => void
     try {
       await createVendor.mutateAsync({
         name: name.trim(),
-        services: services.split(",").map((s) => s.trim()).filter(Boolean),
-        brands: brands.split(",").map((b) => b.trim()).filter(Boolean),
+        services,
+        brands,
         contacts: contacts
           .filter((c) => c.name.trim() || c.phone.trim() || c.email.trim())
           .map((c) => ({ name: c.name.trim() || null, phone: c.phone.trim() || null, email: c.email.trim() || null })),
@@ -495,14 +603,14 @@ function NewVendorDrawer({ open, onClose }: { open: boolean; onClose: () => void
           <Label required>Vendor Name</Label>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Gulf Security Trading LLC" autoFocus />
         </div>
-        <div>
-          <Label>Service Categories</Label>
-          <Input value={services} onChange={(e) => setServices(e.target.value)} placeholder="Comma-separated, e.g. CCTV System, Audio & Visual System" />
-        </div>
-        <div>
-          <Label>Brands Carried</Label>
-          <Input value={brands} onChange={(e) => setBrands(e.target.value)} placeholder="Comma-separated, e.g. Bosch, Hikvision" />
-        </div>
+        <TagInput
+          label="Service Categories"
+          placeholder="Type to search or add…"
+          value={services}
+          onChange={setServices}
+          options={filterOptions?.services ?? []}
+        />
+        <TagInput label="Brands Carried" placeholder="Type to search or add…" value={brands} onChange={setBrands} options={filterOptions?.brands ?? []} />
 
         <div>
           <div className="mb-1.5 flex items-center justify-between">

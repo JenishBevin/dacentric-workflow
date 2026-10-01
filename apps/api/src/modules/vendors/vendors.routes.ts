@@ -9,12 +9,12 @@ import * as vendorsService from "./vendors.service";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
-// Who sees "Add Vendor" and can add one by hand — broader than edit/delete
-// below (Super Admin + Management only), since Admin and Finance (role code
-// ESTIMATION — see rolesSeed.ts) and Procurement are the ones actually
-// dealing with suppliers day to day, even if editing/removing an existing
-// record stays more restricted.
-const VENDOR_CREATORS = [RoleCode.SUPER_ADMIN, RoleCode.MANAGEMENT, RoleCode.ESTIMATION, RoleCode.PROCUREMENT];
+// Who sees "Add Vendor", can add one by hand, and can edit an existing
+// vendor's details — Admin and Finance (role code ESTIMATION — see
+// rolesSeed.ts) and Procurement deal with suppliers day to day, so they get
+// the same access as Management here. Deleting a vendor outright stays
+// narrower still (Super Admin + Management only — see the DELETE route).
+const VENDOR_EDITORS = [RoleCode.SUPER_ADMIN, RoleCode.MANAGEMENT, RoleCode.ESTIMATION, RoleCode.PROCUREMENT];
 
 export const vendorsRouter = Router();
 vendorsRouter.use(authenticate);
@@ -29,7 +29,7 @@ vendorsRouter.get(
 
 vendorsRouter.post(
   "/",
-  requireAnyRole(...VENDOR_CREATORS),
+  requireAnyRole(...VENDOR_EDITORS),
   asyncHandler(async (req, res) => {
     const body = req.body as Record<string, unknown>;
     const toNullable = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
@@ -82,7 +82,7 @@ vendorsRouter.post(
 
 vendorsRouter.patch(
   "/:id",
-  requireAnyRole(RoleCode.SUPER_ADMIN, RoleCode.MANAGEMENT),
+  requireAnyRole(...VENDOR_EDITORS),
   asyncHandler(async (req, res) => {
     const { website, vatNumber, address, notes } = req.body as Record<string, unknown>;
     const toNullable = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
@@ -97,6 +97,8 @@ vendorsRouter.patch(
   })
 );
 
+// Narrower than VENDOR_EDITORS above — removing a vendor outright stays
+// Super Admin + Management only.
 vendorsRouter.delete(
   "/:id",
   requireAnyRole(RoleCode.SUPER_ADMIN, RoleCode.MANAGEMENT),
