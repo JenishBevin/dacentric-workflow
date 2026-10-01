@@ -149,7 +149,7 @@ export function DonutCenter({ total }: { total: number }) {
   );
 }
 
-export type StatKind = "TOTAL_OPEN" | "OVERDUE" | "DUE_TODAY" | "DUE_THIS_WEEK" | "COMPLETED_THIS_MONTH" | "PENDING_APPROVAL" | "PENDING_LOST";
+export type StatKind = "TOTAL_OPEN" | "OVERDUE" | "DUE_TODAY" | "DUE_THIS_WEEK" | "COMPLETED_THIS_MONTH" | "PENDING_APPROVAL" | "PENDING_LOST" | "PENDING_QUOTATION";
 
 const STAT_MODAL_TITLES: Record<StatKind, { title: string; empty: string }> = {
   TOTAL_OPEN: { title: "Total Open Tasks", empty: "No open tasks." },
@@ -159,6 +159,7 @@ const STAT_MODAL_TITLES: Record<StatKind, { title: string; empty: string }> = {
   COMPLETED_THIS_MONTH: { title: "Completed This Month", empty: "Nothing completed yet this month." },
   PENDING_APPROVAL: { title: "Pending Approvals", empty: "Nothing waiting on approval." },
   PENDING_LOST: { title: "Review Lost Projects", empty: "No Lost requests waiting on your review." },
+  PENDING_QUOTATION: { title: "Submit Quotation Approvals", empty: "Nothing waiting on quotation approval." },
 };
 
 /** Drill-down list for a clickable dashboard stat card — opens a task on click. */

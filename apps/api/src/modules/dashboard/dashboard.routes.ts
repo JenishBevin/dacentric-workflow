@@ -2,12 +2,10 @@ import { Router } from "express";
 import { asyncHandler, ok } from "../../common/http";
 import { authenticate } from "../../middleware/authenticate";
 import { Errors } from "../../common/errors";
-import { getDashboard, getDashboardTaskList, DashboardStatKind } from "./dashboard.service";
+import { getDashboard, getDashboardTaskList, DashboardStatKind, DASHBOARD_STAT_KINDS } from "./dashboard.service";
 
 export const dashboardRouter = Router();
 dashboardRouter.use(authenticate);
-
-const STAT_KINDS: DashboardStatKind[] = ["TOTAL_OPEN", "OVERDUE", "DUE_TODAY", "DUE_THIS_WEEK", "COMPLETED_THIS_MONTH", "PENDING_APPROVAL", "PENDING_LOST"];
 
 dashboardRouter.get(
   "/",
@@ -27,7 +25,7 @@ dashboardRouter.get(
   "/tasks",
   asyncHandler(async (req, res) => {
     const q = req.query as Record<string, string>;
-    if (!STAT_KINDS.includes(q.kind as DashboardStatKind)) {
+    if (!DASHBOARD_STAT_KINDS.includes(q.kind as DashboardStatKind)) {
       throw Errors.badRequest("Unknown dashboard stat kind.");
     }
     const tasks = await getDashboardTaskList(req.user!, q.kind as DashboardStatKind, {

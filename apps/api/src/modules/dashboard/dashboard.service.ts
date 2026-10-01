@@ -11,14 +11,21 @@ export interface DashboardFilters {
   dateTo?: Date;
 }
 
-export type DashboardStatKind =
-  | "TOTAL_OPEN"
-  | "OVERDUE"
-  | "DUE_TODAY"
-  | "DUE_THIS_WEEK"
-  | "COMPLETED_THIS_MONTH"
-  | "PENDING_APPROVAL"
-  | "PENDING_LOST";
+// Single source of truth for every valid kind — dashboard.routes.ts
+// validates against this same array, so a kind added only to the type
+// below (not here) would silently 400 at the route instead of ever
+// reaching getDashboardTaskList. Learned that one the hard way.
+export const DASHBOARD_STAT_KINDS = [
+  "TOTAL_OPEN",
+  "OVERDUE",
+  "DUE_TODAY",
+  "DUE_THIS_WEEK",
+  "COMPLETED_THIS_MONTH",
+  "PENDING_APPROVAL",
+  "PENDING_LOST",
+  "PENDING_QUOTATION",
+] as const;
+export type DashboardStatKind = (typeof DASHBOARD_STAT_KINDS)[number];
 
 function dateWindows() {
   const now = new Date();
@@ -71,6 +78,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     pendingApprovals,
     pendingLost,
     pendingAccountsApproval,
+    pendingQuotationApproval,
     recentActivity,
   ] = await Promise.all([
     prisma.task.count({ where: { ...baseWhere, isCompleted: false } }),
@@ -92,6 +100,9 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     // (see listAccountsPendingBoards), same where clause so this count always
     // matches what the Accounts page itself shows.
     prisma.board.count({ where: { ...boardWhere, isDeleted: false, accountsApprovalStatus: "PENDING" } }),
+    // The Estimation board's "Submit Quotation" upload — separate from the
+    // generic approvalStatus above (see decideQuotation in tasks.service.ts).
+    prisma.task.count({ where: { ...baseWhere, quotationApprovalStatus: "PENDING_APPROVAL" } }),
     prisma.auditLog.findMany({ where: { boardId: { in: boardIds } }, orderBy: { createdAt: "desc" }, take: 15 }),
   ]);
 
@@ -137,6 +148,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     pendingApprovals,
     pendingLost,
     pendingAccountsApproval,
+    pendingQuotationApproval,
     priorityDistribution: priorityBreakdown.map((p) => ({ priority: p.priority, count: p._count._all })),
     statusDistribution,
     recentActivity: recentActivityWithBoard,
@@ -171,6 +183,9 @@ export async function getDashboardTaskList(actor: AuthedUser, kind: DashboardSta
       break;
     case "PENDING_LOST":
       where = { ...baseWhere, lostApprovalStatus: "PENDING_APPROVAL" };
+      break;
+    case "PENDING_QUOTATION":
+      where = { ...baseWhere, quotationApprovalStatus: "PENDING_APPROVAL" };
       break;
   }
 

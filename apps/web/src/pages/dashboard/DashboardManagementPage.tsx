@@ -1,9 +1,10 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Flag, ThumbsDown } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Flag, ThumbsDown, FileCheck2, Wallet } from "lucide-react";
 import { useDashboard, useDashboardTaskList, useTeamWorkload } from "../../api/misc";
 import { useBoards } from "../../api/boards";
+import { useActionableClaims } from "../../api/claims";
 import { Card, Skeleton, ErrorState, Avatar, AvatarGroup, Badge } from "../../components/ui/primitives";
 import { PriorityBadge, DueDateBadge } from "../../components/workflow/badges";
 import { TaskDetailDrawer } from "../../components/tasks/TaskDetailDrawer";
@@ -34,6 +35,9 @@ export default function DashboardManagementPage() {
   const boards = React.useMemo(() => boardsRaw?.filter((b) => b.name !== "Enquiry List" && b.name !== "Estimation"), [boardsRaw]);
   const { data: workload } = useTeamWorkload({});
   const { data: dueThisWeek } = useDashboardTaskList("DUE_THIS_WEEK");
+  // listActionableClaims already scopes to exactly what Management can act
+  // on (status PENDING — see claims.service.ts), so its length is the count.
+  const { data: actionableClaims } = useActionableClaims(true);
   const [openStat, setOpenStat] = React.useState<StatKind | null>(null);
   const [drillDownTaskId, setDrillDownTaskId] = React.useState<string | null>(null);
 
@@ -239,6 +243,46 @@ export default function DashboardManagementPage() {
               className="flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25"
             >
               <ThumbsDown className="h-4 w-4" /> Review Lost Projects
+            </button>
+          </div>
+
+          {/* Submit Quotation Approvals — the Estimation board's "Submit
+              Quotation" upload, separate from the generic Pending Approvals
+              above (see decideQuotation in tasks.service.ts). */}
+          <div className="flex flex-col gap-4 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-700 p-5 text-white sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-base font-semibold">Submit Quotation Approvals</p>
+              <p className="text-sm text-white/80">
+                {data.pendingQuotationApproval > 0
+                  ? `${data.pendingQuotationApproval} quotation(s) waiting on your approval.`
+                  : "Nothing waiting on your review right now."}
+              </p>
+            </div>
+            <button
+              onClick={() => setOpenStat("PENDING_QUOTATION")}
+              className="flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25"
+            >
+              <FileCheck2 className="h-4 w-4" /> Review Quotations
+            </button>
+          </div>
+
+          {/* Claim Settlement Approvals — expense claims waiting on
+              Management's decision (stage 2 of 3, see claims.service.ts's
+              listActionableClaims); acted on from the Claim tab, not here. */}
+          <div className="flex flex-col gap-4 rounded-xl bg-gradient-to-br from-amber-500 to-orange-700 p-5 text-white sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-base font-semibold">Claim Settlement Approvals</p>
+              <p className="text-sm text-white/80">
+                {(actionableClaims?.length ?? 0) > 0
+                  ? `${actionableClaims!.length} claim(s) waiting on your approval.`
+                  : "Nothing waiting on your review right now."}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate("/hrms/leave?tab=claim")}
+              className="flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25"
+            >
+              <Wallet className="h-4 w-4" /> Review Claims
             </button>
           </div>
 
