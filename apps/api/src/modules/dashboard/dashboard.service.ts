@@ -70,6 +70,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     statusBreakdown,
     pendingApprovals,
     pendingLost,
+    pendingAccountsApproval,
     recentActivity,
   ] = await Promise.all([
     prisma.task.count({ where: { ...baseWhere, isCompleted: false } }),
@@ -87,6 +88,10 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     prisma.task.groupBy({ by: ["stageId"], where: { ...baseWhere }, _count: { _all: true } }),
     prisma.task.count({ where: { ...baseWhere, approvalStatus: "PENDING_APPROVAL" } }),
     prisma.task.count({ where: { ...baseWhere, lostApprovalStatus: "PENDING_APPROVAL" } }),
+    // Board-level, not task-level — every Project awaiting Accounts sign-off
+    // (see listAccountsPendingBoards), same where clause so this count always
+    // matches what the Accounts page itself shows.
+    prisma.board.count({ where: { ...boardWhere, isDeleted: false, accountsApprovalStatus: "PENDING" } }),
     prisma.auditLog.findMany({ where: { boardId: { in: boardIds } }, orderBy: { createdAt: "desc" }, take: 15 }),
   ]);
 
@@ -131,6 +136,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     activeBoards,
     pendingApprovals,
     pendingLost,
+    pendingAccountsApproval,
     priorityDistribution: priorityBreakdown.map((p) => ({ priority: p.priority, count: p._count._all })),
     statusDistribution,
     recentActivity: recentActivityWithBoard,

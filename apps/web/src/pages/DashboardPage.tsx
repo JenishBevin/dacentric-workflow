@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Trello, ListChecks, Timer } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Trello, ListChecks, Timer, Landmark } from "lucide-react";
 import { useDashboard, useMyTasks, useTeamWorkload } from "../api/misc";
 import { useBoards } from "../api/boards";
 import { useWorkTimeToday, useWorkTimeSummary } from "../api/workTime";
@@ -35,6 +35,10 @@ export default function DashboardPage() {
   // the Projects page actually shows.
   const boards = React.useMemo(() => boardsRaw?.filter((b) => b.name !== "Enquiry List" && b.name !== "Estimation"), [boardsRaw]);
   const canViewWorkload = can(user, "VIEW_TEAM_WORKLOAD");
+  // Same authority check as the Accounts page's own Approve/Reject buttons
+  // (approveAccountsBoard/rejectAccountsBoard) — only shown to people who
+  // can actually act on it, not just anyone who happens to see the count.
+  const canApproveAccounts = can(user, "CREATE_BOARD", "ALL");
   const { data: workload } = useTeamWorkload({});
   const { data: myTaskGroups } = useMyTasks();
   const { data: todayTime } = useWorkTimeToday();
@@ -95,6 +99,16 @@ export default function DashboardPage() {
               <StatCard icon={LayoutGrid} image="/images/dashboard/active-boards.jpg" label="Active Projects" value={data.activeBoards} tone="bg-purple-100 text-purple-700" onClick={() => navigate("/workflow/boards")} />
               <StatCard icon={ShieldCheck} image="/images/dashboard/pending-approvals.jpg" label="Pending Approvals" value={data.pendingApprovals} tone="bg-orange-100 text-orange-700" onClick={() => setOpenStat("PENDING_APPROVAL")} />
               <StatCard icon={CalendarClock} image="/images/dashboard/due-this-week.jpg" label="Due This Week" value={data.dueThisWeek} tone="bg-blue-100 text-blue-700" onClick={() => setOpenStat("DUE_THIS_WEEK")} />
+              {canApproveAccounts && (
+                <StatCard
+                  icon={Landmark}
+                  image="/images/dashboard/pending-approvals.jpg"
+                  label="Pending Accounts Approval"
+                  value={data.pendingAccountsApproval}
+                  tone="bg-indigo-100 text-indigo-700"
+                  onClick={() => navigate("/workflow/accounts")}
+                />
+              )}
 
               {/* My Work Time — fills the leftover grid cell next to the chart */}
               <Card className="relative overflow-hidden p-2 text-left">
