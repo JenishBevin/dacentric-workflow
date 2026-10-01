@@ -175,7 +175,16 @@ export default function BoardsListPage() {
   }
 
   const actions: ProjectActions = {
-    canManage: (b) => b.members.find((m) => m.userId === user?.id)?.role === "OWNER" || isAdmin(user) || false,
+    // Gates the row's ⋮ menu (Edit/Duplicate/Manage Members use EDIT_BOARD,
+    // Archive/Delete use ARCHIVE_DELETE_BOARD on the backend — see
+    // board-access.ts) — shown if this viewer can do at least one of those
+    // actions, same reasoning as canMove below for Management's org-wide
+    // EDIT_BOARD:ALL grant.
+    canManage: (b) =>
+      b.members.find((m) => m.userId === user?.id)?.role === "OWNER" ||
+      isAdmin(user) ||
+      can(user, "EDIT_BOARD", "ALL") ||
+      can(user, "ARCHIVE_DELETE_BOARD", "ALL"),
     onEdit: (b) => navigate(`/workflow/boards/${b.id}?settings=general`),
     onManageMembers: (b) => navigate(`/workflow/boards/${b.id}?settings=members`),
     onDuplicate: async (b) => {
