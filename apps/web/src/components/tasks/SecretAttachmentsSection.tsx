@@ -34,6 +34,12 @@ interface Props {
   decidedByName?: string | null;
   /** isAdmin(user) || can(user, "APPROVE_TASK", "ALL") — whoever can approve/reject. */
   canDecide: boolean;
+  /** task.board?.name === "Estimation" — new uploads/deletes only happen
+   *  during the active review phase; once awarded off Estimation the files
+   *  already here stay visible/downloadable (the permanent record) but the
+   *  dropzone and per-file delete button hide, matching the backend's own
+   *  assertOnEstimationBoard. */
+  canManageFiles: boolean;
 }
 
 /**
@@ -45,7 +51,7 @@ interface Props {
  * the backend) — approve/reject lives here too since it's this section's
  * own concern, not the task's general requiresApproval gate.
  */
-export const SecretAttachmentsSection: React.FC<Props> = ({ taskId, approvalStatus, rejectionReason, decidedByName, canDecide }) => {
+export const SecretAttachmentsSection: React.FC<Props> = ({ taskId, approvalStatus, rejectionReason, decidedByName, canDecide, canManageFiles }) => {
   const { push } = useToast();
   const { data: attachments } = useTaskSecretAttachments(taskId, true);
   const upload = useUploadSecretAttachment(taskId);
@@ -134,30 +140,36 @@ export const SecretAttachmentsSection: React.FC<Props> = ({ taskId, approvalStat
         </div>
       )}
 
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          uploadFiles(e.dataTransfer.files);
-        }}
-        className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-5 text-center text-xs ${
-          dragOver ? "border-amber-400 bg-amber-100/60" : "border-amber-300 bg-white/50"
-        }`}
-      >
-        <UploadCloud className="h-5 w-5 text-amber-500" />
-        <p className="text-amber-800">
-          Drag files here, or{" "}
-          <button onClick={() => inputRef.current?.click()} className="font-medium text-amber-900 hover:underline">
-            browse
-          </button>
+      {canManageFiles ? (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            uploadFiles(e.dataTransfer.files);
+          }}
+          className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-5 text-center text-xs ${
+            dragOver ? "border-amber-400 bg-amber-100/60" : "border-amber-300 bg-white/50"
+          }`}
+        >
+          <UploadCloud className="h-5 w-5 text-amber-500" />
+          <p className="text-amber-800">
+            Drag files here, or{" "}
+            <button onClick={() => inputRef.current?.click()} className="font-medium text-amber-900 hover:underline">
+              browse
+            </button>
+          </p>
+          <input ref={inputRef} type="file" multiple className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
+        </div>
+      ) : (
+        <p className="text-xs text-amber-700/70">
+          This project has moved off the Estimation board — the files below stay here for reference, but new ones can no longer be added.
         </p>
-        <input ref={inputRef} type="file" multiple className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
-      </div>
+      )}
 
       <div className="space-y-1.5">
         {attachments?.map((a: SecretAttachment) => (
@@ -177,9 +189,11 @@ export const SecretAttachmentsSection: React.FC<Props> = ({ taskId, approvalStat
             >
               <Download className="h-4 w-4" />
             </button>
-            <button onClick={() => setPendingDelete(a)} className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label={`Delete ${a.fileName}`}>
-              <Trash2 className="h-4 w-4" />
-            </button>
+            {canManageFiles && (
+              <button onClick={() => setPendingDelete(a)} className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label={`Delete ${a.fileName}`}>
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
           </div>
         ))}
         {attachments?.length === 0 && <p className="py-2 text-xs text-amber-700/70">No files submitted yet.</p>}

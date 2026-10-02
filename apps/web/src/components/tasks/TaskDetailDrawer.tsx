@@ -798,13 +798,19 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
             <AttachmentsSection taskId={task.id} canDelete={canCollab} />
           </section>
 
-          {task.board?.name === "Estimation" && canSeeSecretAttachments(user) && (
+          {/* Awarding moves a task onto a new Project board but keeps the same
+              row — quotationApprovalStatus and its files travel with it — so
+              this stays reachable once the task has ever engaged with the
+              feature, not just while still literally on Estimation. Mirrors
+              loadWithSecretAccess's everEngaged check on the backend. */}
+          {(task.board?.name === "Estimation" || task.quotationApprovalStatus !== "NONE") && canSeeSecretAttachments(user) && (
             <SecretAttachmentsSection
               taskId={task.id}
               approvalStatus={task.quotationApprovalStatus}
               rejectionReason={task.quotationRejectionReason}
               decidedByName={task.quotationDecidedByName}
               canDecide={isAdmin(user) || can(user, "APPROVE_TASK", "ALL")}
+              canManageFiles={task.board?.name === "Estimation"}
             />
           )}
 

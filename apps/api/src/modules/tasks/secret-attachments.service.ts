@@ -17,21 +17,39 @@ function canSeeSecretAttachments(actor: AuthedUser): boolean {
   return actor.roles.some((r) => ALLOWED_ROLES.includes(r));
 }
 
-/** Loads the task and enforces both the role gate and the Estimation-only
- * scope. Anyone outside the allowed roles gets the same 404 loadTaskWithAccess
+/** Loads the task and enforces the role gate. Awarding moves a task onto a
+ * new Project board but keeps the same row — quotationApprovalStatus and
+ * any already-submitted files travel with it — so once a task has ever
+ * engaged with the quotation feature (currently on Estimation, OR its
+ * quotationApprovalStatus is no longer NONE), viewing/deciding on it stays
+ * reachable for good. Without this, an approved quotation's own file became
+ * permanently unreachable — and a still-PENDING one unreachable to actually
+ * approve/reject — the moment the project was created, even though the
+ * backend's own decideQuotation() never required staying on Estimation.
+ * Anyone outside the allowed roles still gets the same 404 loadTaskWithAccess
  * already uses for boards they can't see — a 403 here would leak that a
  * hidden feature exists on this task even to someone who can never open it. */
 async function loadWithSecretAccess(taskId: string, actor: AuthedUser) {
   const ctx = await loadTaskWithAccess(taskId, actor);
   if (!canSeeSecretAttachments(actor)) throw Errors.notFound("Task");
-  if (ctx.task.board?.name !== ESTIMATION_BOARD_NAME) {
+  const everEngaged = ctx.task.board?.name === ESTIMATION_BOARD_NAME || ctx.task.quotationApprovalStatus !== TaskApprovalStatus.NONE;
+  if (!everEngaged) {
     throw Errors.badRequest("Secret attachments only exist while a task is on the Estimation board.");
   }
   return ctx;
 }
 
+/** New uploads/deletes, unlike viewing, stay Estimation-only — those are
+ *  active-review-phase actions, not part of the permanent record. */
+function assertOnEstimationBoard(ctx: Awaited<ReturnType<typeof loadTaskWithAccess>>) {
+  if (ctx.task.board?.name !== ESTIMATION_BOARD_NAME) {
+    throw Errors.badRequest("This action is only available while the task is still on the Estimation board.");
+  }
+}
+
 export async function uploadSecretAttachment(taskId: string, file: Express.Multer.File, actor: AuthedUser) {
   const ctx = await loadWithSecretAccess(taskId, actor);
+  assertOnEstimationBoard(ctx);
 
   const validationError = validateFile(file.originalname, file.size);
   if (validationError) throw Errors.validation(validationError, { file: validationError });
@@ -126,6 +144,7 @@ export async function downloadSecretAttachment(taskId: string, attachmentId: str
 
 export async function deleteSecretAttachment(taskId: string, attachmentId: string, actor: AuthedUser) {
   const ctx = await loadWithSecretAccess(taskId, actor);
+  assertOnEstimationBoard(ctx);
   const attachment = await prisma.secretTaskAttachment.findFirstOrThrow({ where: { id: attachmentId, taskId } });
 
   await getStorageAdapter().remove(attachment.storageKey);
