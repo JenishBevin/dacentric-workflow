@@ -245,6 +245,7 @@ export interface Board {
   stageCount: number;
   openTaskCount: number;
   overdueTaskCount: number;
+  overdueDueDate: string | null;
   members: Array<{ userId: string; name: string; role: BoardMemberRole }>;
   updatedAt: string;
 }

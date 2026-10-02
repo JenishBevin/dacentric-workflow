@@ -78,7 +78,7 @@ export const ProjectsListView: React.FC<{ boards: Board[]; stages: ProjectStage[
           <th className="hidden px-3 py-2.5 md:table-cell">Customer</th>
           <th className="px-3 py-2.5">Open</th>
           <th className="px-3 py-2.5">Overdue</th>
-          <th className="hidden px-3 py-2.5 lg:table-cell">Members</th>
+          <th className="hidden px-3 py-2.5 lg:table-cell">Assignee</th>
           <th className="hidden px-3 py-2.5 lg:table-cell">Updated</th>
           <th className="w-10 px-3 py-2.5" />
         </tr>
@@ -122,9 +122,12 @@ export const ProjectsListView: React.FC<{ boards: Board[]; stages: ProjectStage[
             <td className="px-3 py-2.5">{b.openTaskCount}</td>
             <td className="px-3 py-2.5">
               {b.overdueTaskCount > 0 ? (
-                <Badge tone="red">
-                  <AlertCircle className="h-3 w-3" /> {b.overdueTaskCount}
-                </Badge>
+                <div className="flex flex-col gap-0.5">
+                  <Badge tone="red">
+                    <AlertCircle className="h-3 w-3" /> {b.overdueTaskCount}
+                  </Badge>
+                  {b.overdueDueDate && <span className="whitespace-nowrap text-[11px] text-slate-400">Due {format(new Date(b.overdueDueDate), "d MMM yyyy")}</span>}
+                </div>
               ) : (
                 b.overdueTaskCount
               )}

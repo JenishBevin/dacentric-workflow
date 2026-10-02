@@ -87,13 +87,22 @@ export async function listBoards(
     where: { boardId: { in: boardIds }, isDeleted: false, isCompleted: false },
     _count: { _all: true },
   });
-  const overdueCounts = await prisma.task.groupBy({
-    by: ["boardId"],
+  const overdueTasks = await prisma.task.findMany({
     where: { boardId: { in: boardIds }, isDeleted: false, isCompleted: false, dueDate: { lt: new Date() } },
-    _count: { _all: true },
+    select: { boardId: true, dueDate: true },
   });
   const openMap = new Map(openCounts.map((c) => [c.boardId, c._count._all]));
-  const overdueMap = new Map(overdueCounts.map((c) => [c.boardId, c._count._all]));
+  const overdueMap = new Map<string, number>();
+  // The earliest overdue due date per board — the longest-overdue task is the
+  // most urgent, so that's the one surfaced next to the overdue count.
+  const overdueDueDateMap = new Map<string, Date>();
+  for (const t of overdueTasks) {
+    overdueMap.set(t.boardId, (overdueMap.get(t.boardId) ?? 0) + 1);
+    const earliest = overdueDueDateMap.get(t.boardId);
+    if (t.dueDate && (!earliest || t.dueDate < earliest)) {
+      overdueDueDateMap.set(t.boardId, t.dueDate);
+    }
+  }
   // A project that has never been moved sits in the first kanban column.
   const firstProjectStageId = (await listProjectStages())[0]?.id ?? null;
 
@@ -114,6 +123,7 @@ export async function listBoards(
     stageCount: b.stages.length,
     openTaskCount: openMap.get(b.id) ?? 0,
     overdueTaskCount: overdueMap.get(b.id) ?? 0,
+    overdueDueDate: overdueDueDateMap.get(b.id) ?? null,
     members: b.members.map((m) => ({ userId: m.userId, name: m.user.name, role: m.role })),
     updatedAt: b.updatedAt,
   }));

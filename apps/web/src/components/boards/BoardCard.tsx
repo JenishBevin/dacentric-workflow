@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { MoreVertical, Link2, LayoutGrid, AlertCircle, Building2 } from "lucide-react";
+import { format } from "date-fns";
 import clsx from "clsx";
 import { Card, Badge, AvatarGroup, Checkbox } from "../ui/primitives";
 import { Board } from "../../lib/types";
@@ -91,6 +92,9 @@ export const BoardCard: React.FC<Props> = ({ board, onEdit, onDuplicate, onArchi
           <Badge tone="red">
             <AlertCircle className="h-3 w-3" /> {board.overdueTaskCount} overdue
           </Badge>
+        )}
+        {board.overdueTaskCount > 0 && board.overdueDueDate && (
+          <span className="text-[11px] text-slate-400">Due {format(new Date(board.overdueDueDate), "d MMM yyyy")}</span>
         )}
       </div>
 
