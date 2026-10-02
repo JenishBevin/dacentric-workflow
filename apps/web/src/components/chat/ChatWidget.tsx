@@ -73,6 +73,11 @@ export const ChatWidget: React.FC = () => {
   const [showMembers, setShowMembers] = useState(false);
   const [pulseActive, setPulseActive] = useState(false);
   const prevUnreadRef = useRef<number | null>(null);
+  // Which message ids just appeared in the open thread — briefly true so
+  // they slide/fade in (and, for an incoming one, glow) instead of just
+  // popping into place; cleared once the cue has played.
+  const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set());
+  const prevMessageIdsRef = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const stickerRef = useRef<HTMLDivElement>(null);
@@ -85,13 +90,19 @@ export const ChatWidget: React.FC = () => {
   // A brief "new message" cue on the floating button — pulse + ring + typing
   // dots — the moment the unread count rises while the panel is closed
   // (polling-based, so this is the closest thing to a "receiving" signal we
-  // have; skips the very first load, which isn't a new arrival).
+  // have). Also fires the moment the app is opened/reloaded and there are
+  // already unread messages waiting — not just on a rise from a baseline —
+  // so refreshing the page with unread messages still surfaces the cue
+  // instead of silently showing just the plain badge.
   useEffect(() => {
     if (unreadCount === undefined) return;
     const prev = prevUnreadRef.current;
     prevUnreadRef.current = unreadCount;
-    if (prev === null || open) return;
-    if (unreadCount > prev) {
+    if (open) return;
+    const isFirstLoad = prev === null;
+    const rose = !isFirstLoad && unreadCount > prev!;
+    const arrivedWithUnread = isFirstLoad && unreadCount > 0;
+    if (rose || arrivedWithUnread) {
       setPulseActive(true);
       const timer = setTimeout(() => setPulseActive(false), 1300);
       return () => clearTimeout(timer);
@@ -119,7 +130,7 @@ export const ChatWidget: React.FC = () => {
   useEffect(() => {
     if (!pendingOpen) return;
     setOpen(true);
-    setView({ screen: "thread", conversationId: pendingOpen.conversationId, title: pendingOpen.title, isGroup: true });
+    setView({ screen: "thread", conversationId: pendingOpen.conversationId, title: pendingOpen.title, isGroup: pendingOpen.isGroup });
     clearPendingOpen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingOpen]);
@@ -165,7 +176,30 @@ export const ChatWidget: React.FC = () => {
     setAddPeopleSearch("");
     setSelectedToAdd(new Set());
     setShowMembers(false);
+    // Opening a (possibly different) thread is not a "new arrival" — reset
+    // so its full history doesn't all animate in at once.
+    prevMessageIdsRef.current = new Set();
+    setNewMessageIds(new Set());
   }, [conversationId]);
+
+  // Diffs against the previous render's message ids so only messages that
+  // just appeared (sent or received) get the arrival animation — a poll
+  // refetch of an unchanged thread shouldn't replay it for everything.
+  useEffect(() => {
+    if (!messages) return;
+    const currentIds = new Set<string>(messages.map((m: any) => m.id as string));
+    const prevIds = prevMessageIdsRef.current;
+    if (prevIds.size > 0) {
+      const added = [...currentIds].filter((id) => !prevIds.has(id));
+      if (added.length > 0) {
+        setNewMessageIds(new Set(added));
+        const timer = setTimeout(() => setNewMessageIds(new Set()), 900);
+        prevMessageIdsRef.current = currentIds;
+        return () => clearTimeout(timer);
+      }
+    }
+    prevMessageIdsRef.current = currentIds;
+  }, [messages]);
 
   useEffect(() => {
     if (conversationId) markRead.mutate(conversationId);
@@ -564,10 +598,12 @@ export const ChatWidget: React.FC = () => {
                   </div>
                 )}
                 {(messages ?? []).map((m: any) => {
+                  // See animate-message-in/-glow in index.css.
+                  const isNew = newMessageIds.has(m.id);
                   if (m.kind === "CARD" && m.metadata) {
                     const card = m.metadata as { entityType: "TASK" | "BOARD"; code: string; title: string; subtitle?: string; path: string };
                     return (
-                      <div key={m.id} className="group flex justify-center">
+                      <div key={m.id} className={clsx("group flex justify-center", isNew && "animate-message-in")}>
                         <Link
                           to={card.path}
                           className="flex w-full max-w-[90%] items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-left hover:bg-brand-100"
@@ -594,7 +630,7 @@ export const ChatWidget: React.FC = () => {
                   const isEditing = editingId === m.id;
                   const canEdit = isMine && !(m.attachments?.length > 0) && Date.now() - new Date(m.createdAt).getTime() < EDIT_WINDOW_MS;
                   return (
-                    <div key={m.id} className={clsx("group flex items-end gap-1", isMine ? "justify-end" : "justify-start")}>
+                    <div key={m.id} className={clsx("group flex items-end gap-1", isMine ? "justify-end" : "justify-start", isNew && "animate-message-in")}>
                       {isMine && !isEditing && (
                         <div className="mb-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                           {canEdit && (
@@ -655,7 +691,13 @@ export const ChatWidget: React.FC = () => {
                           </p>
                         </div>
                       ) : (
-                        <div className={clsx("max-w-[80%] rounded-xl px-3 py-2 text-sm", isMine ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800")}>
+                        <div
+                          className={clsx(
+                            "max-w-[80%] rounded-xl px-3 py-2 text-sm",
+                            isMine ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800",
+                            isNew && !isMine && "animate-message-glow"
+                          )}
+                        >
                           {showSenderName && <p className="mb-0.5 text-xs font-semibold text-brand-600">{m.sender.name}</p>}
                           {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
                           {m.attachments?.length > 0 && (

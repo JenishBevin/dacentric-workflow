@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { ChatWidget } from "../chat/ChatWidget";
+import { ChatDesktopNotifications } from "../chat/ChatDesktopNotifications";
 import { DesktopNotifications } from "./DesktopNotifications";
 import { Spinner } from "../ui/primitives";
 import { useAuth } from "../../context/AuthContext";
@@ -75,6 +76,7 @@ export const AppLayout: React.FC = () => {
         <MobileBottomNav />
       </div>
       <ChatWidget />
+      <ChatDesktopNotifications />
       <DesktopNotifications />
     </div>
   );

@@ -3,19 +3,24 @@ import React, { createContext, useContext, useState } from "react";
 interface PendingOpen {
   conversationId: string;
   title: string;
+  isGroup: boolean;
 }
 
 interface ChatLauncherValue {
   pendingOpen: PendingOpen | null;
-  requestOpen: (conversationId: string, title: string) => void;
+  /** isGroup defaults to true — every existing caller (the "Discuss" button)
+   *  only ever creates group conversations; a 1:1 caller (the chat desktop
+   *  notification's click handler) passes the conversation's real value. */
+  requestOpen: (conversationId: string, title: string, isGroup?: boolean) => void;
   clearPendingOpen: () => void;
 }
 
 const ChatLauncherContext = createContext<ChatLauncherValue | null>(null);
 
-/** Lets a "Discuss" button, mounted inside a task/board page, tell the
- * globally-mounted <ChatWidget /> (in AppLayout) to open on a conversation
- * it just created — the two don't otherwise share any state. */
+/** Lets something outside the globally-mounted <ChatWidget /> (in
+ * AppLayout) — a "Discuss" button, a chat desktop notification's click —
+ * tell it to open on a specific conversation. The two don't otherwise share
+ * any state. */
 export function ChatLauncherProvider({ children }: { children: React.ReactNode }) {
   const [pendingOpen, setPendingOpen] = useState<PendingOpen | null>(null);
 
@@ -23,7 +28,7 @@ export function ChatLauncherProvider({ children }: { children: React.ReactNode }
     <ChatLauncherContext.Provider
       value={{
         pendingOpen,
-        requestOpen: (conversationId, title) => setPendingOpen({ conversationId, title }),
+        requestOpen: (conversationId, title, isGroup = true) => setPendingOpen({ conversationId, title, isGroup }),
         clearPendingOpen: () => setPendingOpen(null),
       }}
     >
