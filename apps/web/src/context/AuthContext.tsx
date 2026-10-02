@@ -61,12 +61,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       refreshTimerRef.current = setInterval(() => {
         refreshAccessToken();
+        // Also re-pulls roles/permissions/moduleAccess — an admin can change
+        // someone's role while their tab stays open for hours (this app has
+        // no realtime push), and without this the only other way those
+        // take effect is a full reload or logging out and back in. Found
+        // this gap investigating a report where a Management user's Submit-
+        // Quotation section wasn't showing — the DB/permission logic was
+        // provably correct, so the most likely explanation was a stale
+        // in-memory `user` object from before the role was granted.
+        fetchMe();
       }, PROACTIVE_REFRESH_MS);
     }
     return () => {
       if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
     };
-  }, [user]);
+  }, [user, fetchMe]);
 
   const login = useCallback(
     async (email: string, password: string) => {
