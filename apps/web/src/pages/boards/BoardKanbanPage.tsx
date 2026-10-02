@@ -217,16 +217,30 @@ export default function BoardKanbanPage({ boardId: boardIdProp }: { boardId?: st
     setSearchParams(next, { replace: true });
   }
 
-  const canManageBoard = isAdmin(user) || board?.members.some((m: any) => m.userId === user?.id && m.role === "OWNER") || can(user, "EDIT_BOARD");
+  // Mirrors board-access.ts's assertCanEditBoard/assertIsBoardOwnerOrAdmin
+  // and task-access.ts's assertCanEditTask/assertCanDeleteTask — a plain
+  // can(user, KEY) defaults to minScope "OWN", but the backend only ever
+  // honors board Owner/Editor, Admin, or an org-wide ALL-scope grant (e.g.
+  // Management). See the matching comment in TaskDetailDrawer.tsx.
+  const boardRole = board?.members.find((m: any) => m.userId === user?.id)?.role;
+  const canManageBoard = isAdmin(user) || boardRole === "OWNER" || boardRole === "EDITOR" || can(user, "EDIT_BOARD", "ALL");
   // Mark Complete / Archive / Delete are gated server-side by ARCHIVE_DELETE_BOARD
   // (see assertIsBoardOwnerOrAdmin), not EDIT_BOARD — a distinct permission so
   // e.g. Management can close out projects without general board-edit rights.
   const canCompleteBoard = canManageBoard || can(user, "ARCHIVE_DELETE_BOARD", "ALL");
   const canAddStage = isSuperAdmin(user);
   const canCreateTask = can(user, "CREATE_TASK");
-  const canMoveTasks = can(user, "MOVE_TASK");
+  // moveTask/setAssignees are gated by assertCanEditTask on the backend (not
+  // a dedicated MOVE_TASK check, which only gates coarse route middleware) —
+  // same board Owner/Editor/ALL-scope rule as canManageBoard. A plain
+  // assignee with no board role can still move their own task individually;
+  // this board-wide bulk/drag affordance just can't represent that per-task
+  // exception, same as the pre-existing limitation of a single board-level flag.
+  const canMoveTasks = canManageBoard;
   const canExport = can(user, "EXPORT");
-  const canDeleteTasks = can(user, "DELETE_TASK");
+  // deleteTask is gated by assertCanDeleteTask: board Owner specifically (not
+  // Editor), Admin, or DELETE_TASK:ALL.
+  const canDeleteTasks = isAdmin(user) || boardRole === "OWNER" || can(user, "DELETE_TASK", "ALL");
 
   const stages: BoardStage[] = useMemo(() => [...(board?.stages ?? [])].sort((a: any, b: any) => a.position - b.position), [board]);
 

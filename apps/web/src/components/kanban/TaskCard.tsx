@@ -69,7 +69,11 @@ export const TaskCard: React.FC<Props> = ({ task, onOpen, onMenuAction, dragDisa
           <span onClick={(e) => e.stopPropagation()} className="mt-0.5 shrink-0">
             <Checkbox
               checked={task.isCompleted}
-              disabled={quickComplete.isPending || task.isCompleted}
+              // quickComplete calls moveTask under the hood (see
+              // tasks.service.ts), gated by the exact same edit-rights check
+              // as dragging — reuse that flag rather than letting this
+              // checkbox stay clickable for a viewer the backend will 403.
+              disabled={quickComplete.isPending || task.isCompleted || dragDisabled}
               onChange={async () => {
                 try {
                   await quickComplete.mutateAsync(task.id);

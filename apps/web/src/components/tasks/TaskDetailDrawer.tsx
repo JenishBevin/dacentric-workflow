@@ -107,14 +107,26 @@ export const TaskDetailDrawer: React.FC<Props> = ({ taskId, onClose, onDeleted, 
     }
   }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canEdit = can(user, "EDIT_TASK") || task?.createdById === user?.id;
+  // Mirrors task-access.ts exactly (assertCanEditTask/assertCanCollaborate/
+  // assertCanDeleteTask) — a plain can(user, KEY) defaults to minScope "OWN",
+  // but the backend only ever honors board Owner/Editor, the task's own
+  // assignee, Admin, or an org-wide ALL-scope grant (e.g. Management). Using
+  // just can(user, KEY) without "ALL" made these controls appear enabled for
+  // most roles everywhere, then 403 the moment they weren't actually a
+  // member/assignee of that specific board/task.
+  const isAssignee = !!task?.assignees.some((a) => a.userId === user?.id);
+  const boardRole = board?.members.find((m: any) => m.userId === user?.id)?.role;
+  const canEdit = isAdmin(user) || boardRole === "OWNER" || boardRole === "EDITOR" || isAssignee || can(user, "EDIT_TASK", "ALL");
   // Saved quotations with their costing (vendors, buying costs, margins) are internal: Management and admins may review
   // them to negotiate costs, as may anyone who can edit the task. The API enforces the same rule.
   const canViewCosting = canEdit || isAdmin(user) || !!user?.roles.includes("MANAGEMENT");
-  const canDelete = can(user, "DELETE_TASK");
-  const canAssign = can(user, "ASSIGN_TASK");
-  const canMove = can(user, "MOVE_TASK");
-  const canCollab = can(user, "MANAGE_TASK_COLLAB");
+  const canDelete = isAdmin(user) || boardRole === "OWNER" || can(user, "DELETE_TASK", "ALL");
+  // setAssignees and moveTask are both gated by assertCanEditTask on the
+  // backend, not a dedicated ASSIGN_TASK/MOVE_TASK check — those permission
+  // keys only gate the coarse route-level middleware, not the real decision.
+  const canAssign = canEdit;
+  const canMove = canEdit;
+  const canCollab = isAdmin(user) || isAssignee || can(user, "MANAGE_TASK_COLLAB", "ALL") || (!!boardRole && boardRole !== "VIEWER");
   const canCreateTags = can(user, "CREATE_BOARD"); // tag creation is permission-controlled (Section 20); linking existing tags is not.
   const isApprover = !!task && (task.approverUserId === user?.id || isAdmin(user));
 

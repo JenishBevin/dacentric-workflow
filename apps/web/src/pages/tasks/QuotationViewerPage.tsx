@@ -3,11 +3,12 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { ArrowLeft, FileSpreadsheet, Pencil } from "lucide-react";
 import { useTask, useQuotations, useQuotation } from "../../api/tasks";
+import { useBoardDetail } from "../../api/boards";
 import { downloadExport } from "../../api/misc";
 import { Button, Select, Badge, Skeleton, ErrorState, EmptyState } from "../../components/ui/primitives";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
-import { can } from "../../lib/permissions";
+import { can, isAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { boardPath } from "../../lib/boardPath";
 
@@ -25,6 +26,7 @@ export default function QuotationViewerPage() {
   const { push } = useToast();
 
   const { data: task, isLoading: taskLoading, isError: taskError } = useTask(taskId);
+  const { data: board } = useBoardDetail(task?.boardId);
   const { data: versions, isLoading: versionsLoading, isError: versionsError, refetch } = useQuotations(taskId);
   const [selectedId, setSelectedId] = useState<string | undefined>(searchParams.get("q") ?? undefined);
   const [downloading, setDownloading] = useState(false);
@@ -73,7 +75,15 @@ export default function QuotationViewerPage() {
     return [...map.entries()].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.cost - a.cost);
   }, [rows]);
 
-  const canEdit = !!task && (can(user, "EDIT_TASK") || task.createdById === user?.id) && task.board?.name === "Estimation";
+  // Mirrors task-access.ts's assertCanEditTask exactly — see the matching
+  // comment in TaskDetailDrawer.tsx for why a plain can(user, "EDIT_TASK")
+  // isn't enough on its own.
+  const isAssignee = !!task?.assignees.some((a) => a.userId === user?.id);
+  const boardRole = board?.members.find((m: any) => m.userId === user?.id)?.role;
+  const canEdit =
+    !!task &&
+    (isAdmin(user) || boardRole === "OWNER" || boardRole === "EDITOR" || isAssignee || can(user, "EDIT_TASK", "ALL")) &&
+    task.board?.name === "Estimation";
   const backPath = task ? `${boardPath(task.board?.name, task.boardId)}?task=${task.id}` : "/workflow/estimation";
 
   function selectVersion(id: string) {

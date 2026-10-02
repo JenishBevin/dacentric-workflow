@@ -18,7 +18,7 @@ import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { useSelection } from "../hooks/useSelection";
 import { useToast } from "../context/ToastContext";
 import { extractApiError } from "../lib/apiClient";
-import { can } from "../lib/permissions";
+import { can, isAdmin } from "../lib/permissions";
 import { useAuth } from "../context/AuthContext";
 import clsx from "clsx";
 
@@ -137,8 +137,16 @@ export default function MyTasksPage() {
   }
 
   const canCreateTask = can(user, "CREATE_TASK");
-  const canDeleteTasks = can(user, "DELETE_TASK");
-  const canMoveTasks = can(user, "MOVE_TASK");
+  // This page only ever lists tasks the viewer is assigned to, so
+  // assertCanDeleteTask's board-Owner path can't be evaluated here (tasks
+  // span many boards, each with its own membership) — only Admin or an
+  // org-wide DELETE_TASK:ALL grant (e.g. Management) qualifies for bulk
+  // delete from this view. See the matching comment in TaskDetailDrawer.tsx.
+  const canDeleteTasks = isAdmin(user) || can(user, "DELETE_TASK", "ALL");
+  // moveTask is gated by assertCanEditTask, which every task listed here
+  // already satisfies via isAssignee (this page only shows the viewer's own
+  // assigned tasks) — so this is unconditionally true, not permission-gated.
+  const canMoveTasks = true;
   const canExport = can(user, "EXPORT");
   const totalCount = useMemo(() => (groups ? Object.values(groups).reduce((sum: number, arr: any) => sum + arr.length, 0) : 0), [groups]);
 

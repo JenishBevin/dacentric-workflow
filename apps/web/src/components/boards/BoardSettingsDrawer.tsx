@@ -20,7 +20,7 @@ import { useEmployeeDirectory } from "../../api/misc";
 import { CustomerPicker } from "../customers/CustomerPicker";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
-import { isSuperAdmin } from "../../lib/permissions";
+import { can, isAdmin, isSuperAdmin } from "../../lib/permissions";
 import { extractApiError } from "../../lib/apiClient";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/apiClient";
@@ -38,6 +38,15 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
   const { push } = useToast();
   const { user } = useAuth();
   const canAddStage = isSuperAdmin(user);
+  // Mirrors board-access.ts's assertCanEditBoard/assertIsBoardOwnerOrAdmin —
+  // see the matching comment in TaskDetailDrawer.tsx/BoardKanbanPage.tsx for
+  // why this drawer's every other control was previously ungated entirely
+  // (not even checking board membership), letting anyone who could open
+  // Project Settings also submit an edit/archive/delete the backend would
+  // then reject.
+  const boardRole = board.members.find((m: any) => m.userId === user?.id)?.role;
+  const canEditGeneral = isAdmin(user) || boardRole === "OWNER" || boardRole === "EDITOR" || can(user, "EDIT_BOARD", "ALL");
+  const canArchiveDelete = isAdmin(user) || boardRole === "OWNER" || can(user, "ARCHIVE_DELETE_BOARD", "ALL");
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -82,11 +91,11 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
         <div className="space-y-4">
           <div>
             <Label required>Project name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
+            <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canEditGeneral} />
           </div>
           <div>
             <Label>Description</Label>
-            <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+            <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEditGeneral} />
           </div>
           <Button
             onClick={async () => {
@@ -98,6 +107,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
               }
             }}
             loading={updateBoard.isPending}
+            disabled={!canEditGeneral}
           >
             Save changes
           </Button>
@@ -110,6 +120,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
                 variant="outline"
                 size="sm"
                 className="mt-2"
+                disabled={!canEditGeneral}
                 onClick={async () => {
                   await updateBoard.mutateAsync({ linkedRecordId: null, linkedRecordType: null });
                   push({ variant: "success", title: "Project unlinked." });
@@ -124,6 +135,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
             <p className="mb-1.5 font-medium text-slate-700">Service</p>
             <Select
               value={board.serviceId ?? ""}
+              disabled={!canEditGeneral}
               onChange={async (e) => {
                 const serviceId = e.target.value || null;
                 try {
@@ -149,6 +161,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
             <CustomerPicker
               value={board.customer}
               linkToDetail
+              disabled={!canEditGeneral}
               onChange={async (c) => {
                 await updateBoard.mutateAsync({ customerId: c?.id ?? null });
                 push({ variant: "success", title: c ? "Customer linked." : "Customer unlinked." });
@@ -156,24 +169,26 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
             />
           </div>
 
-          <div className="rounded-lg border border-red-200 bg-red-50/50 p-4">
-            <p className="text-sm font-semibold text-red-800">Danger Zone</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  await archiveBoard.mutateAsync({ boardId: board.id, archived: !board.isArchived });
-                  push({ variant: "success", title: board.isArchived ? "Project unarchived." : "Project archived." });
-                }}
-              >
-                {board.isArchived ? "Unarchive Project" : "Archive Project"}
-              </Button>
-              <Button variant="danger" size="sm" onClick={() => setConfirmDeleteBoard(true)}>
-                Delete Project
-              </Button>
+          {canArchiveDelete && (
+            <div className="rounded-lg border border-red-200 bg-red-50/50 p-4">
+              <p className="text-sm font-semibold text-red-800">Danger Zone</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    await archiveBoard.mutateAsync({ boardId: board.id, archived: !board.isArchived });
+                    push({ variant: "success", title: board.isArchived ? "Project unarchived." : "Project archived." });
+                  }}
+                >
+                  {board.isArchived ? "Unarchive Project" : "Archive Project"}
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => setConfirmDeleteBoard(true)}>
+                  Delete Project
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -205,28 +220,32 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
                 <input
                   type="color"
                   value={stage.color}
+                  disabled={!canEditGeneral}
                   onChange={(e) => updateStage.mutate({ stageId: stage.id, color: e.target.value } as any)}
-                  className="h-7 w-7 shrink-0 cursor-pointer rounded border-0"
+                  className="h-7 w-7 shrink-0 cursor-pointer rounded border-0 disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label={`Colour for ${stage.name}`}
                 />
                 <input
                   defaultValue={stage.name}
+                  disabled={!canEditGeneral}
                   onBlur={(e) => e.target.value !== stage.name && updateStage.mutate({ stageId: stage.id, name: e.target.value } as any)}
-                  className="min-w-0 flex-1 rounded border border-transparent px-1.5 py-1 text-sm hover:border-slate-200 focus-visible:focus-ring"
+                  className="min-w-0 flex-1 rounded border border-transparent px-1.5 py-1 text-sm hover:border-slate-200 focus-visible:focus-ring disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <input
                   type="number"
                   min={1}
                   placeholder="WIP"
                   defaultValue={stage.wipLimit ?? ""}
+                  disabled={!canEditGeneral}
                   onBlur={(e) => updateStage.mutate({ stageId: stage.id, wipLimit: e.target.value ? Number(e.target.value) : null } as any)}
-                  className="w-16 rounded border border-slate-200 px-1.5 py-1 text-xs"
+                  className="w-16 rounded border border-slate-200 px-1.5 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                   title="WIP limit"
                 />
                 <label className="flex shrink-0 items-center gap-1 text-[11px] text-slate-500">
                   <input
                     type="checkbox"
                     defaultChecked={stage.isTerminal}
+                    disabled={!canEditGeneral}
                     onChange={(e) => updateStage.mutate({ stageId: stage.id, isTerminal: e.target.checked } as any)}
                   />
                   Done stage
@@ -238,12 +257,13 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
                   <input
                     type="checkbox"
                     defaultChecked={stage.isFollowUpStage}
+                    disabled={!canEditGeneral}
                     onChange={(e) => updateStage.mutate({ stageId: stage.id, isFollowUpStage: e.target.checked } as any)}
                   />
                   Follow-up stage
                 </label>
                 <button
-                  disabled={idx === 0}
+                  disabled={idx === 0 || !canEditGeneral}
                   onClick={() => {
                     const ids = stages.map((s: any) => s.id);
                     [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
@@ -254,7 +274,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
                   ↑
                 </button>
                 <button
-                  disabled={idx === stages.length - 1}
+                  disabled={idx === stages.length - 1 || !canEditGeneral}
                   onClick={() => {
                     const ids = stages.map((s: any) => s.id);
                     [ids[idx + 1], ids[idx]] = [ids[idx], ids[idx + 1]];
@@ -264,9 +284,11 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
                 >
                   ↓
                 </button>
-                <button onClick={() => setConfirmDeleteStage({ id: stage.id, name: stage.name })} className="text-slate-400 hover:text-red-500">
-                  <X className="h-4 w-4" />
-                </button>
+                {canEditGeneral && (
+                  <button onClick={() => setConfirmDeleteStage({ id: stage.id, name: stage.name })} className="text-slate-400 hover:text-red-500">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -275,25 +297,29 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
 
       {tab === "members" && (
         <div className="space-y-3">
-          <Input placeholder="Search people to add…" value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} />
-          {memberQuery && employees && (
-            <div className="max-h-32 overflow-y-auto rounded-lg border border-slate-200">
-              {employees
-                .filter((e) => !board.members.some((m: any) => m.userId === e.userId))
-                .map((e) => (
-                  <button
-                    key={e.userId}
-                    onClick={async () => {
-                      await addMember.mutateAsync({ userId: e.userId, role: "EDITOR" });
-                      setMemberQuery("");
-                    }}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50"
-                  >
-                    <span>{e.name}</span>
-                    <span className="text-xs text-slate-400">{e.department}</span>
-                  </button>
-                ))}
-            </div>
+          {canEditGeneral && (
+            <>
+              <Input placeholder="Search people to add…" value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} />
+              {memberQuery && employees && (
+                <div className="max-h-32 overflow-y-auto rounded-lg border border-slate-200">
+                  {employees
+                    .filter((e) => !board.members.some((m: any) => m.userId === e.userId))
+                    .map((e) => (
+                      <button
+                        key={e.userId}
+                        onClick={async () => {
+                          await addMember.mutateAsync({ userId: e.userId, role: "EDITOR" });
+                          setMemberQuery("");
+                        }}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      >
+                        <span>{e.name}</span>
+                        <span className="text-xs text-slate-400">{e.department}</span>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </>
           )}
           <div className="space-y-1.5">
             {board.members.map((m: any) => (
@@ -301,6 +327,7 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
                 <span className="flex-1 truncate text-sm text-slate-700">{m.user?.name ?? m.name}</span>
                 <Select
                   value={m.role}
+                  disabled={!canEditGeneral}
                   onChange={(e) => updateMemberRole.mutate({ userId: m.userId, role: e.target.value })}
                   className="!w-32"
                 >
@@ -309,18 +336,20 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
                   <option value="VIEWER">Viewer</option>
                   <option value="COMMENTER">Commenter</option>
                 </Select>
-                <button
-                  onClick={async () => {
-                    try {
-                      await removeMember.mutateAsync(m.userId);
-                    } catch (err) {
-                      push({ variant: "error", title: "Could not remove member", description: extractApiError(err).message });
-                    }
-                  }}
-                  className="text-slate-400 hover:text-red-500"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                {canEditGeneral && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await removeMember.mutateAsync(m.userId);
+                      } catch (err) {
+                        push({ variant: "error", title: "Could not remove member", description: extractApiError(err).message });
+                      }
+                    }}
+                    className="text-slate-400 hover:text-red-500"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -331,8 +360,14 @@ export const BoardSettingsDrawer: React.FC<{ open: boolean; onClose: () => void;
         <div className="space-y-3">
           <p className="text-sm text-slate-500">Save this project's current stage structure as a reusable template for future projects.</p>
           <div className="flex gap-2">
-            <Input placeholder="Template name" value={templateName} onChange={(e) => setTemplateName(e.target.value)} />
+            <Input
+              placeholder="Template name"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              disabled={!canArchiveDelete}
+            />
             <Button
+              disabled={!canArchiveDelete}
               onClick={async () => {
                 if (!templateName.trim()) return;
                 try {
