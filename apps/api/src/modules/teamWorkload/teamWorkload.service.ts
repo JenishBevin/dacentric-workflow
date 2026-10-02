@@ -71,8 +71,12 @@ export async function getTeamWorkload(actor: AuthedUser, filters: WorkloadFilter
         assignees: { some: { userId: emp.user.id } },
         // Parked on a follow-up stage (e.g. Estimation's "Submitted", waiting
         // on the client) — not active work, so it shouldn't count toward
-        // workload until it moves again.
-        stage: { isFollowUpStage: false },
+        // workload until it moves again. A task on a "Lost" stage is in the
+        // same boat — it already shows up in Project/Task History (see
+        // history.service.ts's identical stage.name check) and isCompleted
+        // never gets set true for it, so without this it would otherwise
+        // count toward workload forever.
+        stage: { isFollowUpStage: false, NOT: { name: { equals: "Lost", mode: "insensitive" } } },
         // Marking the whole project Completed doesn't touch its individual
         // tasks' own isCompleted flag, so a task left open at that moment
         // would otherwise count toward workload forever even after the
@@ -234,9 +238,9 @@ export async function getEmployeeWorkloadDetail(employeeId: string, actor: Authe
       isDeleted: false,
       isCompleted: false,
       assignees: { some: { userId: employee.user.id } },
-      stage: { isFollowUpStage: false },
       // Keep this in sync with getTeamWorkload's taskWhere — otherwise this
       // drill-down list wouldn't match the summary count it's opened from.
+      stage: { isFollowUpStage: false, NOT: { name: { equals: "Lost", mode: "insensitive" } } },
       board: { isCompleted: false, isArchived: false, isDeleted: false },
     },
     include: { board: true, stage: true },

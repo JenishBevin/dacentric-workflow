@@ -65,6 +65,13 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
   const { now, startOfToday, endOfToday, endOfWeek, startOfMonth } = dateWindows();
 
   const baseWhere: any = { boardId: { in: boardIds }, isDeleted: false };
+  // A task moved to a "Lost" stage already shows up in Project/Task History
+  // (see history.service.ts's identical stage.name check) — isCompleted
+  // never gets set true for it, so without this it would otherwise keep
+  // counting as open (and even overdue) forever. Only applied to the "open
+  // work" stats below, not approval/completed counts or the status
+  // breakdown, which should still reflect a Lost task's real state.
+  const openWhere = { ...baseWhere, stage: { NOT: { name: { equals: "Lost", mode: "insensitive" as const } } } };
 
   const [
     totalOpen,
@@ -81,10 +88,10 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     pendingQuotationApproval,
     recentActivity,
   ] = await Promise.all([
-    prisma.task.count({ where: { ...baseWhere, isCompleted: false } }),
-    prisma.task.count({ where: { ...baseWhere, isCompleted: false, dueDate: { lt: now } } }),
-    prisma.task.count({ where: { ...baseWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfToday } } }),
-    prisma.task.count({ where: { ...baseWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfWeek } } }),
+    prisma.task.count({ where: { ...openWhere, isCompleted: false } }),
+    prisma.task.count({ where: { ...openWhere, isCompleted: false, dueDate: { lt: now } } }),
+    prisma.task.count({ where: { ...openWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfToday } } }),
+    prisma.task.count({ where: { ...openWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfWeek } } }),
     prisma.task.count({ where: { ...baseWhere, isCompleted: true, completedAt: { gte: startOfMonth } } }),
     // Enquiry List, Estimation, Accounts and each user's Personal Tasks board
     // are system boards, not "Projects" (none are filed under any Service) —
@@ -92,7 +99,7 @@ export async function getDashboard(actor: AuthedUser, filters: DashboardFilters)
     // shows, even though their tasks still count toward every task-based
     // stat above via boardIds.
     prisma.board.count({ where: { ...boardWhere, isArchived: false, isCompleted: false, name: { notIn: SYSTEM_BOARD_NAMES } } }),
-    prisma.task.groupBy({ by: ["priority"], where: { ...baseWhere, isCompleted: false }, _count: { _all: true } }),
+    prisma.task.groupBy({ by: ["priority"], where: { ...openWhere, isCompleted: false }, _count: { _all: true } }),
     prisma.task.groupBy({ by: ["stageId"], where: { ...baseWhere }, _count: { _all: true } }),
     prisma.task.count({ where: { ...baseWhere, approvalStatus: "PENDING_APPROVAL" } }),
     prisma.task.count({ where: { ...baseWhere, lostApprovalStatus: "PENDING_APPROVAL" } }),
@@ -161,19 +168,23 @@ export async function getDashboardTaskList(actor: AuthedUser, kind: DashboardSta
   const { now, startOfToday, endOfToday, endOfWeek, startOfMonth } = dateWindows();
 
   const baseWhere: any = { boardId: { in: boardIds }, isDeleted: false };
+  // Same exclusion as getDashboard's openWhere — a Lost-stage task already
+  // lives in Project/Task History and must drop out of these four lists the
+  // same way it drops out of the stat cards they back.
+  const openWhere = { ...baseWhere, stage: { NOT: { name: { equals: "Lost", mode: "insensitive" as const } } } };
   let where: any;
   switch (kind) {
     case "TOTAL_OPEN":
-      where = { ...baseWhere, isCompleted: false };
+      where = { ...openWhere, isCompleted: false };
       break;
     case "OVERDUE":
-      where = { ...baseWhere, isCompleted: false, dueDate: { lt: now } };
+      where = { ...openWhere, isCompleted: false, dueDate: { lt: now } };
       break;
     case "DUE_TODAY":
-      where = { ...baseWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfToday } };
+      where = { ...openWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfToday } };
       break;
     case "DUE_THIS_WEEK":
-      where = { ...baseWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfWeek } };
+      where = { ...openWhere, isCompleted: false, dueDate: { gte: startOfToday, lte: endOfWeek } };
       break;
     case "COMPLETED_THIS_MONTH":
       where = { ...baseWhere, isCompleted: true, completedAt: { gte: startOfMonth } };
