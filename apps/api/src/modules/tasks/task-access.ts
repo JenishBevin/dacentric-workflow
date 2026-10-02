@@ -28,12 +28,16 @@ export async function loadTaskWithAccess(taskId: string, user: AuthedUser): Prom
 
   const boardRole = await getBoardRole(task.boardId, user);
   const isAdmin = isSystemLevelAdmin(user.roles);
-  if (!boardRole && !isAdmin) throw Errors.notFound("Task");
+  const isAssignee = task.assignees.some((a) => a.userId === user.id);
+  // Being assigned a task is enough to open it even without board membership —
+  // it already shows up in that person's My Tasks, and 404ing on click made
+  // those tasks unopenable (blank drawer) and un-completable.
+  if (!boardRole && !isAdmin && !isAssignee) throw Errors.notFound("Task");
 
   return {
     task: task as any,
     boardRole,
-    isAssignee: task.assignees.some((a) => a.userId === user.id),
+    isAssignee,
     isCreator: task.createdById === user.id,
     isAdmin,
     permissions: user.permissions,

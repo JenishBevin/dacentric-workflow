@@ -173,7 +173,17 @@ export async function searchBoards(q: string, user: AuthedUser) {
 }
 
 export async function getBoardDetail(boardId: string, user: AuthedUser) {
-  const role = await assertBoardVisible(boardId, user);
+  let role = await getBoardRole(boardId, user);
+  if (!role) {
+    // An assignee who isn't a board member still needs the board's stages to
+    // open/move their own task; this exposes stages + member names only —
+    // the board's task list stays gated by assertBoardVisible.
+    const assigned = await prisma.taskAssignee.findFirst({
+      where: { userId: user.id, task: { boardId, isDeleted: false } },
+      select: { id: true },
+    });
+    if (!assigned) throw Errors.notFound("Board", "Board not found.");
+  }
   const board = await prisma.board.findUnique({
     where: { id: boardId },
     include: {
