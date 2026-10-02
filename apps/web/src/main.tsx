@@ -5,9 +5,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
 import { ChatLauncherProvider } from "./context/ChatLauncherContext";
-import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ErrorBoundary, RELOAD_GUARD_KEY } from "./components/ErrorBoundary";
 import App from "./App";
 import "./index.css";
+
+// Vite's own module-preload failure path (distinct from a chunk import
+// error thrown during render, which ErrorBoundary.tsx catches) — fires when
+// a route's lazy chunk 404s because this tab's build is older than what's
+// now deployed. Same self-heal, same one-reload guard, so a genuinely
+// broken deploy still surfaces instead of reloading forever.
+window.addEventListener("vite:preloadError", () => {
+  if (sessionStorage.getItem(RELOAD_GUARD_KEY)) return;
+  sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
+  window.location.reload();
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
