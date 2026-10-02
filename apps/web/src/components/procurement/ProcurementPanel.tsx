@@ -74,6 +74,7 @@ export function ProcurementPanel({ boardId }: { boardId: string }) {
 
   const [poRequestedBy, setPoRequestedBy] = useState("");
   const [poCustomerId, setPoCustomerId] = useState("");
+  const [poProjectName, setPoProjectName] = useState("");
   const [poGeneralComments, setPoGeneralComments] = useState(DEFAULT_PO_COMMENTS);
   const [poQuoteRefNo, setPoQuoteRefNo] = useState("");
   const [poPreparerName, setPoPreparerName] = useState("");
@@ -108,6 +109,14 @@ export function ProcurementPanel({ boardId }: { boardId: string }) {
     setPoQuoteRefNo(record.poQuoteRefNo ?? "");
     setPoPreparerName(record.poPreparerName ?? "");
   }, [record?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Separate from the effect above — the board name often loads after the
+  // procurement record does, and this shouldn't reset any in-progress edits
+  // to the other fields when it arrives.
+  useEffect(() => {
+    if (!record) return;
+    setPoProjectName(record.poProjectName || board?.name || "");
+  }, [record?.id, board?.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function updateLineItem(idx: number, patch: Partial<LineItem>) {
     setLineItems((items) => items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -145,6 +154,7 @@ export function ProcurementPanel({ boardId }: { boardId: string }) {
         receiverDesignation: receiverDesignation.trim() || null,
         poRequestedBy: poRequestedBy.trim() || null,
         poCustomerId: poCustomerId.trim() || null,
+        poProjectName: poProjectName.trim() || null,
         poGeneralComments: poGeneralComments.trim() || null,
         poQuoteRefNo: poQuoteRefNo.trim() || null,
         poPreparerName: poPreparerName.trim() || null,
@@ -191,7 +201,7 @@ export function ProcurementPanel({ boardId }: { boardId: string }) {
           date: orderDate || null,
           requestedBy: poRequestedBy.trim(),
           customerId: poCustomerId.trim(),
-          projectName: board?.name ?? "",
+          projectName: poProjectName.trim() || board?.name || "",
           vendorName: vendorName.trim(),
           vendorAddress: vendorAddress.trim(),
           lineItems: lineItems.filter((it) => it.description.trim()).map((it) => ({ ...it, unit: it.unit ?? "" })),
@@ -434,6 +444,10 @@ export function ProcurementPanel({ boardId }: { boardId: string }) {
               <p className="mb-3 mt-3 text-xs text-slate-400">LPO No., Date and Bill To come from the PO number/Order date/Vendor fields above.</p>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <Label>Project name</Label>
+                  <Input value={poProjectName} onChange={(e) => setPoProjectName(e.target.value)} placeholder="Defaults to this project's name" />
+                </div>
                 <div>
                   <Label>Requested by</Label>
                   <Input value={poRequestedBy} onChange={(e) => setPoRequestedBy(e.target.value)} placeholder="Requester's name" />

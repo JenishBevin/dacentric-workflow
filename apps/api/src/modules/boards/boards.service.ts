@@ -1174,6 +1174,7 @@ export interface UpdateProcurementInput {
   receiverDesignation?: string | null;
   poRequestedBy?: string | null;
   poCustomerId?: string | null;
+  poProjectName?: string | null;
   poGeneralComments?: string | null;
   poQuoteRefNo?: string | null;
   poPreparerName?: string | null;

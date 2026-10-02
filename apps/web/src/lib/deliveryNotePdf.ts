@@ -121,6 +121,11 @@ export async function generateDeliveryNotePdf(input: DeliveryNotePdfInput, opts?
 
   const items = input.lineItems.length > 0 ? input.lineItems : [{ description: "", unit: "", qty: "" as any }];
   items.forEach((item, idx) => {
+    // Measure at the same size the row actually renders at (set below) —
+    // otherwise a borderline-length description can be judged as fitting on
+    // one line at the smaller size still active here, then overflow the
+    // column once it's actually drawn at the real, larger render size.
+    doc.setFontSize(9);
     const descLines = doc.splitTextToSize(item.description || "", cols[1].width - 4) as string[];
     const rowHeight = Math.max(9, descLines.length * 4 + 3);
     if (y + rowHeight > 270) {
@@ -128,7 +133,6 @@ export async function generateDeliveryNotePdf(input: DeliveryNotePdfInput, opts?
       y = 20;
     }
     const rowTop = y;
-    doc.setFontSize(9);
     doc.text(String(idx + 1), colX[0] + cols[0].width / 2, rowTop + 5.5, { align: "center" });
     doc.text(descLines, colX[1] + 2, rowTop + 5.5);
     doc.text(item.unit || "", colX[2] + cols[2].width / 2, rowTop + 5.5, { align: "center" });

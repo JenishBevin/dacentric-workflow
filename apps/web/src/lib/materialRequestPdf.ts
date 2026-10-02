@@ -100,7 +100,7 @@ export async function generateMaterialRequestPdf(input: MaterialRequestPdfInput,
   y += 6;
 
   const rowAH = 11;
-  const rowBH = 9;
+  const rowBH = 11;
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.2);
   // Row A: name | department | Requested Date
@@ -145,9 +145,9 @@ export async function generateMaterialRequestPdf(input: MaterialRequestPdfInput,
   checkbox(marginX + nameW + 44, y + rowBH / 2 + 1.8, input.urgency === "URGENT");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text("Required Date :", marginX + leftW + 2, y + rowBH / 2 + 1.3);
+  doc.text("Required Date :", marginX + leftW + 2, y + 5);
   doc.setFont("helvetica", "normal");
-  doc.text(input.requiredDate ? format(new Date(input.requiredDate), "dd/MM/yyyy") : "", marginX + leftW + 2, y + rowBH - 1);
+  doc.text(input.requiredDate ? format(new Date(input.requiredDate), "dd/MM/yyyy") : "", marginX + leftW + 2, y + 9.5);
   y += rowBH + 6;
 
   // --- Item table ---
@@ -188,6 +188,11 @@ export async function generateMaterialRequestPdf(input: MaterialRequestPdfInput,
 
   const items = input.items.length > 0 ? input.items : [{ description: "", unit: "", qty: "" as any, remarks: "" }];
   items.forEach((item, idx) => {
+    // Measure at the same size the text actually renders at below — splitting
+    // at a smaller size than the render font understates the width, letting
+    // a borderline-length description slip through as "one line" when it
+    // actually overflows the column at its real, larger render size.
+    doc.setFontSize(8.5);
     const descLines = doc.splitTextToSize(item.description || "", cols[1].width - 4) as string[];
     const rowHeight = Math.max(7.5, descLines.length * 3.8 + 3);
     if (y + rowHeight > 265) {
@@ -195,7 +200,6 @@ export async function generateMaterialRequestPdf(input: MaterialRequestPdfInput,
       y = 20;
     }
     const rowTop = y;
-    doc.setFontSize(8.5);
     doc.text(input.items.length > 0 ? String(idx + 1) : "", colX[0] + cols[0].width / 2, rowTop + 5, { align: "center" });
     doc.text(descLines, colX[1] + 2, rowTop + 5);
     doc.text(item.unit || "", colX[2] + cols[2].width / 2, rowTop + 5, { align: "center" });

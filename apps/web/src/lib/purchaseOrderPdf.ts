@@ -202,6 +202,11 @@ export async function generatePurchaseOrderPdf(input: PurchaseOrderPdfInput, opt
   const rows = items.length > 0 ? items : [{ description: "", unit: "", quantity: "" as any, unitCost: "" as any }];
   let subtotal = 0;
   rows.forEach((item, idx) => {
+    // Measure at the same size the row actually renders at (set below) —
+    // otherwise a borderline-length description can be judged as fitting on
+    // one line at the smaller size still active here, then overflow the
+    // column once it's actually drawn at the real, larger render size.
+    doc.setFontSize(8.5);
     const descLines = doc.splitTextToSize(item.description || "", cols[1].width - 4) as string[];
     const rowHeight = Math.max(8, descLines.length * 4 + 3);
     if (y + rowHeight > 255) {
@@ -211,7 +216,6 @@ export async function generatePurchaseOrderPdf(input: PurchaseOrderPdfInput, opt
     const rowTop = y;
     const lineTotal = item.quantity === "" ? 0 : Number(item.quantity) * Number(item.unitCost);
     subtotal += lineTotal;
-    doc.setFontSize(8.5);
     doc.text(items.length > 0 ? String(idx + 1) : "", colX[0] + cols[0].width / 2, rowTop + 5, { align: "center" });
     doc.text(descLines, colX[1] + 2, rowTop + 5);
     doc.text(item.quantity === "" ? "" : String(item.quantity), colX[2] + cols[2].width / 2, rowTop + 5, { align: "center" });

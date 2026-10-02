@@ -119,6 +119,7 @@ export const updateProcurementSchema = z.object({
   receiverDesignation: z.string().max(200).optional().nullable(),
   poRequestedBy: z.string().max(200).optional().nullable(),
   poCustomerId: z.string().max(100).optional().nullable(),
+  poProjectName: z.string().max(300).optional().nullable(),
   poGeneralComments: z.string().max(2000).optional().nullable(),
   poQuoteRefNo: z.string().max(100).optional().nullable(),
   poPreparerName: z.string().max(200).optional().nullable(),

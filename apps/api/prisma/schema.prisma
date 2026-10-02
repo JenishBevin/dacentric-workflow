@@ -1296,6 +1296,9 @@ model ProcurementRecord {
   // this document lives here. See apps/web/src/lib/purchaseOrderPdf.ts.
   poRequestedBy        String?
   poCustomerId         String?
+  // Defaults to the project/board name but editable — some LPOs need a
+  // different name than the project itself is called internally.
+  poProjectName        String?
   poGeneralComments    String?
   poQuoteRefNo         String?
   poPreparerName       String?
