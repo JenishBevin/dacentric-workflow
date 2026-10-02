@@ -22,6 +22,10 @@ export interface Vendor {
 }
 
 export interface VendorDetailsInput {
+  name?: string;
+  brands?: string[];
+  services?: string[];
+  contacts?: VendorContact[];
   website: string | null;
   vatNumber: string | null;
   address: string | null;
@@ -97,7 +101,10 @@ export function useUpdateVendorDetails() {
   return useMutation({
     mutationFn: async ({ id, input }: { id: string; input: VendorDetailsInput }) =>
       (await api.patch<{ data: Vendor }>(`/vendors/${id}`, input)).data.data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["vendors"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vendors"] });
+      qc.invalidateQueries({ queryKey: ["vendor-filter-options"] });
+    },
   });
 }
 

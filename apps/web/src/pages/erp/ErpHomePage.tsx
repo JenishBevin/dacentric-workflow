@@ -240,6 +240,7 @@ function VendorMaster() {
         vendor={selected}
         canEdit={canEdit}
         canDelete={canDelete}
+        filterOptions={filterOptions}
         onClose={() => setSelected(null)}
         onRequestDelete={(v) => setPendingDelete(v)}
       />
@@ -277,24 +278,34 @@ function VendorDetailDrawer({
   vendor,
   canEdit,
   canDelete,
+  filterOptions,
   onClose,
   onRequestDelete,
 }: {
   vendor: Vendor | null;
   canEdit: boolean;
   canDelete: boolean;
+  filterOptions: VendorFilterOptions | undefined;
   onClose: () => void;
   onRequestDelete: (v: Vendor) => void;
 }) {
   const { push } = useToast();
   const updateDetails = useUpdateVendorDetails();
 
+  const [name, setName] = useState("");
+  const [services, setServices] = useState<string[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
+  const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [website, setWebsite] = useState("");
   const [vatNumber, setVatNumber] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
+    setName(vendor?.name ?? "");
+    setServices(vendor?.services ?? []);
+    setBrands(vendor?.brands ?? []);
+    setContacts(vendor && vendor.contacts.length > 0 ? vendor.contacts.map((c) => ({ name: c.name ?? "", phone: c.phone ?? "", email: c.email ?? "" })) : [emptyContactRow()]);
     setWebsite(vendor?.website ?? "");
     setVatNumber(vendor?.vatNumber ?? "");
     setAddress(vendor?.address ?? "");
@@ -303,15 +314,44 @@ function VendorDetailDrawer({
 
   if (!vendor) return null;
 
+  function updateContact(i: number, patch: Partial<ContactRow>) {
+    setContacts((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  const sameContacts = (a: ContactRow[], b: Vendor["contacts"]) =>
+    a.length === b.length && a.every((c, i) => c.name === (b[i].name ?? "") && c.phone === (b[i].phone ?? "") && c.email === (b[i].email ?? ""));
+
   const dirty =
-    website !== (vendor.website ?? "") || vatNumber !== (vendor.vatNumber ?? "") || address !== (vendor.address ?? "") || notes !== (vendor.notes ?? "");
+    name !== vendor.name ||
+    JSON.stringify(services) !== JSON.stringify(vendor.services) ||
+    JSON.stringify(brands) !== JSON.stringify(vendor.brands) ||
+    !sameContacts(contacts, vendor.contacts) ||
+    website !== (vendor.website ?? "") ||
+    vatNumber !== (vendor.vatNumber ?? "") ||
+    address !== (vendor.address ?? "") ||
+    notes !== (vendor.notes ?? "");
 
   async function handleSave() {
     if (!vendor) return;
+    if (!name.trim()) {
+      push({ variant: "error", title: "Vendor name is required." });
+      return;
+    }
     try {
       await updateDetails.mutateAsync({
         id: vendor.id,
-        input: { website: website || null, vatNumber: vatNumber || null, address: address || null, notes: notes || null },
+        input: {
+          name: name.trim(),
+          services,
+          brands,
+          contacts: contacts
+            .filter((c) => c.name.trim() || c.phone.trim() || c.email.trim())
+            .map((c) => ({ name: c.name.trim() || null, phone: c.phone.trim() || null, email: c.email.trim() || null })),
+          website: website || null,
+          vatNumber: vatNumber || null,
+          address: address || null,
+          notes: notes || null,
+        },
       });
       push({ variant: "success", title: "Vendor details saved." });
     } catch (err) {
@@ -344,24 +384,74 @@ function VendorDetailDrawer({
     >
       <div className="space-y-6">
         <section>
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <Tag className="h-3.5 w-3.5" /> Service categories
-          </h3>
-          <ChipList items={vendor.services} tone="indigo" />
+          <Label>Vendor Name</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} />
         </section>
 
         <section>
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <Award className="h-3.5 w-3.5" /> Brands carried
-          </h3>
-          <ChipList items={vendor.brands} tone="slate" />
+          {canEdit ? (
+            <TagInput
+              label="Service Categories"
+              placeholder="Type to search or add…"
+              value={services}
+              onChange={setServices}
+              options={filterOptions?.services ?? []}
+            />
+          ) : (
+            <>
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <Tag className="h-3.5 w-3.5" /> Service categories
+              </h3>
+              <ChipList items={vendor.services} tone="indigo" />
+            </>
+          )}
         </section>
 
         <section>
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <UsersIcon className="h-3.5 w-3.5" /> Contacts
-          </h3>
-          {vendor.contacts.length === 0 ? (
+          {canEdit ? (
+            <TagInput label="Brands Carried" placeholder="Type to search or add…" value={brands} onChange={setBrands} options={filterOptions?.brands ?? []} />
+          ) : (
+            <>
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <Award className="h-3.5 w-3.5" /> Brands carried
+              </h3>
+              <ChipList items={vendor.brands} tone="slate" />
+            </>
+          )}
+        </section>
+
+        <section>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <UsersIcon className="h-3.5 w-3.5" /> Contacts
+            </h3>
+            {canEdit && (
+              <Button type="button" variant="outline" size="sm" onClick={() => setContacts((rows) => [...rows, emptyContactRow()])}>
+                <Plus className="h-3.5 w-3.5" /> Add contact
+              </Button>
+            )}
+          </div>
+          {canEdit ? (
+            <div className="space-y-2">
+              {contacts.map((c, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input className="flex-1" placeholder="Name" value={c.name} onChange={(e) => updateContact(i, { name: e.target.value })} />
+                  <Input className="flex-1" placeholder="Phone" value={c.phone} onChange={(e) => updateContact(i, { phone: e.target.value })} />
+                  <Input className="flex-1" placeholder="Email" value={c.email} onChange={(e) => updateContact(i, { email: e.target.value })} />
+                  {contacts.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setContacts((rows) => rows.filter((_, idx) => idx !== i))}
+                      className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      aria-label="Remove contact"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : vendor.contacts.length === 0 ? (
             <p className="text-sm text-slate-400">No contacts on file.</p>
           ) : (
             <div className="space-y-2">

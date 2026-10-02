@@ -81,17 +81,51 @@ export async function getVendorFilterOptions() {
 }
 
 export interface VendorDetailsInput {
+  name?: string;
+  brands?: string[];
+  services?: string[];
+  contacts?: VendorContact[];
   website?: string | null;
   vatNumber?: string | null;
   address?: string | null;
   notes?: string | null;
 }
 
+/** Every field is independently optional — undefined means "leave as is",
+ *  not "clear it" — so the detail drawer can PATCH just the fields it
+ *  actually changed. name/brands/services/contacts were originally only
+ *  set at creation/import time; this lets any of them be corrected
+ *  afterward too. Renaming goes through the same case-insensitive
+ *  uniqueness check as createVendor/importVendorsFromExcel, so it can't
+ *  collide with another vendor — note that renaming also changes which
+ *  supplier a future Excel re-import would merge into, under its original
+ *  name, since that match is by name. */
 export async function updateVendorDetails(id: string, input: VendorDetailsInput, actor: AuthedUser) {
   const existing = await prisma.vendor.findUnique({ where: { id } });
   if (!existing) throw Errors.notFound("Vendor");
-  const updated = await prisma.vendor.update({ where: { id }, data: input });
-  await writeAudit({ actor, action: AuditAction.EDIT, entityType: "Vendor", entityId: id, afterValue: input, module: ModuleCode.ERP });
+
+  const data: Record<string, unknown> = {
+    website: input.website,
+    vatNumber: input.vatNumber,
+    address: input.address,
+    notes: input.notes,
+  };
+  if (input.brands !== undefined) data.brands = input.brands;
+  if (input.services !== undefined) data.services = input.services;
+  if (input.contacts !== undefined) data.contacts = input.contacts;
+
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw Errors.badRequest("Vendor name is required.");
+    if (name.toLowerCase() !== existing.name.toLowerCase()) {
+      const duplicate = await prisma.vendor.findFirst({ where: { name: { equals: name, mode: "insensitive" }, id: { not: id } } });
+      if (duplicate) throw Errors.conflict(`A vendor named "${duplicate.name}" already exists.`);
+    }
+    data.name = name;
+  }
+
+  const updated = await prisma.vendor.update({ where: { id }, data: data as any });
+  await writeAudit({ actor, action: AuditAction.EDIT, entityType: "Vendor", entityId: id, afterValue: data, module: ModuleCode.ERP });
   return updated;
 }
 

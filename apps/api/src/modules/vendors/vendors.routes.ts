@@ -9,6 +9,17 @@ import * as vendorsService from "./vendors.service";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
+// Shared between POST / (create) and PATCH /:id (edit) — both accept the
+// same free-form body shape (chip-input arrays, a repeatable contacts list).
+const toNullable = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+const toList = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim()) : []);
+const toContacts = (v: unknown) =>
+  Array.isArray(v)
+    ? v
+        .map((c) => ({ name: toNullable((c as any)?.name), phone: toNullable((c as any)?.phone), email: toNullable((c as any)?.email) }))
+        .filter((c) => c.name || c.phone || c.email)
+    : [];
+
 // Who sees "Add Vendor", can add one by hand, and can edit an existing
 // vendor's details — Admin and Finance (role code ESTIMATION — see
 // rolesSeed.ts) and Procurement deal with suppliers day to day, so they get
@@ -32,15 +43,6 @@ vendorsRouter.post(
   requireAnyRole(...VENDOR_EDITORS),
   asyncHandler(async (req, res) => {
     const body = req.body as Record<string, unknown>;
-    const toNullable = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
-    const toList = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim()) : []);
-    const toContacts = (v: unknown) =>
-      Array.isArray(v)
-        ? v
-            .map((c) => ({ name: toNullable((c as any)?.name), phone: toNullable((c as any)?.phone), email: toNullable((c as any)?.email) }))
-            .filter((c) => c.name || c.phone || c.email)
-        : [];
-
     if (typeof body.name !== "string" || !body.name.trim()) throw Errors.badRequest("Vendor name is required.");
 
     return created(
@@ -84,13 +86,23 @@ vendorsRouter.patch(
   "/:id",
   requireAnyRole(...VENDOR_EDITORS),
   asyncHandler(async (req, res) => {
-    const { website, vatNumber, address, notes } = req.body as Record<string, unknown>;
-    const toNullable = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+    const body = req.body as Record<string, unknown>;
+    if (typeof body.name === "string" && !body.name.trim()) throw Errors.badRequest("Vendor name is required.");
+
     return ok(
       res,
       await vendorsService.updateVendorDetails(
         req.params.id,
-        { website: toNullable(website), vatNumber: toNullable(vatNumber), address: toNullable(address), notes: toNullable(notes) },
+        {
+          name: typeof body.name === "string" ? body.name.trim() : undefined,
+          brands: body.brands !== undefined ? toList(body.brands) : undefined,
+          services: body.services !== undefined ? toList(body.services) : undefined,
+          contacts: body.contacts !== undefined ? toContacts(body.contacts) : undefined,
+          website: toNullable(body.website),
+          vatNumber: toNullable(body.vatNumber),
+          address: toNullable(body.address),
+          notes: toNullable(body.notes),
+        },
         req.user!
       )
     );
