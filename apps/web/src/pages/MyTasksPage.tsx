@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { List, LayoutGrid, Plus } from "lucide-react";
 import { useMyTasks } from "../api/misc";
 import { downloadExport } from "../api/misc";
-import { useQuickComplete, useMoveTask, useBulkDeleteTasks, useBulkMoveTasks } from "../api/tasks";
+import { useMoveTask, useBulkDeleteTasks, useBulkMoveTasks } from "../api/tasks";
 import { useBoardDetail, useBoards, usePersonalTasksBoard } from "../api/boards";
 import { Button, Checkbox, Skeleton, EmptyState, ErrorState, Badge } from "../components/ui/primitives";
 import { BulkActionBar } from "../components/ui/BulkActionBar";
@@ -52,7 +52,6 @@ export default function MyTasksPage() {
   const { push } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: groups, isLoading, isError, refetch } = useMyTasks();
-  const quickComplete = useQuickComplete();
   const moveTask = useMoveTask();
   const bulkDeleteTasks = useBulkDeleteTasks();
   const bulkMoveTasks = useBulkMoveTasks();
@@ -149,14 +148,6 @@ export default function MyTasksPage() {
   const canMoveTasks = true;
   const canExport = can(user, "EXPORT");
   const totalCount = useMemo(() => (groups ? Object.values(groups).reduce((sum: number, arr: any) => sum + arr.length, 0) : 0), [groups]);
-
-  async function complete(item: MyTaskItem) {
-    try {
-      await quickComplete.mutateAsync(item.id);
-    } catch (err) {
-      push({ variant: "error", title: "Could not complete task", description: extractApiError(err).message });
-    }
-  }
 
   async function performMove(stageId: string, followUp?: FollowUpChoice) {
     if (!moveItem) return;
@@ -260,7 +251,6 @@ export default function MyTasksPage() {
                   {items.map((item, idx) => (
                     <div key={item.id} className={clsx("flex flex-wrap items-center gap-3 px-3 py-2.5 sm:flex-nowrap", idx !== 0 && "border-t border-slate-100")}>
                       <Checkbox checked={selection.isSelected(item.id)} onChange={() => selection.toggle(item.id)} aria-label={`Select ${item.taskId}`} />
-                      <Checkbox checked={item.isCompleted} disabled={item.isCompleted} onChange={() => complete(item)} aria-label={`Complete ${item.taskId}`} />
                       <button onClick={() => openTask(item.id)} className="min-w-0 flex-1 text-left">
                         <span className="mr-1.5 text-xs text-slate-400">{item.taskId}</span>
                         <span className="text-sm font-medium text-slate-800 hover:text-brand-700">{item.title}</span>
