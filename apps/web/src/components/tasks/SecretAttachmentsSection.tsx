@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { format } from "date-fns";
-import { Lock, Download, Trash2, UploadCloud, Check, X as XIcon } from "lucide-react";
+import { Lock, Download, Eye, Trash2, UploadCloud, Check, X as XIcon } from "lucide-react";
 import { useTaskSecretAttachments, useUploadSecretAttachment, useDeleteSecretAttachment, useQuotationApprovalMutations } from "../../api/tasks";
 import { useToast } from "../../context/ToastContext";
 import { api, extractApiError } from "../../lib/apiClient";
@@ -63,6 +63,7 @@ export const SecretAttachmentsSection: React.FC<Props> = ({ taskId, approvalStat
   const [dragOver, setDragOver] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<SecretAttachment | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
 
   async function downloadAttachment(a: SecretAttachment) {
     setDownloadingId(a.id);
@@ -80,6 +81,28 @@ export const SecretAttachmentsSection: React.FC<Props> = ({ taskId, approvalStat
       push({ variant: "error", title: "Could not download file", description: extractApiError(err).message });
     } finally {
       setDownloadingId(null);
+    }
+  }
+
+  async function previewAttachment(a: SecretAttachment) {
+    // Opened synchronously, before the await below, so the browser still
+    // treats this as part of the click gesture — opening it only after the
+    // fetch resolves gets blocked as a popup by most browsers.
+    const previewWindow = window.open("", "_blank");
+    setPreviewingId(a.id);
+    try {
+      const res = await api.get(`/tasks/${taskId}/secret-attachments/${a.id}/download`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: a.mimeType }));
+      if (previewWindow) {
+        previewWindow.location.href = url;
+      } else {
+        push({ variant: "error", title: "Could not open preview", description: "Your browser blocked the popup — allow popups for this site and try again." });
+      }
+    } catch (err) {
+      previewWindow?.close();
+      push({ variant: "error", title: "Could not preview file", description: extractApiError(err).message });
+    } finally {
+      setPreviewingId(null);
     }
   }
 
@@ -181,6 +204,14 @@ export const SecretAttachmentsSection: React.FC<Props> = ({ taskId, approvalStat
                 {formatBytes(a.fileSizeBytes)} · {a.uploadedByName} · {format(new Date(a.createdAt), "d MMM, HH:mm")}
               </p>
             </div>
+            <button
+              onClick={() => previewAttachment(a)}
+              disabled={previewingId === a.id}
+              className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+              aria-label={`Preview ${a.fileName}`}
+            >
+              <Eye className="h-4 w-4" />
+            </button>
             <button
               onClick={() => downloadAttachment(a)}
               disabled={downloadingId === a.id}
