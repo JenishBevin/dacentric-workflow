@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Trello, ListChecks, Timer, Landmark, Wallet } from "lucide-react";
 import { useDashboard, useMyTasks, useTeamWorkload } from "../api/misc";
-import { useBoards } from "../api/boards";
 import { useActionableClaims } from "../api/claims";
 import { useWorkTimeToday, useWorkTimeSummary } from "../api/workTime";
 import { formatDuration } from "../hooks/useWorkTimer";
@@ -14,7 +13,7 @@ import { format, differenceInCalendarDays } from "date-fns";
 import { useAuth } from "../context/AuthContext";
 import { can, isAdmin } from "../lib/permissions";
 import clsx from "clsx";
-import { StatCard, BoardOverviewCard, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./dashboard/shared";
+import { StatCard, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./dashboard/shared";
 import DashboardManagementPage from "./dashboard/DashboardManagementPage";
 import { FollowUpWorkloadCard } from "./dashboard/FollowUpWorkloadCard";
 
@@ -28,13 +27,6 @@ export default function DashboardPage() {
   if (user?.roles.includes("MANAGEMENT")) return <DashboardManagementPage />;
 
   const { data, isLoading, isError, refetch } = useDashboard({});
-  // Org-wide viewers (System/Super Admin) see every board here, not just
-  // ones they happen to be an explicit member of.
-  const { data: boardsRaw } = useBoards({ scope: can(user, "VIEW_WORKFLOW", "ALL") ? "ALL" : "MY" });
-  // Enquiry List is a distinct feature from "Projects" (its own nav item,
-  // not filed under any Service) — excluded so this count/list matches what
-  // the Projects page actually shows.
-  const boards = React.useMemo(() => boardsRaw?.filter((b) => b.name !== "Enquiry List" && b.name !== "Estimation"), [boardsRaw]);
   const canViewWorkload = can(user, "VIEW_TEAM_WORKLOAD");
   // Same authority check as the Accounts page's own Approve/Reject buttons
   // (approveAccountsBoard/rejectAccountsBoard) — only shown to people who
@@ -179,24 +171,6 @@ export default function DashboardPage() {
               </div>
             </Card>
           </div>
-
-          {/* My Projects Overview */}
-          <Card className="p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-800">My Projects Overview</p>
-              <Link to="/workflow/boards" className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
-                View All Projects <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-            {boards && boards.length === 0 && <p className="py-6 text-center text-sm text-slate-400">You're not a member of any projects yet.</p>}
-            {boards && boards.length > 0 && (
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {boards.map((b) => (
-                  <BoardOverviewCard key={b.id} board={b} />
-                ))}
-              </div>
-            )}
-          </Card>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Team Workload (compact) */}

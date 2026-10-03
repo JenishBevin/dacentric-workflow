@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Flag, ThumbsDown, FileCheck2, Wallet } from "lucide-react";
 import { useDashboard, useDashboardTaskList, useTeamWorkload } from "../../api/misc";
-import { useBoards } from "../../api/boards";
 import { useActionableClaims } from "../../api/claims";
 import { Card, Skeleton, ErrorState, Avatar, AvatarGroup, Badge } from "../../components/ui/primitives";
 import { PriorityBadge, DueDateBadge } from "../../components/workflow/badges";
@@ -11,7 +10,7 @@ import { TaskDetailDrawer } from "../../components/tasks/TaskDetailDrawer";
 import { useAuth } from "../../context/AuthContext";
 import clsx from "clsx";
 import { FollowUpWorkloadCard } from "./FollowUpWorkloadCard";
-import { StatCard, BoardOverviewCard, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./shared";
+import { StatCard, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./shared";
 
 const PRIORITY_ORDER = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
 const PRIORITY_DOT: Record<string, string> = { URGENT: "bg-red-500", HIGH: "bg-orange-500", MEDIUM: "bg-amber-500", LOW: "bg-slate-400" };
@@ -28,11 +27,6 @@ export default function DashboardManagementPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data, isLoading, isError, refetch } = useDashboard({});
-  const { data: boardsRaw } = useBoards({ scope: "ALL" });
-  // Enquiry List is a distinct feature from "Projects" (its own nav item,
-  // not filed under any Service) — excluded so this list matches what the
-  // Projects page actually shows.
-  const boards = React.useMemo(() => boardsRaw?.filter((b) => b.name !== "Enquiry List" && b.name !== "Estimation"), [boardsRaw]);
   const { data: workload } = useTeamWorkload({});
   const { data: dueThisWeek } = useDashboardTaskList("DUE_THIS_WEEK");
   // listActionableClaims already scopes to exactly what Management can act
@@ -131,24 +125,6 @@ export default function DashboardManagementPage() {
               </div>
             </Card>
           </div>
-
-          {/* All Projects Overview */}
-          <Card className="p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-800">All Projects Overview</p>
-              <Link to="/workflow/boards" className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
-                View All Projects <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-            {boards && boards.length === 0 && <p className="py-6 text-center text-sm text-slate-400">No projects yet.</p>}
-            {boards && boards.length > 0 && (
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {boards.map((b) => (
-                  <BoardOverviewCard key={b.id} board={b} />
-                ))}
-              </div>
-            )}
-          </Card>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Team Workload — full org, top 8 */}

@@ -1,29 +1,14 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import { ListTodo } from "lucide-react";
 import { useDashboardTaskList } from "../../api/misc";
 import { Card, Skeleton, EmptyState, Badge, AvatarGroup } from "../../components/ui/primitives";
 import { PriorityBadge, DueDateBadge } from "../../components/workflow/badges";
 import { Modal } from "../../components/ui/Modal";
-import { Board } from "../../lib/types";
 import clsx from "clsx";
 
 // Stage names are board-defined (e.g. "Backlog", "In Progress", "Done"), so
 // colors are assigned by position rather than a fixed status enum.
 export const STATUS_PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#0ea5e9", "#ec4899", "#8b5cf6", "#94a3b8"];
-
-const BOARD_GRADIENTS = [
-  "from-indigo-500 to-purple-600",
-  "from-emerald-500 to-teal-600",
-  "from-amber-500 to-orange-600",
-  "from-sky-500 to-blue-600",
-  "from-pink-500 to-rose-600",
-  "from-violet-500 to-fuchsia-600",
-];
-export function gradientFor(id: string) {
-  const idx = id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % BOARD_GRADIENTS.length;
-  return BOARD_GRADIENTS[idx];
-}
 
 export const WORKLOAD_BAR: Record<string, string> = { LOW: "bg-emerald-500", MEDIUM: "bg-amber-500", HIGH: "bg-red-500" };
 
@@ -110,33 +95,6 @@ export function MiniStatCard({
       <p className="text-xl font-semibold text-slate-900">{value}</p>
       <p className="text-xs font-medium text-slate-500">{label}</p>
     </Card>
-  );
-}
-
-export function BoardOverviewCard({ board }: { board: Board }) {
-  const status =
-    board.overdueTaskCount > 0
-      ? { label: "At Risk", tone: "bg-red-500/90" }
-      : board.openTaskCount === 0
-      ? { label: "Complete", tone: "bg-emerald-500/90" }
-      : { label: "In Progress", tone: "bg-blue-500/90" };
-
-  return (
-    <Link
-      to={`/workflow/boards/${board.id}`}
-      className={clsx("relative flex h-32 w-64 shrink-0 flex-col justify-between overflow-hidden rounded-xl bg-gradient-to-br p-4 text-white shadow-sm transition-transform hover:scale-[1.02]", gradientFor(board.id))}
-    >
-      <div>
-        <span className={clsx("inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", status.tone)}>{status.label}</span>
-        <p className="mt-2 truncate text-sm font-semibold">{board.name}</p>
-      </div>
-      <div className="flex items-center justify-between text-xs text-white/90">
-        <span>
-          {board.openTaskCount} open{board.overdueTaskCount > 0 ? ` · ${board.overdueTaskCount} overdue` : ""}
-        </span>
-        <AvatarGroup names={board.members.map((m) => m.name)} max={3} />
-      </div>
-    </Link>
   );
 }
 
