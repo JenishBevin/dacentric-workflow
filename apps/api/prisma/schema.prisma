@@ -142,6 +142,9 @@ model Employee {
   laborCardNumber        String?
   bankName               String?
   bankAccountNumber      String?
+  // Passport-size professional photo kept on the HR record (ID cards, visa
+  // paperwork, letters) — separate from the linked user's avatar.
+  photoStorageKey        String?
 
   managedTeams Team[]    @relation("TeamManager")
   user         User?

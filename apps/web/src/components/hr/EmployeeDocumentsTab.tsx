@@ -15,6 +15,7 @@ import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
 import { fmtDate } from "../../lib/hrFormat";
 import { ExpiryBadge } from "./EmployeeOverviewTab";
+import { EmployeePhotoCard } from "./EmployeePhotoCard";
 
 export const DOCUMENT_CATEGORIES = [
   { value: "PASSPORT", label: "Passport" },
@@ -105,6 +106,8 @@ export function EmployeeDocumentsTab({ employee }: { employee: HrEmployee }) {
 
   return (
     <div className="space-y-4">
+      <EmployeePhotoCard employee={employee} />
+
       <Card className="p-4 sm:p-5">
         <h3 className="mb-3 text-sm font-semibold text-slate-900">Upload document</h3>
         <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

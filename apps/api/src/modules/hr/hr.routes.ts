@@ -36,6 +36,7 @@ import {
  * Mounted only outside production (see app.ts) until this is deployed.
  */
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const uploadPhoto = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 export const hrRouter = Router();
 hrRouter.use(authenticate);
@@ -82,6 +83,31 @@ hrRouter.delete(
   asyncHandler(async (req, res) => {
     await hr.deleteDocument(req.params.docId, req.user!);
     return ok(res, { message: "Document removed." });
+  })
+);
+
+hrRouter.get(
+  "/employees/:id/photo",
+  asyncHandler(async (req, res) => {
+    const { buffer, mimeType } = await hr.getEmployeePhoto(req.params.id);
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Cache-Control", "private, max-age=60");
+    res.send(buffer);
+  })
+);
+hrRouter.post(
+  "/employees/:id/photo",
+  uploadPhoto.single("file"),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw Errors.badRequest("No file was uploaded.");
+    return ok(res, await hr.uploadEmployeePhoto(req.params.id, req.file, req.user!));
+  })
+);
+hrRouter.delete(
+  "/employees/:id/photo",
+  asyncHandler(async (req, res) => {
+    await hr.removeEmployeePhoto(req.params.id, req.user!);
+    return ok(res, { message: "Photo removed." });
   })
 );
 
