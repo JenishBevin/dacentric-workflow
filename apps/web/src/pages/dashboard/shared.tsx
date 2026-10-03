@@ -99,7 +99,7 @@ export function MiniStatCard({
 }
 
 const BANNER_BUTTON = "flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25";
-const BANNER_BASE = "flex flex-col gap-4 rounded-xl bg-gradient-to-br p-5 text-white sm:flex-row sm:items-center sm:justify-between";
+const BANNER_BASE = "flex flex-col justify-between gap-4 rounded-xl bg-gradient-to-br p-5 text-white xl:flex-row xl:items-center";
 
 /** The four approval banners (tasks, Lost requests, quotations, claims) shown
  *  on the Management dashboard and the Super Admin dashboard. Counts are
@@ -117,7 +117,7 @@ export function ApprovalBanners({
 }) {
   const idle = "Nothing waiting on your review right now.";
   return (
-    <>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <div className={clsx(BANNER_BASE, "from-brand-600 to-purple-700")}>
         <div>
           <p className="text-base font-semibold">Pending Approvals</p>
@@ -159,7 +159,7 @@ export function ApprovalBanners({
           <Wallet className="h-4 w-4" /> Review Claims
         </button>
       </div>
-    </>
+    </div>
   );
 }
 
