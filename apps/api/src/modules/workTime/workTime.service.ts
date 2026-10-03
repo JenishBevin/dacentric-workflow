@@ -11,32 +11,38 @@ import { resolveScopedEmployeeIds } from "../teamWorkload/teamWorkload.service";
 // what every read/write path below reconciles against.
 const STALE_THRESHOLD_MS = 3 * 60 * 1000;
 
+// Day/week/month boundaries are computed in UAE time (UTC+4, no DST), not the
+// server's local zone — the production container runs in UTC, which made
+// "today" and "this month" roll over at 04:00 UAE instead of midnight.
+const UAE_OFFSET_MS = 4 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function uaeWallClock(d: Date): Date {
+  return new Date(d.getTime() + UAE_OFFSET_MS);
+}
+
 function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+  const w = uaeWallClock(d);
+  return new Date(Date.UTC(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate()) - UAE_OFFSET_MS);
 }
 
 function endOfDay(d: Date): Date {
-  const x = startOfDay(d);
-  x.setDate(x.getDate() + 1);
-  return x; // exclusive
+  return new Date(startOfDay(d).getTime() + DAY_MS); // exclusive
 }
 
 function startOfWeek(d: Date): Date {
-  const x = startOfDay(d);
-  x.setDate(x.getDate() - x.getDay()); // Sunday
-  return x;
+  return new Date(startOfDay(d).getTime() - uaeWallClock(d).getUTCDay() * DAY_MS); // Sunday
 }
 
 function startOfMonth(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
+  const w = uaeWallClock(d);
+  return new Date(Date.UTC(w.getUTCFullYear(), w.getUTCMonth(), 1) - UAE_OFFSET_MS);
 }
 
-/** Local YYYY-MM-DD — never use toISOString() for this, it shifts to UTC and
- * can land on the wrong day for any non-zero timezone offset. */
+/** UAE-local YYYY-MM-DD. */
 function dateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const w = uaeWallClock(d);
+  return `${w.getUTCFullYear()}-${String(w.getUTCMonth() + 1).padStart(2, "0")}-${String(w.getUTCDate()).padStart(2, "0")}`;
 }
 
 /** Seconds that [start,end) overlaps [rangeStart,rangeEnd). */
