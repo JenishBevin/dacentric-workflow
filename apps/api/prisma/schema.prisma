@@ -168,7 +168,7 @@ model EmployeeDocument {
   id            String   @id @default(uuid())
   employeeId    String
   employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  category      String   @default("OTHER") // PASSPORT | EMIRATES_ID | VISA | CONTRACT | CERTIFICATE | OTHER
+  category      String   @default("OTHER") // PHOTO | PASSPORT | EMIRATES_ID | VISA | CONTRACT | CERTIFICATE | OTHER
   title         String?
   fileName      String
   storageKey    String

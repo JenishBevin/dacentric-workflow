@@ -57,7 +57,7 @@ export type HrProfileInput = Partial<
 export interface EmployeeDocument {
   id: string;
   employeeId: string;
-  category: string; // PASSPORT | EMIRATES_ID | VISA | CONTRACT | CERTIFICATE | OTHER
+  category: string; // PHOTO | PASSPORT | EMIRATES_ID | VISA | CONTRACT | CERTIFICATE | OTHER
   title: string | null;
   fileName: string;
   mimeType: string;
