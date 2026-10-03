@@ -17,7 +17,6 @@ import { fmtDate } from "../../lib/hrFormat";
 import { ExpiryBadge } from "./EmployeeOverviewTab";
 
 export const DOCUMENT_CATEGORIES = [
-  { value: "PHOTO", label: "Passport Photo" },
   { value: "PASSPORT", label: "Passport" },
   { value: "EMIRATES_ID", label: "Emirates ID" },
   { value: "VISA", label: "Visa" },
@@ -114,13 +113,10 @@ export function EmployeeDocumentsTab({ employee }: { employee: HrEmployee }) {
             <input
               ref={fileRef}
               type="file"
-              accept={category === "PHOTO" ? "image/*" : undefined}
               onChange={onPickFile}
               className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
             />
-            <p className="mt-1 text-xs text-slate-400">
-              {category === "PHOTO" ? "Passport-size professional photo (JPG/PNG). Max 25 MB." : "Max 25 MB."}
-            </p>
+            <p className="mt-1 text-xs text-slate-400">Max 25 MB.</p>
           </div>
           <div>
             <Label>Category</Label>
