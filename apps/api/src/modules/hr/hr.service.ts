@@ -1,4 +1,3 @@
-import path from "path";
 import { prisma } from "../../lib/prisma";
 import { writeAudit } from "../../common/audit";
 import { AuthedUser } from "../../middleware/authenticate";
@@ -185,50 +184,6 @@ export async function deleteDocument(documentId: string, actor: AuthedUser) {
   await getStorageAdapter().remove(document.storageKey);
   await prisma.employeeDocument.delete({ where: { id: documentId } });
   await writeAudit({ actor, action: AuditAction.DELETE, entityType: "EmployeeDocument", entityId: documentId, beforeValue: { fileName: document.fileName }, module: ModuleCode.HRMS });
-}
-
-// --- Passport-size photo ---
-
-const PHOTO_MIME_BY_EXT: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-};
-const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
-
-export async function uploadEmployeePhoto(employeeId: string, file: Express.Multer.File, actor: AuthedUser) {
-  const employee = await loadEmployee(employeeId);
-
-  const ext = path.extname(file.originalname).toLowerCase();
-  if (!PHOTO_MIME_BY_EXT[ext]) throw Errors.validation("Photos must be PNG, JPG, or WEBP.", { file: "Photos must be PNG, JPG, or WEBP." });
-  if (file.size > PHOTO_MAX_BYTES) throw Errors.validation("Photos must be 5 MB or smaller.", { file: "Photos must be 5 MB or smaller." });
-  const scanResult = await scanFile(file.buffer);
-  if (scanResult === "REJECTED") throw Errors.validation("This file failed the security scan and was not stored.");
-
-  const storage = getStorageAdapter();
-  const { storageKey } = await storage.save(file.originalname, file.buffer);
-  await prisma.employee.update({ where: { id: employeeId }, data: { photoStorageKey: storageKey } });
-  if (employee.photoStorageKey) await storage.remove(employee.photoStorageKey).catch(() => undefined);
-
-  await writeAudit({ actor, action: AuditAction.EDIT, entityType: "Employee", entityId: employeeId, field: "photo", module: ModuleCode.HRMS });
-  return { photoStorageKey: storageKey };
-}
-
-export async function removeEmployeePhoto(employeeId: string, actor: AuthedUser) {
-  const employee = await loadEmployee(employeeId);
-  if (!employee.photoStorageKey) return;
-  await getStorageAdapter().remove(employee.photoStorageKey).catch(() => undefined);
-  await prisma.employee.update({ where: { id: employeeId }, data: { photoStorageKey: null } });
-  await writeAudit({ actor, action: AuditAction.EDIT, entityType: "Employee", entityId: employeeId, field: "photo", afterValue: null, module: ModuleCode.HRMS });
-}
-
-export async function getEmployeePhoto(employeeId: string) {
-  const employee = await loadEmployee(employeeId);
-  if (!employee.photoStorageKey) throw Errors.notFound("Photo");
-  const buffer = await getStorageAdapter().read(employee.photoStorageKey);
-  const ext = path.extname(employee.photoStorageKey).toLowerCase();
-  return { buffer, mimeType: PHOTO_MIME_BY_EXT[ext] ?? "application/octet-stream", fileName: `${employee.employeeCode}-photo${ext}` };
 }
 
 // --- Letters ---

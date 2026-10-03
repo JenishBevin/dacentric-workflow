@@ -1,6 +1,5 @@
 import axios from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
 import { api } from "../lib/apiClient";
 
 /**
@@ -41,8 +40,6 @@ export interface HrEmployee {
   laborCardNumber: string | null;
   bankName: string | null;
   bankAccountNumber: string | null;
-  /** Set when a passport-size photo is on file; changes on every upload, so it doubles as a cache key. */
-  photoStorageKey: string | null;
   user: { id: string; name: string; status: string; workEmail: string } | null;
   salaryStructure: SalaryStructure | null;
 }
@@ -451,36 +448,6 @@ export const useUploadEmployeeDocument = (id: string) =>
     if (v.expiryDate) fd.append("expiryDate", v.expiryDate);
     return send<EmployeeDocument>("post", `/employees/${id}/documents`, fd);
   });
-
-/** The passport-size photo as an object URL (fetched with the session's auth), or null when none is on file. */
-export function useEmployeePhotoUrl(id: string, photoKey: string | null) {
-  const { data: blob } = useQuery({
-    queryKey: ["hr", "employee", id, "photo", photoKey],
-    queryFn: () => fetchHrFile(`/employees/${id}/photo`),
-    enabled: !!photoKey,
-    staleTime: Infinity,
-  });
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!blob || !photoKey) {
-      setUrl(null);
-      return;
-    }
-    const objectUrl = URL.createObjectURL(blob);
-    setUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [blob, photoKey]);
-  return url;
-}
-
-export const useUploadEmployeePhoto = (id: string) =>
-  useHrMutation((file: File) => {
-    const fd = new FormData();
-    fd.append("file", file);
-    return send<{ photoStorageKey: string }>("post", `/employees/${id}/photo`, fd);
-  });
-
-export const useRemoveEmployeePhoto = (id: string) => useHrMutation(() => send("delete", `/employees/${id}/photo`));
 
 export const useDeleteEmployeeDocument = () => useHrMutation((docId: string) => send("delete", `/documents/${docId}`));
 
