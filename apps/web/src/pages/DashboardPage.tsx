@@ -11,9 +11,9 @@ import { PriorityBadge } from "../components/workflow/badges";
 import { TaskDetailDrawer } from "../components/tasks/TaskDetailDrawer";
 import { format, differenceInCalendarDays } from "date-fns";
 import { useAuth } from "../context/AuthContext";
-import { can, isAdmin } from "../lib/permissions";
+import { can, isAdmin, isSuperAdmin } from "../lib/permissions";
 import clsx from "clsx";
-import { StatCard, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./dashboard/shared";
+import { StatCard, ApprovalBanners, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./dashboard/shared";
 import DashboardManagementPage from "./dashboard/DashboardManagementPage";
 import { FollowUpWorkloadCard } from "./dashboard/FollowUpWorkloadCard";
 
@@ -233,6 +233,10 @@ export default function DashboardPage() {
               </ul>
             </Card>
           </div>
+
+          {isSuperAdmin(user) && (
+            <ApprovalBanners data={data} claimsCount={actionableClaims?.length ?? 0} onOpenStat={setOpenStat} onReviewClaims={() => navigate("/hrms/leave?tab=claim")} />
+          )}
 
           {/* Quick Create */}
           <div className="flex flex-col gap-4 rounded-xl bg-gradient-to-br from-brand-600 to-purple-700 p-5 text-white sm:flex-row sm:items-center sm:justify-between">

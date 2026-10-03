@@ -1,5 +1,5 @@
 import React from "react";
-import { ListTodo } from "lucide-react";
+import { ListTodo, ShieldCheck, ThumbsDown, FileCheck2, Wallet } from "lucide-react";
 import { useDashboardTaskList } from "../../api/misc";
 import { Card, Skeleton, EmptyState, Badge, AvatarGroup } from "../../components/ui/primitives";
 import { PriorityBadge, DueDateBadge } from "../../components/workflow/badges";
@@ -95,6 +95,71 @@ export function MiniStatCard({
       <p className="text-xl font-semibold text-slate-900">{value}</p>
       <p className="text-xs font-medium text-slate-500">{label}</p>
     </Card>
+  );
+}
+
+const BANNER_BUTTON = "flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25";
+const BANNER_BASE = "flex flex-col gap-4 rounded-xl bg-gradient-to-br p-5 text-white sm:flex-row sm:items-center sm:justify-between";
+
+/** The four approval banners (tasks, Lost requests, quotations, claims) shown
+ *  on the Management dashboard and the Super Admin dashboard. Counts are
+ *  already scoped server-side to whatever the viewer can see. */
+export function ApprovalBanners({
+  data,
+  claimsCount,
+  onOpenStat,
+  onReviewClaims,
+}: {
+  data: { pendingApprovals: number; pendingLost: number; pendingQuotationApproval: number };
+  claimsCount: number;
+  onOpenStat: (kind: StatKind) => void;
+  onReviewClaims: () => void;
+}) {
+  const idle = "Nothing waiting on your review right now.";
+  return (
+    <>
+      <div className={clsx(BANNER_BASE, "from-brand-600 to-purple-700")}>
+        <div>
+          <p className="text-base font-semibold">Pending Approvals</p>
+          <p className="text-sm text-white/80">{data.pendingApprovals > 0 ? `${data.pendingApprovals} task(s) waiting on your review.` : idle}</p>
+        </div>
+        <button onClick={() => onOpenStat("PENDING_APPROVAL")} className={BANNER_BUTTON}>
+          <ShieldCheck className="h-4 w-4" /> Review Approvals
+        </button>
+      </div>
+
+      <div className={clsx(BANNER_BASE, "from-red-500 to-rose-700")}>
+        <div>
+          <p className="text-base font-semibold">Review Lost Projects</p>
+          <p className="text-sm text-white/80">{data.pendingLost > 0 ? `${data.pendingLost} enquiry(ies) requesting to be marked Lost.` : idle}</p>
+        </div>
+        <button onClick={() => onOpenStat("PENDING_LOST")} className={BANNER_BUTTON}>
+          <ThumbsDown className="h-4 w-4" /> Review Lost Projects
+        </button>
+      </div>
+
+      {/* Separate from the generic Pending Approvals above — see decideQuotation in tasks.service.ts. */}
+      <div className={clsx(BANNER_BASE, "from-teal-500 to-cyan-700")}>
+        <div>
+          <p className="text-base font-semibold">Submit Quotation Approvals</p>
+          <p className="text-sm text-white/80">{data.pendingQuotationApproval > 0 ? `${data.pendingQuotationApproval} quotation(s) waiting on your approval.` : idle}</p>
+        </div>
+        <button onClick={() => onOpenStat("PENDING_QUOTATION")} className={BANNER_BUTTON}>
+          <FileCheck2 className="h-4 w-4" /> Review Quotations
+        </button>
+      </div>
+
+      {/* Acted on from the Claim tab, not here (see claims.service.ts listActionableClaims). */}
+      <div className={clsx(BANNER_BASE, "from-amber-500 to-orange-700")}>
+        <div>
+          <p className="text-base font-semibold">Claim Settlement Approvals</p>
+          <p className="text-sm text-white/80">{claimsCount > 0 ? `${claimsCount} claim(s) waiting on your approval.` : idle}</p>
+        </div>
+        <button onClick={onReviewClaims} className={BANNER_BUTTON}>
+          <Wallet className="h-4 w-4" /> Review Claims
+        </button>
+      </div>
+    </>
   );
 }
 

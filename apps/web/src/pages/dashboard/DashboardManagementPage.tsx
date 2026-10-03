@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Flag, ThumbsDown, FileCheck2, Wallet } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, LayoutGrid, ListTodo, ShieldCheck, ArrowRight, Flag } from "lucide-react";
 import { useDashboard, useDashboardTaskList, useTeamWorkload } from "../../api/misc";
 import { useActionableClaims } from "../../api/claims";
 import { Card, Skeleton, ErrorState, Avatar, AvatarGroup, Badge } from "../../components/ui/primitives";
@@ -10,7 +10,7 @@ import { TaskDetailDrawer } from "../../components/tasks/TaskDetailDrawer";
 import { useAuth } from "../../context/AuthContext";
 import clsx from "clsx";
 import { FollowUpWorkloadCard } from "./FollowUpWorkloadCard";
-import { StatCard, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./shared";
+import { StatCard, ApprovalBanners, DonutCenter, StatDrillDownModal, StatKind, STATUS_PALETTE, WORKLOAD_BAR, greeting } from "./shared";
 
 const PRIORITY_ORDER = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
 const PRIORITY_DOT: Record<string, string> = { URGENT: "bg-red-500", HIGH: "bg-orange-500", MEDIUM: "bg-amber-500", LOW: "bg-slate-400" };
@@ -190,77 +190,7 @@ export default function DashboardManagementPage() {
             </Card>
           </div>
 
-          {/* Pending Approvals — the one action Management actually takes here */}
-          <div className="flex flex-col gap-4 rounded-xl bg-gradient-to-br from-brand-600 to-purple-700 p-5 text-white sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-base font-semibold">Pending Approvals</p>
-              <p className="text-sm text-white/80">
-                {data.pendingApprovals > 0 ? `${data.pendingApprovals} task(s) waiting on your review.` : "Nothing waiting on your review right now."}
-              </p>
-            </div>
-            <button
-              onClick={() => setOpenStat("PENDING_APPROVAL")}
-              className="flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25"
-            >
-              <ShieldCheck className="h-4 w-4" /> Review Approvals
-            </button>
-          </div>
-
-          {/* Review Lost Projects — Enquiry List "Lost" requests waiting on sign-off */}
-          <div className="flex flex-col gap-4 rounded-xl bg-gradient-to-br from-red-500 to-rose-700 p-5 text-white sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-base font-semibold">Review Lost Projects</p>
-              <p className="text-sm text-white/80">
-                {data.pendingLost > 0 ? `${data.pendingLost} enquiry(ies) requesting to be marked Lost.` : "Nothing waiting on your review right now."}
-              </p>
-            </div>
-            <button
-              onClick={() => setOpenStat("PENDING_LOST")}
-              className="flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25"
-            >
-              <ThumbsDown className="h-4 w-4" /> Review Lost Projects
-            </button>
-          </div>
-
-          {/* Submit Quotation Approvals — the Estimation board's "Submit
-              Quotation" upload, separate from the generic Pending Approvals
-              above (see decideQuotation in tasks.service.ts). */}
-          <div className="flex flex-col gap-4 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-700 p-5 text-white sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-base font-semibold">Submit Quotation Approvals</p>
-              <p className="text-sm text-white/80">
-                {data.pendingQuotationApproval > 0
-                  ? `${data.pendingQuotationApproval} quotation(s) waiting on your approval.`
-                  : "Nothing waiting on your review right now."}
-              </p>
-            </div>
-            <button
-              onClick={() => setOpenStat("PENDING_QUOTATION")}
-              className="flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25"
-            >
-              <FileCheck2 className="h-4 w-4" /> Review Quotations
-            </button>
-          </div>
-
-          {/* Claim Settlement Approvals — expense claims waiting on
-              Management's decision (stage 2 of 3, see claims.service.ts's
-              listActionableClaims); acted on from the Claim tab, not here. */}
-          <div className="flex flex-col gap-4 rounded-xl bg-gradient-to-br from-amber-500 to-orange-700 p-5 text-white sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-base font-semibold">Claim Settlement Approvals</p>
-              <p className="text-sm text-white/80">
-                {(actionableClaims?.length ?? 0) > 0
-                  ? `${actionableClaims!.length} claim(s) waiting on your approval.`
-                  : "Nothing waiting on your review right now."}
-              </p>
-            </div>
-            <button
-              onClick={() => navigate("/hrms/leave?tab=claim")}
-              className="flex items-center gap-2 rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium backdrop-blur hover:bg-white/25"
-            >
-              <Wallet className="h-4 w-4" /> Review Claims
-            </button>
-          </div>
+          <ApprovalBanners data={data} claimsCount={actionableClaims?.length ?? 0} onOpenStat={setOpenStat} onReviewClaims={() => navigate("/hrms/leave?tab=claim")} />
 
           <StatDrillDownModal kind={openStat} onClose={() => setOpenStat(null)} onOpenTask={setDrillDownTaskId} />
           <TaskDetailDrawer taskId={drillDownTaskId} onClose={() => setDrillDownTaskId(null)} onDeleted={() => setDrillDownTaskId(null)} />
