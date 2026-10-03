@@ -1,10 +1,19 @@
 import { env } from "../env";
 
+export interface EmailAttachment {
+  filename: string;
+  content: string | Buffer;
+  contentType: string;
+}
+
 export interface EmailMessage {
   to: string;
+  cc?: string[];
+  replyTo?: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: EmailAttachment[];
 }
 
 /** Email abstraction — swap the adapter without touching call sites. */
@@ -16,7 +25,7 @@ class ConsoleEmailAdapter implements EmailAdapter {
   async send(message: EmailMessage): Promise<void> {
     // eslint-disable-next-line no-console
     console.log(
-      `\n----- [DEV EMAIL] -----\nTo: ${message.to}\nSubject: ${message.subject}\n${message.text ?? message.html}\n------------------------\n`
+      `\n----- [DEV EMAIL] -----\nTo: ${message.to}\n${message.cc?.length ? `Cc: ${message.cc.join(", ")}\n` : ""}Subject: ${message.subject}\n${message.text ?? message.html}\n------------------------\n`
     );
   }
 }
@@ -46,9 +55,12 @@ class SmtpEmailAdapter implements EmailAdapter {
     const info = await transporter.sendMail({
       from: env.smtp.from,
       to: message.to,
+      cc: message.cc?.length ? message.cc : undefined,
+      replyTo: message.replyTo,
       subject: message.subject,
       html: message.html,
       text: message.text,
+      attachments: message.attachments,
     });
     // Ethereal (and a couple of other nodemailer-friendly test services)
     // hand back a direct link to view the exact message that was "sent" —
@@ -57,7 +69,9 @@ class SmtpEmailAdapter implements EmailAdapter {
     const previewUrl = nodemailer.getTestMessageUrl(info);
     if (previewUrl) {
       // eslint-disable-next-line no-console
-      console.log(`\n----- [SMTP PREVIEW] -----\nTo: ${message.to}\nSubject: ${message.subject}\n${previewUrl}\n---------------------------\n`);
+      console.log(
+        `\n----- [SMTP PREVIEW] -----\nTo: ${message.to}\n${message.cc?.length ? `Cc: ${message.cc.join(", ")}\n` : ""}Subject: ${message.subject}\n${previewUrl}\n---------------------------\n`
+      );
     }
   }
 }
@@ -93,8 +107,24 @@ class SendGridEmailAdapter implements EmailAdapter {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        personalizations: [{ to: [{ email: message.to }] }],
+        personalizations: [
+          {
+            to: [{ email: message.to }],
+            ...(message.cc?.length ? { cc: message.cc.map((email) => ({ email })) } : {}),
+          },
+        ],
         from: parseFromHeader(env.sendgrid.from),
+        ...(message.replyTo ? { reply_to: { email: message.replyTo } } : {}),
+        ...(message.attachments?.length
+          ? {
+              attachments: message.attachments.map((a) => ({
+                content: Buffer.from(a.content).toString("base64"),
+                filename: a.filename,
+                type: a.contentType,
+                disposition: "attachment",
+              })),
+            }
+          : {}),
         subject: message.subject,
         content: [
           ...(message.text ? [{ type: "text/plain", value: message.text }] : []),

@@ -122,13 +122,221 @@ model Employee {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // Full HR profile (request 1008) — all optional so existing employees stay valid.
+  phone                  String?
+  personalEmail          String?
+  dateOfBirth            DateTime?
+  gender                 String?
+  nationality            String?
+  maritalStatus          String?
+  address                String?
+  emergencyContactName   String?
+  emergencyContactPhone  String?
+  joiningDate            DateTime?
+  passportNumber         String?
+  passportExpiry         DateTime?
+  emiratesId             String?
+  emiratesIdExpiry       DateTime?
+  visaNumber             String?
+  visaExpiry             DateTime?
+  laborCardNumber        String?
+  bankName               String?
+  bankAccountNumber      String?
+
   managedTeams Team[]    @relation("TeamManager")
   user         User?
   leaveRequests LeaveRequest[] @relation("LeaveEmployee")
   leaveHandovers LeaveRequest[] @relation("LeaveHandoverTo")
   expenseClaims ExpenseClaim[] @relation("ClaimEmployee")
+  hrDocuments   EmployeeDocument[]
+  hrHistory     EmployeeHistory[]
+  hrLetters     HrLetter[]
+  salaryStructure SalaryStructure?
+  payslips      Payslip[]
 
   @@index([departmentId])
+}
+
+// ----------------------------------------------------------------------
+// HRMS expansion (request 1008): employee documents/letters/history,
+// recruitment, payroll. createdBy/uploadedBy ids are plain strings (with a
+// name snapshot where shown) rather than User relations, so these tables
+// don't need back-relations on the production-critical User model.
+// ----------------------------------------------------------------------
+
+model EmployeeDocument {
+  id            String   @id @default(uuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  category      String   @default("OTHER") // PASSPORT | EMIRATES_ID | VISA | CONTRACT | CERTIFICATE | OTHER
+  title         String?
+  fileName      String
+  storageKey    String
+  mimeType      String
+  fileSizeBytes Int
+  expiryDate    DateTime?
+  uploadedById  String
+  uploadedByName String
+  scanStatus    String   @default("CLEAN")
+  createdAt     DateTime @default(now())
+
+  @@index([employeeId])
+}
+
+model EmployeeHistory {
+  id          String   @id @default(uuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  eventType   String   // JOINED | DESIGNATION_CHANGE | DEPARTMENT_CHANGE | SALARY_REVISION | STATUS_CHANGE | LETTER_ISSUED | DOCUMENT_UPLOADED | NOTE
+  title       String
+  details     String?
+  eventDate   DateTime @default(now())
+  createdById String?
+  createdByName String?
+  createdAt   DateTime @default(now())
+
+  @@index([employeeId, eventDate])
+}
+
+/// A letter generated from the Employee page (offer/appointment/experience/
+/// relieving/salary certificate/other). `data` keeps the exact fields used so
+/// the PDF can be regenerated identically later.
+model HrLetter {
+  id          String   @id @default(uuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  letterType  String   // OFFER | APPOINTMENT | EXPERIENCE | RELIEVING | SALARY_CERTIFICATE | OTHER
+  refNo       String
+  issueDate   DateTime
+  data        Json
+  createdById String
+  createdByName String
+  createdAt   DateTime @default(now())
+
+  @@index([employeeId, letterType])
+}
+
+model Candidate {
+  id              String   @id @default(uuid())
+  fullName        String
+  email           String?
+  phone           String?
+  designation     String   // the role they applied for — CV bank is organised by this
+  source          String?  // LinkedIn / Referral / Walk-in / Agency ...
+  experienceYears Float?
+  currentCompany  String?
+  currentSalary   Float?
+  expectedSalary  Float?
+  noticePeriodDays Int?
+  notes           String?
+  status          String   @default("NEW") // NEW | SCREENING | INTERVIEW | SELECTED | REJECTED | OFFERED | ACCEPTED | DECLINED | JOINED
+  // CV file (optional)
+  cvFileName      String?
+  cvStorageKey    String?
+  cvMimeType      String?
+  cvFileSizeBytes Int?
+  cvUploadedAt    DateTime?
+  // Offer
+  offerRefNo      String?
+  offerDate       DateTime?
+  offeredDesignation String?
+  offeredSalary   Float?
+  offerBasic      Float?
+  offerHousing    Float?
+  offerTransport  Float?
+  offerOther      Float?
+  offerTerms      String?
+  // Joining
+  joiningDate     DateTime?
+  joiningStatus   String?  // PENDING | JOINED | NO_SHOW
+  joiningNotes    String?
+  joiningChecklist Json?   // { documentsReceived, medicalDone, idCardIssued, laptopIssued, emailCreated }
+  employeeId      String?  // set when converted into an Employee
+  createdById     String
+  createdByName   String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  interviews      CandidateInterview[]
+
+  @@index([designation])
+  @@index([status])
+}
+
+model CandidateInterview {
+  id            String    @id @default(uuid())
+  candidateId   String
+  candidate     Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  round         String    // e.g. HR Screening, Technical, Final
+  scheduledAt   DateTime
+  mode          String    @default("ONSITE") // ONSITE | VIDEO | PHONE
+  interviewerName String
+  status        String    @default("SCHEDULED") // SCHEDULED | COMPLETED | CANCELLED | NO_SHOW
+  rating        Int?      // 1-5
+  result        String?   // PASS | FAIL | HOLD
+  feedback      String?
+  locationOrLink String?  // address or video-call link, shown in the invitation email
+  inviteSentAt  DateTime?
+  inviteSentTo  String?
+  inviteCc      String?   // comma-separated
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([candidateId])
+  @@index([scheduledAt])
+}
+
+model SalaryStructure {
+  id                String   @id @default(uuid())
+  employeeId        String   @unique
+  employee          Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  basicSalary       Float    @default(0)
+  housingAllowance  Float    @default(0)
+  transportAllowance Float   @default(0)
+  otherAllowance    Float    @default(0)
+  effectiveFrom     DateTime @default(now())
+  updatedById       String?
+  updatedByName     String?
+  updatedAt         DateTime @updatedAt
+}
+
+model PayrollRun {
+  id            String   @id @default(uuid())
+  month         String   @unique // YYYY-MM
+  status        String   @default("DRAFT") // DRAFT | PROCESSED | PAID
+  processedAt   DateTime?
+  paidAt        DateTime?
+  createdById   String
+  createdByName String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  payslips      Payslip[]
+}
+
+model Payslip {
+  id               String     @id @default(uuid())
+  runId            String
+  run              PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId       String
+  employee         Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  basicSalary      Float
+  housingAllowance Float
+  transportAllowance Float
+  otherAllowance   Float
+  bonus            Float      @default(0)
+  grossEarnings    Float
+  daysInMonth      Int
+  unpaidLeaveDays  Float      @default(0)
+  leaveDeduction   Float      @default(0)
+  otherDeduction   Float      @default(0)
+  deductionNote    String?
+  netPay           Float
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@unique([runId, employeeId])
+  @@index([employeeId])
 }
 
 /// The single platform account. One login serves CRM/ERP/HRMS/Workflow.

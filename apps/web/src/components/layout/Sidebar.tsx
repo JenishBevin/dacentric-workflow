@@ -28,6 +28,19 @@ import {
   DatabaseBackup,
   ChevronDown,
   X,
+  UserPlus,
+  Banknote,
+  BarChart3,
+  Users,
+  FileText,
+  CalendarClock,
+  UserCheck,
+  Mail,
+  LogIn,
+  Layers,
+  Receipt,
+  CalendarCheck,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { can, isSuperAdmin } from "../../lib/permissions";
@@ -43,6 +56,8 @@ interface NavItem {
   icon: React.ElementType;
   visible: boolean;
   badge?: number;
+  /** Collapsible sub-menu; the parent row itself has no page. */
+  children?: NavItem[];
 }
 
 interface NavSectionProps {
@@ -99,8 +114,42 @@ export const Sidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => void 
     { key: "crm.customers", to: "/workflow/customers", label: "Customers", icon: Building2, visible: !isStaff && !isRestricted("crm.customers") && hasModule("CRM") && can(user, "VIEW_WORKFLOW") },
   ];
 
+  // Request 1008 (HRMS expansion) is localhost-only until deployed, so the
+  // rename and the new Recruitment/Payroll/Reports menus are all gated here.
+  // Salary/ID data is HR-only on the API too (canManageHr in modules/hr).
+  const canUseHr = !isStaff && hasModule("HRMS") && (user?.roles.some((r) => ["HR", "SYSTEM_ADMIN", "SUPER_ADMIN"].includes(r)) || can(user, "MANAGE_USERS", "ALL"));
+  const hrChild = (key: string, to: string, label: string, icon: React.ElementType): NavItem => ({ key, to, label, icon, visible: !!canUseHr && !isRestricted(key) });
+  const hrGroup = (to: string, label: string, icon: React.ElementType, children: NavItem[]): NavItem => ({ to, label, icon, visible: children.some((c) => c.visible), children });
+
   const hrmsItems: NavItem[] = [
-    { key: "hrms.employees", to: "/settings/employees", label: "Employees", icon: Contact, visible: !isStaff && !isRestricted("hrms.employees") && hasModule("HRMS") },
+    {
+      key: "hrms.employees",
+      to: "/settings/employees",
+      label: "Employee Management",
+      icon: Contact,
+      visible: !isStaff && !isRestricted("hrms.employees") && hasModule("HRMS"),
+    },
+    hrGroup("/hrms/recruitment", "Recruitment", UserPlus, [
+      hrChild("hrms.recruitment.candidates", "/hrms/recruitment/candidates", "Candidate Management", Users),
+      hrChild("hrms.recruitment.cv-bank", "/hrms/recruitment/cv-bank", "CV Management", FileText),
+      hrChild("hrms.recruitment.interviews", "/hrms/recruitment/interviews", "Interview Management", CalendarClock),
+      hrChild("hrms.recruitment.selection", "/hrms/recruitment/selection", "Candidate Selection", UserCheck),
+      hrChild("hrms.recruitment.offers", "/hrms/recruitment/offers", "Offer Letter Generation", Mail),
+      hrChild("hrms.recruitment.joining", "/hrms/recruitment/joining", "Joining Details", LogIn),
+    ]),
+    hrGroup("/hrms/payroll", "Payroll", Banknote, [
+      hrChild("hrms.payroll.structure", "/hrms/payroll/structure", "Salary Structure", Layers),
+      hrChild("hrms.payroll.processing", "/hrms/payroll/processing", "Payroll Processing", Calculator),
+      hrChild("hrms.payroll.payslips", "/hrms/payroll/payslips", "Payslip Generation", Receipt),
+      hrChild("hrms.payroll.reports", "/hrms/payroll/reports", "Salary Reports", BarChart3),
+    ]),
+    hrGroup("/hrms/reports", "Reports", BarChart3, [
+      hrChild("hrms.reports.employees", "/hrms/reports/employees", "Employee Reports", Users),
+      hrChild("hrms.reports.attendance", "/hrms/reports/attendance", "Attendance Reports", CalendarCheck),
+      hrChild("hrms.reports.leave", "/hrms/reports/leave", "Leave Reports", ClipboardList),
+      hrChild("hrms.reports.payroll", "/hrms/reports/payroll", "Payroll Reports", Wallet),
+      hrChild("hrms.reports.recruitment", "/hrms/reports/recruitment", "Recruitment Reports", UserPlus),
+    ]),
   ];
 
   const erpItems: NavItem[] = [{ key: "erp.erp", to: "/erp", label: "Vendor List", icon: Package, visible: !isStaff && !isRestricted("erp.erp") && hasModule("ERP") }];
@@ -211,7 +260,10 @@ const ModuleGroup: React.FC<{ title: string; items: NavItem[]; onNavigate?: () =
   const visible = items.filter((i) => i.visible);
   const location = useLocation();
   const navigate = useNavigate();
-  const containsActive = visible.some((i) => location.pathname.startsWith(i.to)) || (!!dashboardTo && location.pathname === dashboardTo);
+  const containsActive =
+    visible.some((i) => location.pathname.startsWith(i.to) || i.children?.some((c) => location.pathname.startsWith(c.to))) || (!!dashboardTo && location.pathname === dashboardTo);
+  // The Employee page lives under /hrms/employees/:id but its menu item is /settings/employees.
+  const onEmployeePage = title === "HRMS" && location.pathname.startsWith("/hrms/employees");
   const [open, setOpen] = React.useState(true);
 
   if (!visible.length) return null;
@@ -236,8 +288,48 @@ const ModuleGroup: React.FC<{ title: string; items: NavItem[]; onNavigate?: () =
       </button>
       {open && (
         <div className="mt-1 flex flex-col gap-0.5">
-          {visible.map((item) => (
-            <SidebarLink key={item.to} {...item} onNavigate={onNavigate} />
+          {visible.map((item) =>
+            item.children ? (
+              <SidebarSubGroup key={item.to} item={item} onNavigate={onNavigate} />
+            ) : (
+              <SidebarLink key={item.to} {...item} forceActive={onEmployeePage && item.to === "/settings/employees"} onNavigate={onNavigate} />
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** Collapsible parent row with indented children (HRMS: Recruitment / Payroll / Reports). */
+const SidebarSubGroup: React.FC<{ item: NavItem; onNavigate?: () => void }> = ({ item, onNavigate }) => {
+  const location = useLocation();
+  const kids = (item.children ?? []).filter((c) => c.visible);
+  const active = kids.some((k) => location.pathname.startsWith(k.to));
+  const [open, setOpen] = React.useState(active);
+  React.useEffect(() => {
+    if (active) setOpen(true);
+  }, [active]);
+  if (!kids.length) return null;
+  const Icon = item.icon;
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={clsx(
+          "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+          active ? "text-white" : "text-slate-300 hover:bg-white/5 hover:text-white"
+        )}
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="flex-1 text-left">{item.label}</span>
+        <ChevronDown className={clsx("h-3.5 w-3.5 shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-white/10 pl-2">
+          {kids.map((k) => (
+            <SidebarLink key={k.to} {...k} onNavigate={onNavigate} />
           ))}
         </div>
       )}
@@ -245,7 +337,7 @@ const ModuleGroup: React.FC<{ title: string; items: NavItem[]; onNavigate?: () =
   );
 };
 
-const SidebarLink: React.FC<NavItem & { onNavigate?: () => void }> = ({ to, label, icon: Icon, badge, onNavigate }) => (
+const SidebarLink: React.FC<NavItem & { onNavigate?: () => void; forceActive?: boolean }> = ({ to, label, icon: Icon, badge, onNavigate, forceActive }) => (
   <NavLink
     to={to}
     end={to === "/"}
@@ -253,7 +345,7 @@ const SidebarLink: React.FC<NavItem & { onNavigate?: () => void }> = ({ to, labe
     className={({ isActive }) =>
       clsx(
         "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
-        isActive ? "bg-brand-600 text-white shadow-sm" : "text-slate-300 hover:bg-white/5 hover:text-white"
+        isActive || forceActive ? "bg-brand-600 text-white shadow-sm" : "text-slate-300 hover:bg-white/5 hover:text-white"
       )
     }
   >

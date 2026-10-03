@@ -18,6 +18,7 @@ import { useToast } from "../../context/ToastContext";
 import { extractApiError } from "../../lib/apiClient";
 import { useAuth } from "../../context/AuthContext";
 import { can, isSuperAdmin } from "../../lib/permissions";
+import { useNavigate } from "react-router-dom";
 
 interface EmployeeRow {
   id: string;
@@ -37,6 +38,8 @@ interface EmployeeRow {
 export default function EmployeesSettingsPage() {
   const { user } = useAuth();
   const canManage = can(user, "MANAGE_USERS", "ALL");
+  const navigate = useNavigate();
+  const canOpenProfile = (canManage || !!user?.roles.some((r) => r === "HR" || r === "SYSTEM_ADMIN" || r === "SUPER_ADMIN"));
   const { push } = useToast();
   const [search, setSearch] = useState("");
   const { data: employees, isLoading, isError, refetch } = useAllEmployees(search);
@@ -76,7 +79,7 @@ export default function EmployeesSettingsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Employees</h1>
+          <h1 className="text-lg font-semibold text-slate-900">Employee Management</h1>
           <p className="text-sm text-slate-500">
             {canManage
               ? "HR records — job title, department, team. Link one to a login from Settings → Users."
@@ -118,9 +121,21 @@ export default function EmployeesSettingsPage() {
             </thead>
             <tbody>
               {sortedEmployees.map((e) => (
-                <tr key={e.id} className="border-b border-slate-100 last:border-0">
+                <tr
+                  key={e.id}
+                  className={`border-b border-slate-100 last:border-0 ${canOpenProfile ? "cursor-pointer hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none" : ""}`}
+                  {...(canOpenProfile
+                    ? {
+                        tabIndex: 0,
+                        onClick: () => navigate(`/hrms/employees/${e.id}`),
+                        onKeyDown: (ev: React.KeyboardEvent<HTMLTableRowElement>) => {
+                          if (ev.key === "Enter" && ev.target === ev.currentTarget) navigate(`/hrms/employees/${e.id}`);
+                        },
+                      }
+                    : {})}
+                >
                   <td className="px-4 py-2.5">
-                    <p className="font-medium text-slate-800">{e.fullName}</p>
+                    <p className={`font-medium ${canOpenProfile ? "text-brand-700 hover:underline" : "text-slate-800"}`}>{e.fullName}</p>
                     <p className="text-xs text-slate-400">{e.workEmail}</p>
                   </td>
                   <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{e.employeeCode}</td>
@@ -135,7 +150,7 @@ export default function EmployeesSettingsPage() {
                     <Badge tone={e.isActive ? "green" : "slate"}>{e.isActive ? "Active" : "Inactive"}</Badge>
                   </td>
                   {canManage && (
-                    <td className="px-4 py-2.5 text-right">
+                    <td className="px-4 py-2.5 text-right" onClick={(ev) => ev.stopPropagation()}>
                       <Button variant="ghost" size="sm" onClick={() => setEditEmployee(e)}>
                         Edit
                       </Button>

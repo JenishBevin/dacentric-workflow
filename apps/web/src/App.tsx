@@ -45,6 +45,23 @@ const NotificationSettingsPage = lazy(() => import("./pages/settings/Notificatio
 const AuditTrailPage = lazy(() => import("./pages/settings/AuditTrailPage"));
 const BackupSettingsPage = lazy(() => import("./pages/settings/BackupSettingsPage"));
 const RequestPage = lazy(() => import("./pages/RequestPage"));
+// HRMS expansion (request 1008) — localhost-only until deployed.
+const EmployeeDetailPage = lazy(() => import("./pages/hrms/EmployeeDetailPage"));
+const CandidatesPage = lazy(() => import("./pages/hrms/recruitment/CandidatesPage"));
+const CvBankPage = lazy(() => import("./pages/hrms/recruitment/CvBankPage"));
+const InterviewsPage = lazy(() => import("./pages/hrms/recruitment/InterviewsPage"));
+const SelectionPage = lazy(() => import("./pages/hrms/recruitment/SelectionPage"));
+const OfferLettersPage = lazy(() => import("./pages/hrms/recruitment/OfferLettersPage"));
+const JoiningPage = lazy(() => import("./pages/hrms/recruitment/JoiningPage"));
+const SalaryStructurePage = lazy(() => import("./pages/hrms/payroll/SalaryStructurePage"));
+const PayrollProcessingPage = lazy(() => import("./pages/hrms/payroll/PayrollProcessingPage"));
+const PayslipsPage = lazy(() => import("./pages/hrms/payroll/PayslipsPage"));
+const SalaryReportsPage = lazy(() => import("./pages/hrms/payroll/SalaryReportsPage"));
+const EmployeeReportPage = lazy(() => import("./pages/hrms/reports/EmployeeReportPage"));
+const AttendanceReportPage = lazy(() => import("./pages/hrms/reports/AttendanceReportPage"));
+const LeaveReportPage = lazy(() => import("./pages/hrms/reports/LeaveReportPage"));
+const PayrollReportPage = lazy(() => import("./pages/hrms/reports/PayrollReportPage"));
+const RecruitmentReportPage = lazy(() => import("./pages/hrms/reports/RecruitmentReportPage"));
 const TicketsPage = lazy(() => import("./pages/TicketsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
@@ -111,6 +128,25 @@ export default function App() {
           <Route path="/workflow/customers/:customerId" element={<CustomerDetailPage />} />
           <Route path="/erp" element={<ErpHomePage />} />
           <Route path="/hrms/leave" element={<RequestPage />} />
+          <Route path="/hrms/employees/:employeeId" element={<EmployeeDetailPage />} />
+          <Route path="/hrms/recruitment" element={<Navigate to="/hrms/recruitment/candidates" replace />} />
+          <Route path="/hrms/recruitment/candidates" element={<CandidatesPage />} />
+          <Route path="/hrms/recruitment/cv-bank" element={<CvBankPage />} />
+          <Route path="/hrms/recruitment/interviews" element={<InterviewsPage />} />
+          <Route path="/hrms/recruitment/selection" element={<SelectionPage />} />
+          <Route path="/hrms/recruitment/offers" element={<OfferLettersPage />} />
+          <Route path="/hrms/recruitment/joining" element={<JoiningPage />} />
+          <Route path="/hrms/payroll" element={<Navigate to="/hrms/payroll/structure" replace />} />
+          <Route path="/hrms/payroll/structure" element={<SalaryStructurePage />} />
+          <Route path="/hrms/payroll/processing" element={<PayrollProcessingPage />} />
+          <Route path="/hrms/payroll/payslips" element={<PayslipsPage />} />
+          <Route path="/hrms/payroll/reports" element={<SalaryReportsPage />} />
+          <Route path="/hrms/reports" element={<Navigate to="/hrms/reports/employees" replace />} />
+          <Route path="/hrms/reports/employees" element={<EmployeeReportPage />} />
+          <Route path="/hrms/reports/attendance" element={<AttendanceReportPage />} />
+          <Route path="/hrms/reports/leave" element={<LeaveReportPage />} />
+          <Route path="/hrms/reports/payroll" element={<PayrollReportPage />} />
+          <Route path="/hrms/reports/recruitment" element={<RecruitmentReportPage />} />
           <Route path="/tickets" element={<TicketsPage />} />
           <Route path="/settings/profile" element={<MyProfilePage />} />
           <Route path="/settings/users" element={<UsersSettingsPage />} />
